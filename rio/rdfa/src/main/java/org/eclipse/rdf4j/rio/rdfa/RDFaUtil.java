@@ -20,7 +20,6 @@ import java.util.Map;
  * @author Bart.Hanssens
  */
 public class RDFaUtil {
-
 	/**
 	 * Build the initial context from a JSON-LD context file
 	 * 
