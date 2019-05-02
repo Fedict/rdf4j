@@ -10,6 +10,7 @@ package org.eclipse.rdf4j.rio.rdfa;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.Reader;
+
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -22,13 +23,13 @@ import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.vocabulary.RDF;
 import org.eclipse.rdf4j.model.vocabulary.XMLSchema;
+
 import org.eclipse.rdf4j.rio.RDFFormat;
 import org.eclipse.rdf4j.rio.RDFHandlerException;
 import org.eclipse.rdf4j.rio.RDFParseException;
 import org.eclipse.rdf4j.rio.RDFParser;
 import org.eclipse.rdf4j.rio.RioSetting;
 import org.eclipse.rdf4j.rio.helpers.AbstractRDFParser;
-import org.eclipse.rdf4j.rio.helpers.BasicParserSettings;
 
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -107,14 +108,43 @@ public class RDFaParser extends AbstractRDFParser implements RDFParser {
 		return result;
 	}
 
+	/**
+	 * Handle a namespace
+	 * 
+	 * @param prefix
+	 * @param ns 
+	 */
+	protected void handleNS(String prefix, String ns) {
+		rdfHandler.handleNamespace(prefix, ns);
+	}
+
+	/**
+	 * Handle a triple statement
+	 * 
+	 * @param subj
+	 * @param pred
+	 * @param obj 
+	 */
 	protected void handleTriple(Resource subj, IRI pred, Value obj) {
 		rdfHandler.handleStatement(valueFactory.createStatement(subj, pred, pred));
 	}
 
+	/**
+	 * Handle an error
+	 * 
+	 * @param msg
+	 * @throws RDFParseException 
+	 */
 	protected void error(String msg) throws RDFParseException {
 		reportError(msg, null);
 	}
 
+	/**
+	 * Handle a fatal error
+	 * 
+	 * @param msg
+	 * @throws RDFParseException 
+	 */
 	protected void fatalError(String msg) throws RDFParseException {
 		reportFatalError(msg);
 	}
@@ -124,6 +154,7 @@ public class RDFaParser extends AbstractRDFParser implements RDFParser {
 		private final static String SRC = "src";
 		private final static String LANG = "lang";
 		private final static String XML_LANG = "xml:lang";
+		private final static String DATATYPE = "datatype";
 		// RDFa-Lite subset
 		private final static String PREFIX = "prefix";
 		private final static String PROPERTY = "property";
@@ -135,18 +166,21 @@ public class RDFaParser extends AbstractRDFParser implements RDFParser {
 		private final static String CONTENT = "content";
 		private final static String REL = "rel";
 
-		// keep track of vocabularies and subjects
+		// keep track of vocabularies, subjects and language
 		private final TreeMap<Integer,Map<String,String>> localNS = new TreeMap<>();
+		private int lastNSLevel = -1;
 		private final TreeMap<Integer,Resource> localSubject = new TreeMap<>();
+		private int lastSubjectLevel = -1;
 		private final TreeMap<Integer,String> localLang = new TreeMap<>();
-	
+		private int lastLangLevel = -1;
+
 		/**
 		 * Constructor
 		 */
 		public ElementNodeVisitor() {
-			localNS.put(0, INITIAL_CONTEXT);
-			localSubject.put(0, createNode());
-			localLang.put(0, "");
+			localNS.put(lastNSLevel, INITIAL_CONTEXT);
+			localSubject.put(lastSubjectLevel, createNode());
+			localLang.put(lastLangLevel, "");
 		}
 
 		/**
@@ -185,25 +219,47 @@ public class RDFaParser extends AbstractRDFParser implements RDFParser {
 		 * This namespace could be defined on the element itself or on an ancestor element.
 		 * 
 		 * @param prefix prefix
-		 * @return URI of the namespace as string
+		 * @return URI of the namespace as string, or null if not found
 		 */
 		private String getNamespace(String prefix) {
-			String ns = "";
+			String ns;
 			for (Map.Entry<Integer, Map<String,String>> e: localNS.descendingMap().entrySet()) {
-				ns = e.getValue().getOrDefault(prefix, "");
-				if (!ns.isEmpty()) {
+				ns = e.getValue().get(prefix);
+				if (ns != null) {
 					return ns;
 				}
 			}
-			return ns;
+			return null;
 		}
 
+		/**
+		 * Expand prefixed string
+		 * 
+		 * @param str
+		 * @return fully IRI as a string
+		 */
+		private String expandPrefix(String str) {
+			String[] parts = str.split(":", 2);
+			String prefix = (parts.length == 1) ? "" : parts[0];
+			String ns = getNamespace(prefix);
+			return (ns != null) ? ns + parts[parts.length-1] : null;
+		}
+
+		/**
+		 * Check if the element has an xml:lang or lang attribute (in that order) for declaring the language.
+		 * This is only valid for the element itself and its descendants, so it must be removed when 
+		 * JSoup is finished with processing the element.
+		 * 
+		 * @param el element
+		 * @param depth depth of the element in the DOM structure
+		 */
 		private void checkLanguage(Element el, int depth) {
 			String lang = el.attr(XML_LANG);
 			if (lang == null) {
 				lang = el.attr(LANG);
 				if (lang != null) {
 					localLang.put(depth, lang);
+					lastLangLevel = depth;
 				}
 			}
 		}
@@ -224,7 +280,9 @@ public class RDFaParser extends AbstractRDFParser implements RDFParser {
 
 			Map<String, String> ctx = new HashMap<>();
 			ctx.put("", vocab);
+			handleNS("", vocab);
 			localNS.put(depth, ctx);
+			lastNSLevel = depth;
 		}
 
 		/**
@@ -245,14 +303,10 @@ public class RDFaParser extends AbstractRDFParser implements RDFParser {
 			// there can be multiple prefix + namespace pairs in one attribute, also separated with whitespaces
 			String[] splits = prefixes.split(" +");
 			int len = splits.length;
-			if (len < 2) {
-				error("Empty prefix or namespace " + el.tagName() + " " + prefixes);
-				return;
-			}
 			if (len % 2 != 0) {
-				error("Empty prefix or namespace " + el.tagName() + " " + prefixes);
-				len--;
+				fatalError("Error processing namespaces " + el.tagName() + " " + prefixes);
 			}
+
 			// Keep track of depth: namespaces are valid for the element itself and descendants,
 			// so they must be removed at the end of the element.
 			// The prefix can also locally hide/change a prefix previously set by an ancestor element.
@@ -261,40 +315,45 @@ public class RDFaParser extends AbstractRDFParser implements RDFParser {
 				if (splits[i].endsWith(":")) {
 					String prefix = splits[i].substring(0, splits[i].length()-1);
 					ctx.put(prefix, splits[i+1]);
+					handleNS(prefix, splits[i+1]);
 				} else {
 					error("Prefix doesn't end with ':' " + el.tagName() + " " + splits[i]);
 				}
 				localNS.put(depth, ctx);
+				lastNSLevel = depth;
 			}
 		}
 
+		/**
+		 * 
+		 * @param el
+		 * @param depth 
+		 */
 		private void checkResource(Element el, int depth) {
 			String resource = el.attr(RESOURCE);
 			if (resource == null || resource.isEmpty()) {
 				return;
 			}
 			localSubject.put(depth, createURI(toAbsolute(resource)));
+			lastSubjectLevel = depth;
 		}
 
 		/**
 		 * Check if the element has a property attribute for declaring the predicate of a triple.
 		 * 
 		 * @param el element
-		 * @param depth 
+		 * @param depth depth in DOM structure
 		 */
 		private void checkProperty(Element el, int depth) {
 			String prop = el.attr(PROPERTY);
 			if (prop == null || prop.isEmpty()) {
 				return;
 			}
-			
-			String[] splits = prop.split(":", 2);
-			String prefix = (splits.length == 1) ? "" : splits[0];
-			String ns = getNamespace(prefix);
-			if (ns.isEmpty()) {
-				error("Could not find namespace for " + el + " " + prefix);
+			String iri = expandPrefix(prop);
+			if (iri.isEmpty()) {
+				error("Could not find namespace for " + el + " " + prop);
 			}
-			IRI pred = createURI(ns + splits[splits.length-1]);
+			IRI pred = createURI(iri);
 
 			Value val;
 			// href or src attribute value takes precedence over text content
@@ -302,25 +361,50 @@ public class RDFaParser extends AbstractRDFParser implements RDFParser {
 			if (url == null) {
 				url = el.attr(SRC);
 			}
+			
 			if (url == null) {
-				String txt = el.text();
+				// content attribute value takes precedence over text node
+				String txt = el.attr(CONTENT);
 				if (txt == null) {
-					error("No href/src attribute and no content " + el);
-					txt = "";
+					txt = el.text();
+					if (txt == null) {
+						error("No href/src attribute, no content attribute and no text node " + el);
+						txt = "";
+					}
 				}
-				val = createLiteral(txt, getLanguage(), XMLSchema.STRING);
+				String type = el.attr(DATATYPE);
+				if (type != null) {
+					type = expandPrefix(type);
+					if (type == null) {
+						error("Could not expand datatype for " + el);
+					}
+				}
+				IRI datatype = (type != null) ? createURI(type) : XMLSchema.STRING;
+				val = createLiteral(txt, getLanguage(), datatype);
 			} else {
 				val = createURI(url);
 			}
 			handleTriple(getSubject(), pred, val);
 		}
 
+		/* Check if the element has a typeOf attribute for declaring the RDF class of the subject.
+		 * 
+		 * @param el element
+		 * @param depth depth in DOM structure
+		 */
 		private void checkTypeof(Element el, int depth) {
 			String type = el.attr(TYPEOF);
 			if (type == null || type.isEmpty()) {
 				return;
 			}
 			IRI obj = createURI(type);
+
+			// typeof without resource implictly creates a blank node subject
+			if (lastSubjectLevel != depth) {
+				Resource blank = createNode();
+				localSubject.put(depth, blank);
+				lastSubjectLevel = depth;
+			}
 			handleTriple(getSubject(), RDF.TYPE, obj);
 		}
 
@@ -344,9 +428,18 @@ public class RDFaParser extends AbstractRDFParser implements RDFParser {
 		public void tail(Node node, int i) {
 			if (node instanceof Element) {
 				// remove out-of-scope namespaces, subject and language
-				localNS.remove(i);
-				localSubject.remove(i);
-				localLang.remove(i);
+				if (i == lastNSLevel) {
+					localNS.remove(i);
+					lastNSLevel = localNS.lastKey();
+				}
+				if (i == lastSubjectLevel) {
+					localSubject.remove(i);
+					lastSubjectLevel = localSubject.lastKey();
+				}
+				if (i == lastLangLevel) {
+					localLang.remove(i);
+					lastLangLevel = localLang.lastKey();
+				}
 			}
 		}
 	}
