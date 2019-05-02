@@ -21,6 +21,7 @@ import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.ValueFactory;
 import org.eclipse.rdf4j.model.vocabulary.RDF;
+import org.eclipse.rdf4j.model.vocabulary.XMLSchema;
 import org.eclipse.rdf4j.rio.RDFFormat;
 import org.eclipse.rdf4j.rio.RDFHandlerException;
 import org.eclipse.rdf4j.rio.RDFParseException;
@@ -106,16 +107,7 @@ public class RDFaParser extends AbstractRDFParser implements RDFParser {
 		return result;
 	}
 
-	protected IRI createIRI(String str) {
-		try {
-			return valueFactory.createIRI(str);
-		} catch (IllegalArgumentException iae) {
-			reportError(iae, BasicParserSettings.VERIFY_URI_SYNTAX);
-		}
-		return null;
-	}
-
-	protected void createTriple(Resource subj, IRI pred, Value obj) {
+	protected void handleTriple(Resource subj, IRI pred, Value obj) {
 		rdfHandler.handleStatement(valueFactory.createStatement(subj, pred, pred));
 	}
 
@@ -130,6 +122,8 @@ public class RDFaParser extends AbstractRDFParser implements RDFParser {
 	private class ElementNodeVisitor implements NodeVisitor {
 		private final static String HREF = "href";
 		private final static String SRC = "src";
+		private final static String LANG = "lang";
+		private final static String XML_LANG = "xml:lang";
 		// RDFa-Lite subset
 		private final static String PREFIX = "prefix";
 		private final static String PROPERTY = "property";
@@ -142,36 +136,85 @@ public class RDFaParser extends AbstractRDFParser implements RDFParser {
 		private final static String REL = "rel";
 
 		// keep track of vocabularies and subjects
-		private final TreeMap<Integer,Map<String,String>> localNS;
-		private final TreeMap<Integer,Resource> localSubject;
+		private final TreeMap<Integer,Map<String,String>> localNS = new TreeMap<>();
+		private final TreeMap<Integer,Resource> localSubject = new TreeMap<>();
+		private final TreeMap<Integer,String> localLang = new TreeMap<>();
 	
-		protected ElementNodeVisitor() {
-			localNS = new TreeMap<>();
+		/**
+		 * Constructor
+		 */
+		public ElementNodeVisitor() {
 			localNS.put(0, INITIAL_CONTEXT);
-
-			localSubject = new TreeMap<>();
+			localSubject.put(0, createNode());
+			localLang.put(0, "");
 		}
 
-		protected String geFullURI(String str) {
+		/**
+		 * Get absolute URI, using baseURL to convert relative URLs and local names.
+		 * 
+		 * @param str string
+		 * @return absolute URL
+		 */
+		private String toAbsolute(String str) {
 			return (str.startsWith("#") || !str.contains(":")) ? baseURL + str : str;
 		}
 
-		private String getNamespace(String str) {
+		/**
+		 * Get subject.
+		 * The subject could be defined on the element itself or on an ancestor element.
+		 * 
+		 * @return subject IRI or blank node
+		 */
+		private Resource getSubject() {
+			return localSubject.get(localSubject.lastKey());
+		}
+
+		/**
+		 * Get language.
+		 * The language could be defined on the element itself or on an ancestor element.
+		 * 
+		 * @param prefix prefix
+		 * @return language code
+		 */
+		private String getLanguage() {
+			return localLang.get(localLang.lastKey());
+		}
+
+		/**
+		 * Get namespace associated with a prefix.
+		 * This namespace could be defined on the element itself or on an ancestor element.
+		 * 
+		 * @param prefix prefix
+		 * @return URI of the namespace as string
+		 */
+		private String getNamespace(String prefix) {
 			String ns = "";
 			for (Map.Entry<Integer, Map<String,String>> e: localNS.descendingMap().entrySet()) {
-				ns = e.getValue().getOrDefault(str, "");
+				ns = e.getValue().getOrDefault(prefix, "");
 				if (!ns.isEmpty()) {
 					return ns;
 				}
 			}
 			return ns;
 		}
-	
+
+		private void checkLanguage(Element el, int depth) {
+			String lang = el.attr(XML_LANG);
+			if (lang == null) {
+				lang = el.attr(LANG);
+				if (lang != null) {
+					localLang.put(depth, lang);
+				}
+			}
+		}
+
 		/**
-		 * Check if the element has a vocab attribute for declaring local namespace.
+		 * Check if the element has a vocab attribute for declaring the local vocabulary namespace.
+		 * This is only valid for the element itself and its descendants, so it must be removed when 
+		 * JSoup is finished with processing the element.
 		 * 
-		 * @param el
-		 * @param depth 
+		 * @param el element
+		 * @param depth depth of the element in the DOM structure
 		 */
 		private void checkVocab(Element el, int depth) {
 			String vocab = el.attr(VOCAB);
@@ -186,9 +229,11 @@ public class RDFaParser extends AbstractRDFParser implements RDFParser {
 
 		/**
 		 * Check if the element has a prefix attribute for declaring local namespaces.
+		 * They are only valid for the element itself and its descendants, so they must be removed when 
+		 * JSoup is finished with processing the element.
 		 * 
-		 * @param el
-		 * @param depth 
+		 * @param el element
+		 * @param depth depth in DOM structure
 		 */
 		private void checkPrefixes(Element el, int depth) {
 			String prefixes = el.attr(PREFIX);
@@ -208,8 +253,9 @@ public class RDFaParser extends AbstractRDFParser implements RDFParser {
 				error("Empty prefix or namespace " + el.tagName() + " " + prefixes);
 				len--;
 			}
-			// keep track of depth: namespaces are also valid for child elements,
-			// but should be removed at the end of the element
+			// Keep track of depth: namespaces are valid for the element itself and descendants,
+			// so they must be removed at the end of the element.
+			// The prefix can also locally hide/change a prefix previously set by an ancestor element.
 			Map<String,String> ctx = localNS.getOrDefault(depth, new HashMap<>());
 			for (int i = 0 ; i < len; i += 2) {
 				if (splits[i].endsWith(":")) {
@@ -227,13 +273,13 @@ public class RDFaParser extends AbstractRDFParser implements RDFParser {
 			if (resource == null || resource.isEmpty()) {
 				return;
 			}
-			IRI subj = createIRI(getFullURI(resource));
+			localSubject.put(depth, createURI(toAbsolute(resource)));
 		}
 
 		/**
-		 * Check if the element has a property attribute for declaring predicate.
+		 * Check if the element has a property attribute for declaring the predicate of a triple.
 		 * 
-		 * @param el
+		 * @param el element
 		 * @param depth 
 		 */
 		private void checkProperty(Element el, int depth) {
@@ -248,17 +294,25 @@ public class RDFaParser extends AbstractRDFParser implements RDFParser {
 			if (ns.isEmpty()) {
 				error("Could not find namespace for " + el + " " + prefix);
 			}
-			IRI pred = createIRI(ns + splits[splits.length-1]);
+			IRI pred = createURI(ns + splits[splits.length-1]);
 
-			// href or src attribute takes precedence over text content
+			Value val;
+			// href or src attribute value takes precedence over text content
 			String url = el.attr(HREF);
-			if (url == null || url.isEmpty()) {
+			if (url == null) {
 				url = el.attr(SRC);
 			}
-			if (url != null || !url.isEmpty()) {
-				
+			if (url == null) {
+				String txt = el.text();
+				if (txt == null) {
+					error("No href/src attribute and no content " + el);
+					txt = "";
+				}
+				val = createLiteral(txt, getLanguage(), XMLSchema.STRING);
+			} else {
+				val = createURI(url);
 			}
-			el.text();
+			handleTriple(getSubject(), pred, val);
 		}
 
 		private void checkTypeof(Element el, int depth) {
@@ -266,8 +320,8 @@ public class RDFaParser extends AbstractRDFParser implements RDFParser {
 			if (type == null || type.isEmpty()) {
 				return;
 			}
-			IRI obj = createIRI(resource);
-			createTriple(, RDF.TYPE, obj);
+			IRI obj = createURI(type);
+			handleTriple(getSubject(), RDF.TYPE, obj);
 		}
 
 		@Override
@@ -275,6 +329,8 @@ public class RDFaParser extends AbstractRDFParser implements RDFParser {
 			if (node instanceof Element) {
 				Element el = (Element) node;
 
+				checkLanguage(el, i);
+				
 				checkVocab(el, i);
 				checkPrefixes(el, i);
 
@@ -287,9 +343,10 @@ public class RDFaParser extends AbstractRDFParser implements RDFParser {
 		@Override
 		public void tail(Node node, int i) {
 			if (node instanceof Element) {
-				// remove out-of-scope namespaces 
+				// remove out-of-scope namespaces, subject and language
 				localNS.remove(i);
 				localSubject.remove(i);
+				localLang.remove(i);
 			}
 		}
 	}
