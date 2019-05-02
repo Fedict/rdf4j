@@ -150,27 +150,13 @@ public class RDFaParser extends AbstractRDFParser implements RDFParser {
 	}
 
 	private class ElementNodeVisitor implements NodeVisitor {
-		private final static String HREF = "href";
-		private final static String SRC = "src";
-		private final static String LANG = "lang";
-		private final static String XML_LANG = "xml:lang";
-		private final static String DATATYPE = "datatype";
-		// RDFa-Lite subset
-		private final static String PREFIX = "prefix";
-		private final static String PROPERTY = "property";
-		private final static String RESOURCE = "resource";
-		private final static String TYPEOF = "typeof";
-		private final static String VOCAB = "vocab";
-		// Other RDFa "full"
-		private final static String ABOUT = "about";
-		private final static String CONTENT = "content";
-		private final static String REL = "rel";
-
 		// keep track of vocabularies, subjects and language
 		private final TreeMap<Integer,Map<String,String>> localNS = new TreeMap<>();
 		private int lastNSLevel = -1;
-		private final TreeMap<Integer,Resource> localSubject = new TreeMap<>();
-		private int lastSubjectLevel = -1;
+		private final TreeMap<Integer,Resource> localSubj = new TreeMap<>();
+		private int lastSubjLevel = -1;
+		private final TreeMap<Integer,Resource> localPred= new TreeMap<>();
+		private int lastPredLevel = -1;
 		private final TreeMap<Integer,String> localLang = new TreeMap<>();
 		private int lastLangLevel = -1;
 
@@ -179,8 +165,9 @@ public class RDFaParser extends AbstractRDFParser implements RDFParser {
 		 */
 		public ElementNodeVisitor() {
 			localNS.put(lastNSLevel, INITIAL_CONTEXT);
-			localSubject.put(lastSubjectLevel, createNode());
+			localSubj.put(lastSubjLevel, createNode());
 			localLang.put(lastLangLevel, "");
+			// localPred remains empty
 		}
 
 		/**
@@ -197,10 +184,20 @@ public class RDFaParser extends AbstractRDFParser implements RDFParser {
 		 * Get subject.
 		 * The subject could be defined on the element itself or on an ancestor element.
 		 * 
-		 * @return subject IRI or blank node
+		 * @return subject IRI/blank node or null
 		 */
 		private Resource getSubject() {
-			return localSubject.get(localSubject.lastKey());
+			return localSubj.get(localSubj.lastKey());
+		}
+
+		/**
+		 * Get predicate.
+		 * The predicate could be defined on the element itself or on an ancestor element.
+		 * 
+		 * @return subject IRI or null
+		 */
+		private Resource getPredicate() {
+			return localPred.get(localPred.lastKey());
 		}
 
 		/**
@@ -254,9 +251,9 @@ public class RDFaParser extends AbstractRDFParser implements RDFParser {
 		 * @param depth depth of the element in the DOM structure
 		 */
 		private void checkLanguage(Element el, int depth) {
-			String lang = el.attr(XML_LANG);
+			String lang = el.attr(RDFaUtil.XML_LANG);
 			if (lang == null) {
-				lang = el.attr(LANG);
+				lang = el.attr(RDFaUtil.LANG);
 				if (lang != null) {
 					localLang.put(depth, lang);
 					lastLangLevel = depth;
@@ -273,7 +270,7 @@ public class RDFaParser extends AbstractRDFParser implements RDFParser {
 		 * @param depth depth of the element in the DOM structure
 		 */
 		private void checkVocab(Element el, int depth) {
-			String vocab = el.attr(VOCAB);
+			String vocab = el.attr(RDFaUtil.VOCAB);
 			if (vocab == null || vocab.isEmpty()) {
 				return;
 			}
@@ -294,7 +291,7 @@ public class RDFaParser extends AbstractRDFParser implements RDFParser {
 		 * @param depth depth in DOM structure
 		 */
 		private void checkPrefixes(Element el, int depth) {
-			String prefixes = el.attr(PREFIX);
+			String prefixes = el.attr(RDFaUtil.PREFIX);
 			if (prefixes == null || prefixes.isEmpty()) {
 				return;
 			}
@@ -325,17 +322,39 @@ public class RDFaParser extends AbstractRDFParser implements RDFParser {
 		}
 
 		/**
+		 * Check if the element has a rel attribute for declaring the predicate of a series of triples.
 		 * 
-		 * @param el
-		 * @param depth 
+		 * @param el element
+		 * @param depth depth in DOM structure
 		 */
-		private void checkResource(Element el, int depth) {
-			String resource = el.attr(RESOURCE);
-			if (resource == null || resource.isEmpty()) {
+		private void checkRel(Element el, int depth) {
+			String rel = el.attr(RDFaUtil.REL);
+			if (rel == null) {
 				return;
 			}
-			localSubject.put(depth, createURI(toAbsolute(resource)));
-			lastSubjectLevel = depth;
+			if (rel.isEmpty()) {
+				error("Empty rel attribute for " + el);
+			}
+			localPred.put(depth, createURI(toAbsolute(rel)));
+			lastPredLevel = depth;
+		}
+
+		/**
+		 * Check if the element has a resource attribute for declaring the subject of a triple.
+		 * 
+		 * @param el element
+		 * @param depth depth in DOM structure
+		 */
+		private void checkResource(Element el, int depth) {
+			String resource = el.attr(RDFaUtil.RESOURCE);
+			if (resource == null) {
+				return;
+			}
+			if (resource.isEmpty()) {
+				error("Empty resource attribute for " + el);
+			}
+			localSubj.put(depth, createURI(toAbsolute(resource)));
+			lastSubjLevel = depth;
 		}
 
 		/**
@@ -345,7 +364,7 @@ public class RDFaParser extends AbstractRDFParser implements RDFParser {
 		 * @param depth depth in DOM structure
 		 */
 		private void checkProperty(Element el, int depth) {
-			String prop = el.attr(PROPERTY);
+			String prop = el.attr(RDFaUtil.PROPERTY);
 			if (prop == null || prop.isEmpty()) {
 				return;
 			}
@@ -357,14 +376,14 @@ public class RDFaParser extends AbstractRDFParser implements RDFParser {
 
 			Value val;
 			// href or src attribute value takes precedence over text content
-			String url = el.attr(HREF);
+			String url = el.attr(RDFaUtil.HREF);
 			if (url == null) {
-				url = el.attr(SRC);
+				url = el.attr(RDFaUtil.SRC);
 			}
 			
 			if (url == null) {
 				// content attribute value takes precedence over text node
-				String txt = el.attr(CONTENT);
+				String txt = el.attr(RDFaUtil.CONTENT);
 				if (txt == null) {
 					txt = el.text();
 					if (txt == null) {
@@ -372,7 +391,7 @@ public class RDFaParser extends AbstractRDFParser implements RDFParser {
 						txt = "";
 					}
 				}
-				String type = el.attr(DATATYPE);
+				String type = el.attr(RDFaUtil.DATATYPE);
 				if (type != null) {
 					type = expandPrefix(type);
 					if (type == null) {
@@ -393,17 +412,17 @@ public class RDFaParser extends AbstractRDFParser implements RDFParser {
 		 * @param depth depth in DOM structure
 		 */
 		private void checkTypeof(Element el, int depth) {
-			String type = el.attr(TYPEOF);
+			String type = el.attr(RDFaUtil.TYPEOF);
 			if (type == null || type.isEmpty()) {
 				return;
 			}
 			IRI obj = createURI(type);
 
 			// typeof without resource implictly creates a blank node subject
-			if (lastSubjectLevel != depth) {
+			if (lastSubjLevel != depth) {
 				Resource blank = createNode();
-				localSubject.put(depth, blank);
-				lastSubjectLevel = depth;
+				localSubj.put(depth, blank);
+				lastSubjLevel = depth;
 			}
 			handleTriple(getSubject(), RDF.TYPE, obj);
 		}
@@ -417,6 +436,8 @@ public class RDFaParser extends AbstractRDFParser implements RDFParser {
 				
 				checkVocab(el, i);
 				checkPrefixes(el, i);
+
+				checkRel(el, i);
 
 				checkResource(el, i);
 				checkProperty(el, i);
@@ -432,9 +453,13 @@ public class RDFaParser extends AbstractRDFParser implements RDFParser {
 					localNS.remove(i);
 					lastNSLevel = localNS.lastKey();
 				}
-				if (i == lastSubjectLevel) {
-					localSubject.remove(i);
-					lastSubjectLevel = localSubject.lastKey();
+				if (i == lastSubjLevel) {
+					localSubj.remove(i);
+					lastSubjLevel = localSubj.lastKey();
+				}
+				if (i == lastPredLevel) {
+					localPred.remove(i);
+					lastPredLevel = localPred.lastKey();
 				}
 				if (i == lastLangLevel) {
 					localLang.remove(i);
