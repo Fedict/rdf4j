@@ -155,7 +155,7 @@ public class RDFaParser extends AbstractRDFParser implements RDFParser {
 		private int lastNSLevel = -1;
 		private final TreeMap<Integer,Resource> localSubj = new TreeMap<>();
 		private int lastSubjLevel = -1;
-		private final TreeMap<Integer,Resource> localPred= new TreeMap<>();
+		private final TreeMap<Integer,IRI> localPred= new TreeMap<>();
 		private int lastPredLevel = -1;
 		private final TreeMap<Integer,String> localLang = new TreeMap<>();
 		private int lastLangLevel = -1;
@@ -196,7 +196,7 @@ public class RDFaParser extends AbstractRDFParser implements RDFParser {
 		 * 
 		 * @return subject IRI or null
 		 */
-		private Resource getPredicate() {
+		private IRI getPredicate() {
 			return localPred.get(localPred.lastKey());
 		}
 
@@ -262,17 +262,39 @@ public class RDFaParser extends AbstractRDFParser implements RDFParser {
 		}
 
 		/**
+		 * Get the value of a non empty attribute.
+		 * If the attribute is present but its value is empty, an error will be raised.
+		 * No error will be raised if the attribute is not present at all.
+		 * 
+		 * @param el element
+		 * @param attr attribute to look for
+		 * @return null when attribute is not present or empty
+		 */
+		private String getNonEmptyAttr(Element el, String attr) {
+			String str = el.attr(attr);
+			if (str == null) {
+				return null;
+			}
+			if (str.isEmpty()) {
+				error("Empty " + attr + " attribute for " + el);
+				return null;
+			}
+			return str;
+		}
+
+		/**
 		 * Check if the element has a vocab attribute for declaring the local vocabulary namespace.
 		 * This is only valid for the element itself and its descendants, so it must be removed when 
 		 * JSoup is finished with processing the element.
 		 * 
 		 * @param el element
 		 * @param depth depth of the element in the DOM structure
+		 * @return true if a vocab attribute was found
 		 */
-		private void checkVocab(Element el, int depth) {
-			String vocab = el.attr(RDFaUtil.VOCAB);
-			if (vocab == null || vocab.isEmpty()) {
-				return;
+		private boolean checkVocab(Element el, int depth) {
+			String vocab = getNonEmptyAttr(el, RDFaUtil.VOCAB);
+			if (vocab == null) {
+				return false;
 			}
 
 			Map<String, String> ctx = new HashMap<>();
@@ -280,6 +302,8 @@ public class RDFaParser extends AbstractRDFParser implements RDFParser {
 			handleNS("", vocab);
 			localNS.put(depth, ctx);
 			lastNSLevel = depth;
+
+			return true;
 		}
 
 		/**
@@ -289,11 +313,12 @@ public class RDFaParser extends AbstractRDFParser implements RDFParser {
 		 * 
 		 * @param el element
 		 * @param depth depth in DOM structure
+		 * @return true if a prefix attribute was found
 		 */
-		private void checkPrefixes(Element el, int depth) {
-			String prefixes = el.attr(RDFaUtil.PREFIX);
-			if (prefixes == null || prefixes.isEmpty()) {
-				return;
+		private boolean checkPrefixes(Element el, int depth) {
+			String prefixes = getNonEmptyAttr(el, RDFaUtil.PREFIX);
+			if (prefixes == null) {
+				return false;
 			}
 
 			// look for prefix and namespace, separated with whitespace
@@ -302,6 +327,7 @@ public class RDFaParser extends AbstractRDFParser implements RDFParser {
 			int len = splits.length;
 			if (len % 2 != 0) {
 				fatalError("Error processing namespaces " + el.tagName() + " " + prefixes);
+				return false;
 			}
 
 			// Keep track of depth: namespaces are valid for the element itself and descendants,
@@ -315,10 +341,13 @@ public class RDFaParser extends AbstractRDFParser implements RDFParser {
 					handleNS(prefix, splits[i+1]);
 				} else {
 					error("Prefix doesn't end with ':' " + el.tagName() + " " + splits[i]);
+					continue;
 				}
 				localNS.put(depth, ctx);
 				lastNSLevel = depth;
 			}
+			
+			return true;
 		}
 
 		/**
@@ -326,17 +355,18 @@ public class RDFaParser extends AbstractRDFParser implements RDFParser {
 		 * 
 		 * @param el element
 		 * @param depth depth in DOM structure
+		 * @return true if a rel attribute was found
 		 */
-		private void checkRel(Element el, int depth) {
-			String rel = el.attr(RDFaUtil.REL);
+		private boolean checkRel(Element el, int depth) {
+			String rel = getNonEmptyAttr(el, RDFaUtil.REL);
 			if (rel == null) {
-				return;
+				return false;
 			}
-			if (rel.isEmpty()) {
-				error("Empty rel attribute for " + el);
-			}
+
 			localPred.put(depth, createURI(toAbsolute(rel)));
 			lastPredLevel = depth;
+			
+			return true;
 		}
 
 		/**
@@ -345,16 +375,17 @@ public class RDFaParser extends AbstractRDFParser implements RDFParser {
 		 * @param el element
 		 * @param depth depth in DOM structure
 		 */
-		private void checkResource(Element el, int depth) {
-			String resource = el.attr(RDFaUtil.RESOURCE);
+		private boolean checkResource(Element el, int depth) {
+			String resource = getNonEmptyAttr(el, RDFaUtil.RESOURCE);
 			if (resource == null) {
-				return;
+				return false;
 			}
-			if (resource.isEmpty()) {
-				error("Empty resource attribute for " + el);
-			}
-			localSubj.put(depth, createURI(toAbsolute(resource)));
+
+			IRI iri = createURI(toAbsolute(resource));
+			localSubj.put(depth, iri);
 			lastSubjLevel = depth;
+			
+			return true;
 		}
 
 		/**
@@ -364,8 +395,8 @@ public class RDFaParser extends AbstractRDFParser implements RDFParser {
 		 * @param depth depth in DOM structure
 		 */
 		private void checkProperty(Element el, int depth) {
-			String prop = el.attr(RDFaUtil.PROPERTY);
-			if (prop == null || prop.isEmpty()) {
+			String prop = getNonEmptyAttr(el, RDFaUtil.PROPERTY);
+			if (prop == null) {
 				return;
 			}
 			String iri = expandPrefix(prop);
@@ -381,7 +412,12 @@ public class RDFaParser extends AbstractRDFParser implements RDFParser {
 				url = el.attr(RDFaUtil.SRC);
 			}
 			
+			// check content
 			if (url == null) {
+				if (depth == lastPredLevel) {
+					// ignore content if rel attribute is present
+					return;
+				}
 				// content attribute value takes precedence over text node
 				String txt = el.attr(RDFaUtil.CONTENT);
 				if (txt == null) {
@@ -411,10 +447,10 @@ public class RDFaParser extends AbstractRDFParser implements RDFParser {
 		 * @param el element
 		 * @param depth depth in DOM structure
 		 */
-		private void checkTypeof(Element el, int depth) {
-			String type = el.attr(RDFaUtil.TYPEOF);
-			if (type == null || type.isEmpty()) {
-				return;
+		private boolean checkTypeof(Element el, int depth) {
+			String type = getNonEmptyAttr(el, RDFaUtil.TYPEOF);
+			if (type == null) {
+				return false;
 			}
 			IRI obj = createURI(type);
 
@@ -425,6 +461,8 @@ public class RDFaParser extends AbstractRDFParser implements RDFParser {
 				lastSubjLevel = depth;
 			}
 			handleTriple(getSubject(), RDF.TYPE, obj);
+
+			return true;
 		}
 
 		@Override
