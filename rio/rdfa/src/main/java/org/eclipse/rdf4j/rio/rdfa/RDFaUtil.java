@@ -20,9 +20,6 @@ import java.util.Map;
  * @author Bart.Hanssens
  */
 public class RDFaUtil {
-	public final static String DOCTYPE_RDFA_10 = "-//W3C//DTD XHTML+RDFa 1.0//EN";
-	public final static String DOCTYPE_RDFA_11 = "-//W3C//DTD XHTML+RDFa 1.1//EN";
-
 	// RDFa-Lite subset
 	public final static String PREFIX = "prefix";
 	public final static String PROPERTY = "property";
@@ -31,6 +28,7 @@ public class RDFaUtil {
 	public final static String VOCAB = "vocab";
 	// Other RDFa "full"
 	public final static String ABOUT = "about";
+	public final static String BASE = "base";
 	public final static String CONTENT = "content";
 	public final static String DATATYPE = "datatype";
 	public final static String DATETIME = "datetime";
@@ -43,7 +41,8 @@ public class RDFaUtil {
 	public final static String VERSION = "version";
 	public final static String XML_BASE = "xml:base";
 	public final static String XML_LANG = "xml:lang";
-
+	public final static String XMLNS = "xmlns";
+		
 	/**
 	 * Build the initial context from a JSON-LD context file
 	 * 

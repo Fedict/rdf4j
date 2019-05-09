@@ -10,6 +10,7 @@ package org.eclipse.rdf4j.rio.rdfa;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.Reader;
+import java.util.Arrays;
 
 import java.util.Collection;
 import java.util.HashMap;
@@ -149,55 +150,27 @@ public class RDFaParser extends AbstractRDFParser implements RDFParser {
 		reportFatalError(msg);
 	}
 
+	/**
+	 * Class to iterate over XML/XHTML/HTML elements
+	 */
 	private class ElementNodeVisitor implements NodeVisitor {
-		// keep track of vocabularies, subjects and language
-		private final TreeMap<Integer,Map<String,String>> localNS = new TreeMap<>();
-		private int lastNSLevel = -1;
-		private final TreeMap<Integer,Resource> localSubj = new TreeMap<>();
-		private int lastSubjLevel = -1;
-		private final TreeMap<Integer,IRI> localPred= new TreeMap<>();
-		private int lastPredLevel = -1;
+		// keep track of language and RDF vocabularies, they may be set on ancestor elements
 		private final TreeMap<Integer,String> localLang = new TreeMap<>();
-		private int lastLangLevel = -1;
+		private final TreeMap<Integer,Map<String,String>> localNS = new TreeMap<>();
+		// keep track of RDF subjects, predicates and types/classes, they may be set on ancestor elements
+		private final TreeMap<Integer,Resource> pendingSubj = new TreeMap<>();
+		private final TreeMap<Integer,IRI> pendingPred = new TreeMap<>();
+		private final TreeMap<Integer,IRI[]> pendingTypes = new TreeMap<>();
 
 		/**
 		 * Constructor
 		 */
 		public ElementNodeVisitor() {
-			localNS.put(lastNSLevel, INITIAL_CONTEXT);
-			localSubj.put(lastSubjLevel, createNode());
-			localPred.put(lastPredLevel, null);
-			localLang.put(lastLangLevel, "");
-		}
+			localLang.put(-1, "");
+			localNS.put(-1, INITIAL_CONTEXT);
 
-		/**
-		 * Get absolute URI, using baseURL to convert relative URLs and local names.
-		 * 
-		 * @param str string
-		 * @return absolute URL
-		 */
-		private String toAbsolute(String str) {
-			return (str.startsWith("#") || !str.contains(":")) ? baseURL + str : str;
-		}
-
-		/**
-		 * Get subject.
-		 * The subject could be defined on the element itself or on an ancestor element.
-		 * 
-		 * @return subject IRI/blank node or null
-		 */
-		private Resource getSubject() {
-			return localSubj.get(localSubj.lastKey());
-		}
-
-		/**
-		 * Get predicate.
-		 * The predicate could be defined on the element itself or on an ancestor element.
-		 * 
-		 * @return subject IRI or null
-		 */
-		private IRI getPredicate() {
-			return localPred.get(localPred.lastKey());
+			pendingSubj.put(-1, createURI(baseURL));
+			pendingPred.put(-1, null);
 		}
 
 		/**
@@ -220,6 +193,7 @@ public class RDFaParser extends AbstractRDFParser implements RDFParser {
 		 */
 		private String getNamespace(String prefix) {
 			String ns;
+			// a prefix may "hide" a previously set prefix, especially the empty prrefix
 			for (Map.Entry<Integer, Map<String,String>> e: localNS.descendingMap().entrySet()) {
 				ns = e.getValue().get(prefix);
 				if (ns != null) {
@@ -230,18 +204,52 @@ public class RDFaParser extends AbstractRDFParser implements RDFParser {
 		}
 
 		/**
+		 * Get absolute URL, using baseURL to convert relative URLs.
+		 * 
+		 * @param str relative URL
+		 * @return absolute URL or null
+		 */
+		private String absoluteURL(String str) {
+			if (str == null) {
+				return null;
+			}
+			
+			return (str.startsWith("#") || !str.contains(":")) ? baseURL + str : str;
+		}
+
+		/**
+		 * Get RDF subject.
+		 * The subject could be defined on the element itself or on an ancestor element.
+		 * 
+		 * @return subject IRI/blank node or null
+		 */
+		private Resource getPendingSubject() {
+			return pendingSubj.get(pendingSubj.lastKey());
+		}
+
+		/**
+		 * Get RDF predicate.
+		 * The predicate could be defined on the element itself or on an ancestor element.
+		 * 
+		 * @return subject IRI or null
+		 */
+		private IRI getPendingPredicate() {
+			return pendingPred.get(pendingPred.lastKey());
+		}
+
+		/**
 		 * Expand prefixed string
 		 * 
 		 * @param str
-		 * @return fully IRI as a string
+		 * @return fully IRI as a string or null
 		 */
 		private String expandPrefix(String str) {
-			if (str.startsWith("http:") || str.startsWith("https:")) {
+			if (str.startsWith("http:") || str.startsWith("https:") || str.startsWith("mailto:")) {
 				// already expandend
 				return str;
 			}
 			String[] parts = str.split(":", 2);
-			String prefix = (parts.length == 1) ? "" : parts[0];
+			String prefix = (parts.length == 1) ? "" : parts[0].toLowerCase();
 			String ns = getNamespace(prefix);
 			return (ns != null) ? ns + parts[parts.length-1] : null;
 		}
@@ -268,25 +276,33 @@ public class RDFaParser extends AbstractRDFParser implements RDFParser {
 		}
 
 		/**
+		 * Check base href element.
+		 * 
+		 */
+		private void setBase(Element el) {
+			String base = el.attr(RDFaUtil.HREF);
+			if (base == null) {
+				return;
+			}
+			baseURL = absoluteURL(base);
+		}
+
+		/**
 		 * Check if the element has an xml:lang or lang attribute (in that order) for declaring the language.
 		 * This is only valid for the element itself and its descendants, so it must be removed when 
 		 * JSoup is finished with processing the element.
 		 * 
 		 * @param el element
 		 * @param depth depth of the element in the DOM structure
-		 * @return true if a lang or xml:lang attribute was found
 		 */
-		private boolean checkLanguage(Element el, int depth) {
+		private void setLanguage(Element el, int depth) {
 			String lang = el.attr(RDFaUtil.XML_LANG);
 			if (lang == null) {
 				lang = el.attr(RDFaUtil.LANG);
 				if (lang != null) {
 					localLang.put(depth, lang);
-					lastLangLevel = depth;
-					return true;
 				}
 			}
-			return false;
 		}
 
 		/**
@@ -296,21 +312,17 @@ public class RDFaParser extends AbstractRDFParser implements RDFParser {
 		 * 
 		 * @param el element
 		 * @param depth depth of the element in the DOM structure
-		 * @return true if a vocab attribute was found
 		 */
-		private boolean checkVocab(Element el, int depth) {
+		private void setVocab(Element el, int depth) {
 			String vocab = getNonEmptyAttr(el, RDFaUtil.VOCAB);
 			if (vocab == null) {
-				return false;
+				return;
 			}
 
-			Map<String, String> ctx = new HashMap<>();
+			Map<String,String> ctx = localNS.getOrDefault(depth, new HashMap<>());
 			ctx.put("", vocab);
-			handleNS("", vocab);
 			localNS.put(depth, ctx);
-			lastNSLevel = depth;
-
-			return true;
+			handleNS("", vocab);
 		}
 
 		/**
@@ -320,12 +332,11 @@ public class RDFaParser extends AbstractRDFParser implements RDFParser {
 		 * 
 		 * @param el element
 		 * @param depth depth in DOM structure
-		 * @return true if a prefix attribute was found
 		 */
-		private boolean checkPrefixes(Element el, int depth) {
+		private void setPrefixes(Element el, int depth) {
 			String prefixes = getNonEmptyAttr(el, RDFaUtil.PREFIX);
 			if (prefixes == null) {
-				return false;
+				return;
 			}
 
 			// look for prefix and namespace, separated with whitespace
@@ -334,7 +345,7 @@ public class RDFaParser extends AbstractRDFParser implements RDFParser {
 			int len = splits.length;
 			if (len % 2 != 0) {
 				fatalError("Error processing namespaces " + el.tagName() + " " + prefixes);
-				return false;
+				return;
 			}
 
 			// Keep track of depth: namespaces are valid for the element itself and descendants,
@@ -343,18 +354,14 @@ public class RDFaParser extends AbstractRDFParser implements RDFParser {
 			Map<String,String> ctx = localNS.getOrDefault(depth, new HashMap<>());
 			for (int i = 0 ; i < len; i += 2) {
 				if (splits[i].endsWith(":")) {
-					String prefix = splits[i].substring(0, splits[i].length()-1);
+					String prefix = splits[i].substring(0, splits[i].length()-1).toLowerCase();
 					ctx.put(prefix, splits[i+1]);
+					localNS.put(depth, ctx);
 					handleNS(prefix, splits[i+1]);
 				} else {
 					error("Prefix doesn't end with ':' " + el.tagName() + " " + splits[i]);
-					continue;
 				}
-				localNS.put(depth, ctx);
-				lastNSLevel = depth;
 			}
-			
-			return true;
 		}
 
 		/**
@@ -369,30 +376,37 @@ public class RDFaParser extends AbstractRDFParser implements RDFParser {
 			if (rel == null) {
 				return false;
 			}
+			pendingPred.put(depth, createURI(toAbsolute(rel)));
 
-			localPred.put(depth, createURI(toAbsolute(rel)));
-			lastPredLevel = depth;
-			
 			return true;
 		}
 
 		/**
-		 * Check if the element has an about attribute for declaring the subject of a triple.
+		 * Get subject, based on various attributes and/or subjects set by ancestor elements.
 		 * 
-		 * @param el element
-		 * @param depth depth in DOM structure
+		 * @param about value of about attribute
+		 * @param typeof value of typeof attribute
+		 * @param attrs number of attributes
+		 * @param depth
+		 * @return IRI or or null
 		 */
-		private boolean checkAbout(Element el, int depth) {
-			String about = getNonEmptyAttr(el, RDFaUtil.ABOUT);
-			if (about == null) {
-				return false;
+		private Resource getNewSubject(String about, String typeof, int attrs, int depth) {
+			// per spec, create a blank node if typeof is set as the only attribute
+			if (typeof != null && attrs == 1) {
+				return createNode(about);
 			}
-
-			IRI iri = createURI(toAbsolute(about));
-			localSubj.put(depth, iri);
-			lastSubjLevel = depth;
-
-			return true;
+			// maybe the subject was set on an ancestor element
+			if (about == null) {
+				return getPendingSubject();
+			}
+			if (about.startsWith("_")) {
+				return createNode(about);
+			}
+			String str = expandPrefix(about);
+			if (str == null) {
+				error("Could not get current subject");
+			}
+			return createURI(absoluteURL(str));
 		}
 
 		/**
@@ -408,7 +422,6 @@ public class RDFaParser extends AbstractRDFParser implements RDFParser {
 			}
 
 			IRI iri = createURI(toAbsolute(resource));
-
 			// this element or an ancestor may have a rel attribute / triple predicate, making this an object
 			if (lastPredLevel != -1 && depth >= lastPredLevel) {
 				handleTriple(getSubject(), getPredicate(), iri);
@@ -423,52 +436,42 @@ public class RDFaParser extends AbstractRDFParser implements RDFParser {
 		 * @param el element
 		 * @param depth depth in DOM structure
 		 */
-		private void checkProperty(Element el, int depth) {
-			String prop = getNonEmptyAttr(el, RDFaUtil.PROPERTY);
+		private IRI getPredicate(String prop, String rel, String dtype, String txt, String href, String src) {
 			if (prop == null) {
-				return;
+				return getPendingPredicate();
 			}
 			String iri = expandPrefix(prop);
 			if (iri.isEmpty()) {
-				error("Could not find namespace for " + el + " " + prop);
+				error("Could not find namespace for " + prop);
 			}
-			IRI pred = createURI(iri);
+			return createURI(iri);
+		}
 
-			Value val;
-			// href or src attribute value takes precedence over text content
-			String url = el.attr(RDFaUtil.HREF);
-			if (url == null) {
-				url = el.attr(RDFaUtil.SRC);
-			}
-			
-			// check content
-			if (url == null) {
-				if (depth == lastPredLevel) {
-					// ignore content if rel attribute is present
-					return;
-				}
-				// content attribute value takes precedence over text node
-				String txt = el.attr(RDFaUtil.CONTENT);
+		/**
+		 * Get RDF object value from an element
+		 * 
+		 * @param el
+		 * @return typed literal, IRI or null
+		 */
+		private Value getContent(Element el, int depth) {
+			// content attribute value takes precedence over text node
+			String txt = el.attr(RDFaUtil.CONTENT);
+			if (txt == null) {
+				txt = el.text();
 				if (txt == null) {
-					txt = el.text();
-					if (txt == null) {
-						error("No href/src attribute, no content attribute and no text node " + el);
-						txt = "";
-					}
+					error("No content attribute and no text node " + el);
+					return null;
 				}
-				String type = el.attr(RDFaUtil.DATATYPE);
-				if (type != null) {
-					type = expandPrefix(type);
-					if (type == null) {
-						error("Could not expand datatype for " + el);
-					}
-				}
-				IRI datatype = (type != null) ? createURI(type) : XMLSchema.STRING;
-				val = createLiteral(txt, getLanguage(), datatype);
-			} else {
-				val = createURI(url);
 			}
-			handleTriple(getSubject(), pred, val);
+			String type = el.attr(RDFaUtil.DATATYPE);
+			if (type != null) {
+				type = expandPrefix(type);
+				if (type == null) {
+					error("Could not expand datatype for " + el);
+				}
+			}
+			IRI datatype = (type != null) ? createURI(type) : XMLSchema.STRING;
+			return createLiteral(txt, getLanguage(), datatype);
 		}
 
 		/**
@@ -477,24 +480,34 @@ public class RDFaParser extends AbstractRDFParser implements RDFParser {
 		 * @param el element
 		 * @param depth depth in DOM structure
 		 */
-		private boolean checkTypeof(Element el, int depth) {
-			String type = getNonEmptyAttr(el, RDFaUtil.TYPEOF);
+		private boolean checkTypeof(Element el, int depth, String type) {
 			if (type == null) {
 				return false;
 			}
-			
-			// typeof without resource/about implictly creates a blank node subject
-			if (lastSubjLevel < depth) {
-				Resource blank = createNode();
-				localSubj.put(depth, blank);
-				lastSubjLevel = depth;
+
+			// typeof without another attribute creates a blank node		
+			if (el.attributes().size() == 1) {
+				pendingSubj.put(depth, createNode());
 			}
-	
+
 			// multiple (whitespace separated) types/classes are allowed
-			String types[] = type.split(" ");
-			for (String t: types) {
-				IRI obj = createURI(expandPrefix(t));
-				handleTriple(getSubject(), RDF.TYPE, obj);
+			IRI[] types = Arrays.stream(type.split(" "))
+								.map(t -> createURI(expandPrefix(t)))
+								.toArray(IRI[]::new);
+			pendingTypes.put(depth, types);
+			return true;
+		}
+		
+		/**
+		 * 
+		 * @param values
+		 * @return 
+		 */
+		private boolean allNull(String... values) {
+			for(String value: values) {
+				if (value != null) {
+					return false;
+				}
 			}
 			return true;
 		}
@@ -503,39 +516,82 @@ public class RDFaParser extends AbstractRDFParser implements RDFParser {
 		public void head(Node node, int i) {
 			if (node instanceof Element) {
 				Element el = (Element) node;
+				int attrs = el.attributes().size();
+				if (attrs == 0) {
+					return;
+				}
 
-				checkLanguage(el, i);
+				// basic context settings
+				if (el.tagName().equals(RDFaUtil.BASE)) {
+					setBase(el);
+				}				
+				setLanguage(el, i);
+				setVocab(el, i);
+				setPrefixes(el, i);
+
+				String about = getNonEmptyAttr(el, RDFaUtil.ABOUT);
+				String prop = getNonEmptyAttr(el, RDFaUtil.PROPERTY);
+				String rel = getNonEmptyAttr(el, RDFaUtil.REL);
+				String rev = getNonEmptyAttr(el, RDFaUtil.REV);
+				String res = getNonEmptyAttr(el, RDFaUtil.RESOURCE);
+				String typeof = getNonEmptyAttr(el, RDFaUtil.TYPEOF);
+
+				// check if the element has RDFa attributes that need to be processed
+				if (allNull(about, prop, rel, rev, res, typeof)) {
+					return;
+				}
+
+				Resource subj = null;
+				if (rel == null && rev == null) {
+					subj = getNewSubject(about, typeof, attrs, i);
+				} else {
+					subj = getExistingSubject(rel, rev);
+					obj = get
+				}
 				
-				checkVocab(el, i);
-				checkPrefixes(el, i);
+				
+				
+				String inlist = el.attr(RDFaUtil.INLIST);
+				String datatype =	el.attr(RDFaUtil.DATATYPE);
 
-				checkRel(el, i);
+				String ref = getNonEmptyAttr(el, RDFaUtil.HREF);
+				if (ref == null) {
+					ref = getNonEmptyAttr(el, RDFaUtil.SRC);
+				}
 
-				checkAbout(el, i);
-				checkProperty(el, i);
-				checkTypeof(el, i);
+				IRI pred = getPredicate(prop, rel);
+				Value obj = getObject();
+				IRI[] types;
+				
+				if (subj != null && pred != null && obj != null) {
+					handleTriple(subj, pred, obj);
+				}
+				for (IRI t: types) {
+					handleTriple(subj,RDF.TYPE, t);
+				}
 			} 
 		}
 
 		@Override
 		public void tail(Node node, int i) {
 			if (node instanceof Element) {
-				// remove out-of-scope namespaces, subject and language
-				if (i == lastNSLevel) {
+				// remove "out-of-scope" namespaces and languages
+				if (i == localNS.lastKey()) {
 					localNS.remove(i);
-					lastNSLevel = localNS.lastKey();
 				}
-				if (i == lastSubjLevel) {
-					localSubj.remove(i);
-					lastSubjLevel = localSubj.lastKey();
-				}
-				if (i == lastPredLevel) {
-					localPred.remove(i);
-					lastPredLevel = localPred.lastKey();
-				}
-				if (i == lastLangLevel) {
+				if (i == localLang.lastKey()) {
 					localLang.remove(i);
-					lastLangLevel = localLang.lastKey();
+				}
+
+				
+				if (i == pendingSubj.lastKey()) {
+					pendingSubj.remove(i);
+				}
+				if (i == pendingPred.lastKey()) {
+					pendingPred.remove(i);
+				}
+				if (i == pendingTypes.lastKey()) {
+					pendingTypes.remove(i);
 				}
 			}
 		}
