@@ -64,4 +64,13 @@ public class RDFaUtil {
 		}
 		return map;
 	}
+	
+	public static String firstNonNull(String... values) {
+		for (String value: values) {
+			if (value != null) {
+				return value;
+			}
+		}
+		return null;
+	}
 }
