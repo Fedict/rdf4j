@@ -5,7 +5,7 @@
  * which accompanies this distribution, and is available at
  * http://www.eclipse.org/org/documents/edl-v10.php.
  *******************************************************************************/
-package org.eclipse.rdf4j.rio.rdfa;
+package org.eclipse.rdf4j.rio.rdfa.iml;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -73,4 +73,6 @@ public class RDFaUtil {
 		}
 		return null;
 	}
+	
+	public enum Direction { REVERSE, NONE, FORWARD; }
 }
