@@ -7,7 +7,7 @@
  *******************************************************************************/
 package org.eclipse.rdf4j.rio.rdfa;
 
-import org.eclipse.rdf4j.rio.rdfa.iml.RDFaElementNodeVisitor;
+import org.eclipse.rdf4j.rio.rdfa.impl.RDFaElementNodeVisitor;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.Reader;
