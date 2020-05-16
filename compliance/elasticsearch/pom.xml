@@ -101,6 +101,18 @@
 					<groupId>com.vividsolutions</groupId>
 					<artifactId>jts</artifactId>
 				</exclusion>
+				<exclusion>
+					<groupId>com.fasterxml.jackson.core</groupId>
+					<artifactId>jackson-databind</artifactId>
+				</exclusion>
+				<exclusion>
+					<groupId>com.fasterxml.jackson.core</groupId>
+					<artifactId>jackson-core</artifactId>
+				</exclusion>
+				<exclusion>
+					<groupId>com.fasterxml.jackson.core</groupId>
+					<artifactId>jackson-databind-yaml</artifactId>
+				</exclusion>
 			</exclusions>
 		</dependency>
 		<dependency>
