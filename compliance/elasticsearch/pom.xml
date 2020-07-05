@@ -29,12 +29,6 @@
 			<artifactId>rdf4j-sail-elasticsearch</artifactId>
 			<version>${project.version}</version>
 			<scope>test</scope>
-			<exclusions>
-				<exclusion>
-					<groupId>org.yaml</groupId>
-					<artifactId>snakeyaml</artifactId>
-				</exclusion>
-			</exclusions>
 		</dependency>
 		<dependency>
 			<groupId>${project.groupId}</groupId>
@@ -107,11 +101,14 @@
 					<groupId>com.vividsolutions</groupId>
 					<artifactId>jts</artifactId>
 				</exclusion>
-				<exclusion>
-					<groupId>org.yaml</groupId>
-					<artifactId>snakeyaml</artifactId>
-				</exclusion>
 			</exclusions>
+		</dependency>
+		<dependency>
+			<!--  transitive dependency of both jackson-dataformat-yaml and elasticsearch transport client. Set to fixed version here to resolve version conflicts -->
+			<groupId>org.yaml</groupId>
+			<artifactId>snakeyaml</artifactId>
+			<version>1.24</version>
+			<scope>test</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.apache.logging.log4j</groupId>
