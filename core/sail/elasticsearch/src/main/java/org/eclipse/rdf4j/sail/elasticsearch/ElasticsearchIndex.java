@@ -67,7 +67,6 @@ import org.elasticsearch.search.SearchHit;
 import org.elasticsearch.search.SearchHits;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
 import org.elasticsearch.search.fetch.subphase.highlight.HighlightBuilder;
-import org.elasticsearch.transport.client.PreBuiltTransportClient;
 import org.locationtech.spatial4j.context.SpatialContext;
 import org.locationtech.spatial4j.context.SpatialContextFactory;
 import org.locationtech.spatial4j.distance.DistanceUtils;
@@ -80,6 +79,15 @@ import org.slf4j.LoggerFactory;
 import com.google.common.base.Function;
 import com.google.common.base.Functions;
 import com.google.common.collect.Iterables;
+import org.apache.http.HttpHost;
+import org.elasticsearch.action.admin.cluster.health.ClusterHealthRequest;
+import org.elasticsearch.action.admin.indices.get.GetIndexRequest;
+import org.elasticsearch.action.admin.indices.mapping.get.GetMappingsRequest;
+import org.elasticsearch.client.RequestOptions;
+import org.elasticsearch.client.RestClient;
+import org.elasticsearch.client.RestClientBuilder;
+import org.elasticsearch.client.RestHighLevelClient;
+import org.elasticsearch.cluster.health.ClusterHealthStatus;
 
 /**
  * Requires an Elasticsearch cluster with the DeleteByQuery plugin.
@@ -102,7 +110,10 @@ public class ElasticsearchIndex extends AbstractSearchIndex {
 	/**
 	 * Set the parameter "transport=" to specify the address of the cluster to use (e.g. localhost:9300).
 	 */
+	@Deprecated
 	public static final String TRANSPORT_KEY = "transport";
+
+	public static final String CLUSTER_KEY = "cluster";
 
 	/**
 	 * Set the parameter "waitForStatus=" to configure if {@link #initialize(java.util.Properties) initialization}
@@ -144,7 +155,10 @@ public class ElasticsearchIndex extends AbstractSearchIndex {
 
 	public static final String DEFAULT_DOCUMENT_TYPE = "resource";
 
+	@Deprecated
 	public static final String DEFAULT_TRANSPORT = "localhost";
+
+	public static final String DEFAULT_CLUSTER_HOST = "localhost";
 
 	public static final String DEFAULT_ANALYZER = "standard";
 
@@ -160,7 +174,7 @@ public class ElasticsearchIndex extends AbstractSearchIndex {
 
 	private final Logger logger = LoggerFactory.getLogger(getClass());
 
-	private volatile TransportClient client;
+	private volatile Client client;
 
 	private String clusterName;
 
@@ -189,7 +203,6 @@ public class ElasticsearchIndex extends AbstractSearchIndex {
 		return new String[] { documentType };
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
 	public void initialize(Properties parameters) throws Exception {
 		super.initialize(parameters);
@@ -210,52 +223,48 @@ public class ElasticsearchIndex extends AbstractSearchIndex {
 			}
 		}
 
-		client = new PreBuiltTransportClient(settingsBuilder.build());
-		String transport = parameters.getProperty(TRANSPORT_KEY, DEFAULT_TRANSPORT);
-		for (String addrStr : transport.split(",")) {
-			TransportAddress addr;
-			if (addrStr.startsWith("local[")) {
-				String id = addrStr.substring("local[".length(), addrStr.length() - 1);
-				// addr = new LocalTransportAddress(id);
-				throw new UnsupportedOperationException("Local Transport Address no longer supported");
-			} else {
-				String host;
-				int port;
-				String[] hostPort = addrStr.split(":");
-				host = hostPort[0];
-				if (hostPort.length > 1) {
-					port = Integer.parseInt(hostPort[1]);
-				} else {
-					port = 9300;
-				}
-				addr = new TransportAddress(InetAddress.getByName(host), port);
-			}
-			client.addTransportAddress(addr);
-		}
-		clusterName = client.settings().get("cluster.name");
+		String transport = parameters.getProperty(CLUSTER_KEY, 
+								parameters.getProperty(TRANSPORT_KEY, DEFAULT_TRANSPORT));
 
-		boolean exists = client.admin().indices().prepareExists(indexName).execute().actionGet().isExists();
+		Set<HttpHost> hosts = new HashSet<>();
+		for (String addrStr : transport.split(",")) {
+			if (addrStr.startsWith("local[")) {
+				throw new UnsupportedOperationException("Local Transport Address no longer supported");
+			}
+	
+			String[] hostPort = addrStr.split(":");
+			String host = hostPort[0];
+			int port = (hostPort.length > 1) ? Integer.parseInt(hostPort[1]) : 9200;
+			hosts.add(new HttpHost(host, port));
+		}
+		client = new RestHighLevelClient(RestClient.builder(hosts.toArray(HttpHost[]::new)));
+		//clusterName = client.settings().get("cluster.name");
+
+		boolean exists = client.indices().exists(new GetIndexRequest().indices(indexName), RequestOptions.DEFAULT);
 		if (!exists) {
 			createIndex();
 		}
 
 		logger.info("Field mappings:\n{}", getMappings());
 
-		ClusterHealthRequestBuilder healthReqBuilder = client.admin().cluster().prepareHealth(indexName);
-		String waitForStatus = parameters.getProperty(WAIT_FOR_STATUS_KEY);
-		if ("green".equals(waitForStatus)) {
-			healthReqBuilder.setWaitForGreenStatus();
-		} else if ("yellow".equals(waitForStatus)) {
-			healthReqBuilder.setWaitForYellowStatus();
+		ClusterHealthRequest healthRequest = new ClusterHealthRequest().indices(indexName);
+
+		String str = parameters.getProperty(WAIT_FOR_STATUS_KEY);
+		if (str != null) {
+			ClusterHealthStatus status = ClusterHealthStatus.fromString(str);
+			healthRequest.waitForStatus(status);
 		}
+	
 		String waitForNodes = parameters.getProperty(WAIT_FOR_NODES_KEY);
 		if (waitForNodes != null) {
-			healthReqBuilder.setWaitForNodes(waitForNodes);
+			healthRequest.waitForNodes(waitForNodes);
 		}
+
 		String waitForActiveShards = parameters.getProperty(WAIT_FOR_ACTIVE_SHARDS_KEY);
 		if (waitForActiveShards != null) {
-			healthReqBuilder.setWaitForActiveShards(Integer.parseInt(waitForActiveShards));
+			healthRequest.waitForActiveShards(Integer.parseInt(waitForActiveShards));
 		}
+
 		String waitForRelocatingShards = parameters.getProperty(WAIT_FOR_RELOCATING_SHARDS_KEY);
 		if (waitForRelocatingShards != null) {
 			logger.warn("Property " + WAIT_FOR_RELOCATING_SHARDS_KEY + " no longer supported. Use "
@@ -263,9 +272,10 @@ public class ElasticsearchIndex extends AbstractSearchIndex {
 		}
 		String waitForNoRelocatingShards = parameters.getProperty(WAIT_FOR_NO_RELOCATING_SHARDS_KEY);
 		if (waitForNoRelocatingShards != null) {
-			healthReqBuilder.setWaitForNoRelocatingShards(Boolean.parseBoolean(waitForNoRelocatingShards));
+			healthRequest.waitForNoRelocatingShards(Boolean.parseBoolean(waitForNoRelocatingShards));
 		}
-		ClusterHealthResponse healthResponse = healthReqBuilder.execute().actionGet();
+
+		ClusterHealthResponse healthResponse = client.cluster().health(healthRequest, RequestOptions.DEFAULT);
 		logger.info("Cluster health: {}", healthResponse.getStatus());
 		logger.info("Cluster nodes: {} (data {})", healthResponse.getNumberOfNodes(),
 				healthResponse.getNumberOfDataNodes());
@@ -286,12 +296,9 @@ public class ElasticsearchIndex extends AbstractSearchIndex {
 	}
 
 	public Map<String, Object> getMappings() throws IOException {
-		ImmutableOpenMap<String, ImmutableOpenMap<String, MappingMetaData>> indexMappings = client.admin()
+		ImmutableOpenMap<String, ImmutableOpenMap<String, MappingMetaData>> indexMappings = client
 				.indices()
-				.prepareGetMappings(indexName)
-				.setTypes(documentType)
-				.execute()
-				.actionGet()
+				.getMapping(new GetMappingsRequest().indices(indexName).types(documentType), RequestOptions.DEFAULT)
 				.getMappings();
 		ImmutableOpenMap<String, MappingMetaData> typeMappings = indexMappings.get(indexName);
 		MappingMetaData mappings = typeMappings.get(documentType);
@@ -310,8 +317,8 @@ public class ElasticsearchIndex extends AbstractSearchIndex {
 				.endObject()
 				.endObject()
 				.endObject()) {
-
-			doAcknowledgedRequest(client.admin()
+			client.indices().
+			doAcknowledgedRequest(client.
 					.indices()
 					.prepareCreate(indexName)
 					.setSettings(
@@ -422,6 +429,7 @@ public class ElasticsearchIndex extends AbstractSearchIndex {
 	@Override
 	protected void addDocument(SearchDocument doc) throws IOException {
 		ElasticsearchDocument esDoc = (ElasticsearchDocument) doc;
+		client.index(indexRequest, RequestOptions.DEFAULT).
 		doIndexRequest(
 				client.prepareIndex(esDoc.getIndex(), esDoc.getType(), esDoc.getId()).setSource(esDoc.getSource()));
 	}
