@@ -123,8 +123,8 @@ class ElasticsearchNamespaceStore implements NamespaceStoreInterface {
 				.get();
 
 		SearchHits hits = searchResponse.getHits();
-		if (hits.totalHits > 10000) {
-			throw new SailException("Namespace store only supports 10 000 items, found " + hits.totalHits);
+		if (hits.getTotalHits().value > 10000) {
+			throw new SailException("Namespace store only supports 10 000 items, found " + hits.getTotalHits().value);
 		}
 
 		return StreamSupport.stream(hits.spliterator(), false)

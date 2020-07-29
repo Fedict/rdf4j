@@ -299,9 +299,9 @@
 		<jsonldjava.version>0.13.0</jsonldjava.version>
 		<last.japicmp.compare.version>3.1.4</last.japicmp.compare.version>
 		<jaxb.version>2.3.1</jaxb.version>
-		<lucene.version>7.7.2</lucene.version>
-		<solr.version>7.7.2</solr.version>
-		<elasticsearch.version>6.8.8</elasticsearch.version>
+		<lucene.version>8.5.1</lucene.version>
+		<solr.version>8.4.0</solr.version>
+		<elasticsearch.version>7.8.1</elasticsearch.version>
 		<servlet.version>3.1.0</servlet.version>
 		<jetty.version>9.4.24.v20191120</jetty.version>
 		<spring.version>5.2.4.RELEASE</spring.version>
@@ -759,7 +759,7 @@
 					<version>2.22.2</version>
 					<configuration>
 						<encoding>UTF-8</encoding>
-						<argLine>-Xmx1024M</argLine>
+						<argLine>-Xmx2048M</argLine>
 					</configuration>
 				</plugin>
 				<plugin>
