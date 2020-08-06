@@ -119,6 +119,7 @@ class ElasticsearchNamespaceStore implements NamespaceStoreInterface {
 				.prepareSearch(index)
 				.addSort(FieldSortBuilder.DOC_FIELD_NAME, SortOrder.ASC)
 				.setQuery(QueryBuilders.constantScoreQuery(matchAllQuery()))
+				.setTrackTotalHits(true)
 				.setSize(10000)
 				.get();
 
