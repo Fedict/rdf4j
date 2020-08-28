@@ -55,9 +55,4 @@ public class TestHelpers {
 		}
 		runner.clean();
 	}
-
-	public static ElasticsearchClusterRunner startElasticsearch(File installLocation, String javaHomePath)
-			throws IOException, InterruptedException {
-		return startElasticsearch(installLocation);
-	}
 }
