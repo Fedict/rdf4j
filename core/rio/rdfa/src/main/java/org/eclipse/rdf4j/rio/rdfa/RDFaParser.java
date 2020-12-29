@@ -10,7 +10,6 @@ package org.eclipse.rdf4j.rio.rdfa;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.Reader;
-
 import java.util.Collection;
 import java.util.HashSet;
 
@@ -18,13 +17,13 @@ import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.ValueFactory;
-
 import org.eclipse.rdf4j.rio.RDFFormat;
 import org.eclipse.rdf4j.rio.RDFHandlerException;
 import org.eclipse.rdf4j.rio.RDFParseException;
 import org.eclipse.rdf4j.rio.RDFParser;
 import org.eclipse.rdf4j.rio.RioSetting;
 import org.eclipse.rdf4j.rio.helpers.AbstractRDFParser;
+import org.eclipse.rdf4j.rio.rdfa.util.XHTMLNodeVisitor;
 
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -40,23 +39,22 @@ public class RDFaParser extends AbstractRDFParser implements RDFParser {
 	protected String baseURL = "";
 
 	/**
-	 * Creates a new RDFaParser that will use a {@link SimpleValueFactory} to create object for resources,
-	 * bNodes and literals.
+	 * Creates a new RDFaParser that will use a {@link SimpleValueFactory} to create object for resources, bNodes and
+	 * literals.
 	 */
 	public RDFaParser() {
 		super();
 	}
 
 	/**
-	 * Creates a new RDFaParser that will use the supplied <tt>ValueFactory</tt> to create RDF model objects.
+	 * Creates a new RDFaParser that will use the supplied {@link ValueFactory} to create RDF model objects.
 	 * 
-	 * @param valueFactory
-	 *        A ValueFactory.
+	 * @param valueFactory A ValueFactory.
 	 */
 	public RDFaParser(ValueFactory valueFactory) {
 		super(valueFactory);
 	}
-	
+
 	@Override
 	public RDFFormat getRDFFormat() {
 		return RDFFormat.RDFA;
@@ -71,11 +69,11 @@ public class RDFaParser extends AbstractRDFParser implements RDFParser {
 
 		try {
 			Document doc = Jsoup.parse(in, null, baseURI);
-			NodeTraversor.traverse(new XHTMLNodeVisitor(this), doc);
+			NodeTraversor.traverse(new XHTMLNodeVisitor(this, baseURI), doc);
 		} catch (IOException ex) {
 			reportFatalError(ex);
 		}
-		
+
 		if (this.rdfHandler != null) {
 			this.rdfHandler.endRDF();
 		}
@@ -88,7 +86,8 @@ public class RDFaParser extends AbstractRDFParser implements RDFParser {
 			@Override
 			public int read() throws IOException {
 				return reader.read();
-			}}) {
+			}
+		}) {
 			parse(is, baseURI);
 		}
 	}
@@ -103,7 +102,7 @@ public class RDFaParser extends AbstractRDFParser implements RDFParser {
 	 * Handle a namespace
 	 * 
 	 * @param prefix
-	 * @param ns 
+	 * @param ns
 	 */
 	public void handleNS(String prefix, String ns) {
 		rdfHandler.handleNamespace(prefix, ns);
@@ -114,7 +113,7 @@ public class RDFaParser extends AbstractRDFParser implements RDFParser {
 	 * 
 	 * @param subj
 	 * @param pred
-	 * @param obj 
+	 * @param obj
 	 */
 	public void handleTriple(Resource subj, IRI pred, Value obj) {
 		rdfHandler.handleStatement(valueFactory.createStatement(subj, pred, pred));
@@ -124,7 +123,7 @@ public class RDFaParser extends AbstractRDFParser implements RDFParser {
 	 * Handle an error
 	 * 
 	 * @param msg
-	 * @throws RDFParseException 
+	 * @throws RDFParseException
 	 */
 	public void error(String msg) throws RDFParseException {
 		reportError(msg, null);
@@ -134,16 +133,16 @@ public class RDFaParser extends AbstractRDFParser implements RDFParser {
 	 * Handle a fatal error
 	 * 
 	 * @param msg
-	 * @throws RDFParseException 
+	 * @throws RDFParseException
 	 */
 	public void fatalError(String msg) throws RDFParseException {
 		reportFatalError(msg);
 	}
-	
+
 	public IRI createIRI(String str) {
 		return createURI(str);
 	}
-	
+
 	public Resource createBlank() {
 		return createNode();
 	}
