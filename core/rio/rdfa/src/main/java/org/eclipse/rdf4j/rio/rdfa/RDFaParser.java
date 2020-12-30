@@ -69,7 +69,7 @@ public class RDFaParser extends AbstractRDFParser implements RDFParser {
 
 		try {
 			Document doc = Jsoup.parse(in, null, baseURI);
-			NodeTraversor.traverse(new XHTMLNodeVisitor(this, baseURI), doc);
+			NodeTraversor.traverse(new XHTMLNodeVisitor(this, baseURI, doc.root()), doc);
 		} catch (IOException ex) {
 			reportFatalError(ex);
 		}

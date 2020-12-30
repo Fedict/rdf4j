@@ -13,6 +13,7 @@ import java.util.Map;
 import java.util.TreeMap;
 
 import org.eclipse.rdf4j.common.annotation.InternalUseOnly;
+import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.rio.rdfa.RDFaParser;
 
 import org.jsoup.nodes.Element;
@@ -29,8 +30,7 @@ import org.jsoup.select.NodeVisitor;
  */
 @InternalUseOnly
 public class XHTMLNodeVisitor implements NodeVisitor {
-	public final static Map<String, String> INITIAL_CONTEXT = RDFaUtil.buildContext();
-
+	private final Element root;
 	private final RDFaParser parser;
 	private final EvaluationContext initialContext;
 	private final Map<Integer, EvaluationContext> localContexts = new TreeMap<>();
@@ -40,16 +40,17 @@ public class XHTMLNodeVisitor implements NodeVisitor {
 	 * 
 	 * @param parser
 	 * @param baseURI
+	 * @param root
 	 */
-	public XHTMLNodeVisitor(RDFaParser parser, String baseURI) {
+	public XHTMLNodeVisitor(RDFaParser parser, String baseURI, Element root) {
 		this.parser = parser;
+		this.root = root;
 
 		initialContext = new EvaluationContext();
 		initialContext.setBase(baseURI);
 		initialContext.setIriMappings(Collections.EMPTY_MAP);
 		initialContext.setTermMappings(Collections.EMPTY_MAP);
 		initialContext.setDefaultVocabulary(null);
-		
 	}
 
 	/**
@@ -69,7 +70,7 @@ public class XHTMLNodeVisitor implements NodeVisitor {
 	 * @param prefix prefix
 	 * @return URI of the namespace as string, or null if not found
 	 */
-/*	private String getNamespace(String prefix) {
+	private String getNamespace(String prefix) {
 		String ns;
 		// a prefix may "hide" a previously set prefix, especially the empty prrefix
 		for (Map.Entry<Integer, Map<String, String>> e : localNS.descendingMap().entrySet()) {
@@ -80,7 +81,7 @@ public class XHTMLNodeVisitor implements NodeVisitor {
 		}
 		return null;
 	}
-*/
+
 	/**
 	 * Get absolute URL, using baseURL to convert relative URLs.
 	 *
@@ -124,7 +125,7 @@ public class XHTMLNodeVisitor implements NodeVisitor {
 	 * @param str
 	 * @return fully IRI as a string or null
 	 */
-/*	private String expandPrefix(String str) {
+	private String expandPrefix(String str) {
 		if (str.startsWith("_:")) {
 			// blank node
 			return str;
@@ -143,10 +144,12 @@ public class XHTMLNodeVisitor implements NodeVisitor {
 		String ns = getNamespace(prefix);
 		return (ns != null) ? ns + parts[parts.length - 1] : null;
 	}
-*/
+
 	/**
-	 * Get the value of a non empty attribute. If the attribute is present but its value is empty, an error will be
-	 * raised. No error will be raised if the attribute is not present at all.
+	 * Get the value of a non empty attribute.
+	 * 
+	 * If the attribute is present but its value is empty, a parse error will be generated.
+	 * No error will be raised if the attribute is not present at all.
 	 *
 	 * @param el   element
 	 * @param attr attribute to look for
@@ -219,8 +222,8 @@ public class XHTMLNodeVisitor implements NodeVisitor {
 			return null;
 		}
 
-		// look for prefix and namespace, separated with whitespace
-		// there can be multiple prefix + namespace pairs in one attribute, also separated with whitespaces
+		// Look for prefix and namespace, separated with whitespace
+		// There can be multiple prefix + namespace pairs in one attribute, also separated with whitespaces.
 		String[] splits = prefixes.split(" +");
 		int len = splits.length;
 		if (len % 2 != 0) {
@@ -228,8 +231,7 @@ public class XHTMLNodeVisitor implements NodeVisitor {
 			return null;
 		}
 
-		// Keep track of depth: namespaces are valid for the element itself and descendants,
-		// so they must be removed at the end of the element.
+		// Namespaces are valid for the element itself and descendants, so they must be removed at the end of the element.
 		// The prefix can also locally hide/change a prefix previously set by an ancestor element.
 		Map<String, String> map = new HashMap<>();
 		for (int i = 0; i < len; i += 2) {
@@ -248,10 +250,9 @@ public class XHTMLNodeVisitor implements NodeVisitor {
 	 * Get subject, based on various attributes and/or subjects set by ancestor elements.
 	 *
 	 * @param about value of about attribute
-	 * @param depth
 	 * @return Resource or null
 	 */
-/*	private Resource getNewSubj(String about, int depth) {
+/*	private Resource getNewSubj(String about) {
 		if (about != null) {
 			return parser.createIRI(absoluteURL(expandPrefix(about)));
 		}
@@ -268,7 +269,7 @@ public class XHTMLNodeVisitor implements NodeVisitor {
 		}
 		return (typeof != null) ? parser.createBlank() : getParentObj();
 	}
-
+*/
 	private Resource getTypeSubj(String about, String res, String href, String src, String typeof, int depth) {
 		if (about != null) {
 			return parser.createIRI(absoluteURL(expandPrefix(about)));
@@ -344,6 +345,21 @@ public class XHTMLNodeVisitor implements NodeVisitor {
 				.toArray(IRI[]::new);
 	}
 */
+	private EvaluationContext getLocalContext(Element el, int i) {
+		// 7.5.1
+		EvaluationContext localContext = new EvaluationContext();
+		localContexts.put(i, localContext);
+		localContext.setSkipElement(false);
+		
+		// basic context settings
+		// 7.5.2 - 7.5.4
+		localContext.setDefaultVocabulary(getVocab(el));
+		localContext.setIriMappings(getPrefixes(el));
+		localContext.setLanguage(getLanguage(el));
+		
+		return localContext;
+	}
+
 	@Override
 	public void head(Node node, int i) {
 		if (!(node instanceof Element)) {
@@ -357,16 +373,6 @@ public class XHTMLNodeVisitor implements NodeVisitor {
 		if (attrs == 0) {
 			return;
 		}
-
-		EvaluationContext localContext = new EvaluationContext();
-		localContexts.put(i, localContext);
-		localContext.setSkipElement(false);
-		
-		// basic context settings
-		// 7.5.2 - 7.5.4
-		localContext.setDefaultVocabulary(getVocab(el));
-		localContext.setIriMappings(getPrefixes(el));
-		localContext.setLanguage(getLanguage(el));
 
 		// check "special" attributes
 		String about = el.attr(RDFaUtil.ABOUT);
@@ -384,6 +390,8 @@ public class XHTMLNodeVisitor implements NodeVisitor {
 			return;
 		}
 
+		EvaluationContext localContext = getLocalContext(el, i);
+	
 		// used for (typed) literals
 		String content = getNonEmptyAttr(el, RDFaUtil.CONTENT);
 		String datatype = getNonEmptyAttr(el, RDFaUtil.DATATYPE);
@@ -391,7 +399,22 @@ public class XHTMLNodeVisitor implements NodeVisitor {
 		if (rel == null && rev == null) {
 			// 7.5.5
 			if (prop != null && content == null && datatype == null) {
-				newSubject = getNewSubj(about, i);
+				// 7.5.5.1
+				Resource subject;
+				if (about != null) {
+					subject = about;
+				} else {
+					if (el.equals(root)) {
+						subject = initialContext.getBase();
+					} else {
+						parent = initialContext.getSubject();
+						if (parent != null) {
+							subject = parent;						
+						}
+					}
+				}
+				localContext.setSubject(subject);
+
 				if (typeof != null) {
 					typedRes = getTypeSubj(about, res, href, src, typeof, i);
 					if (about == null) {
