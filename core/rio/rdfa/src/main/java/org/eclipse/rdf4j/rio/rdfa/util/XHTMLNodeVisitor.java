@@ -8,7 +8,9 @@
 package org.eclipse.rdf4j.rio.rdfa.util;
 
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
+import java.util.TreeMap;
 
 import org.eclipse.rdf4j.common.annotation.InternalUseOnly;
 import org.eclipse.rdf4j.rio.rdfa.RDFaParser;
@@ -31,9 +33,8 @@ public class XHTMLNodeVisitor implements NodeVisitor {
 
 	private final RDFaParser parser;
 	private final EvaluationContext initialContext;
-	private final EvaluationContext localContext;
+	private final Map<Integer, EvaluationContext> localContexts = new TreeMap<>();
 	
-
 	/**
 	 * Constructor
 	 * 
@@ -43,18 +44,13 @@ public class XHTMLNodeVisitor implements NodeVisitor {
 	public XHTMLNodeVisitor(RDFaParser parser, String baseURI) {
 		this.parser = parser;
 
-		this.initialContext = new EvaluationContext();
-		this.initialContext.initInitial(baseURI, Collections.EMPTY_MAP, Collections.EMPTY_MAP, null);
-
-		this.localContext = new EvaluationContext();
-		this.localContext.initLocal(initialContext);
+		initialContext = new EvaluationContext();
+		initialContext.setBase(baseURI);
+		initialContext.setIriMappings(Collections.EMPTY_MAP);
+		initialContext.setTermMappings(Collections.EMPTY_MAP);
+		initialContext.setDefaultVocabulary(null);
 		
-/*		skipElement = false;
-		newSubject = null;
-		currObjRes = null;
-		typedRes = null;
-		localNS.put(-1, INITIAL_CONTEXT);
-*/	}
+	}
 
 	/**
 	 * Get language. The language could be defined on the element itself or on an ancestor element.
@@ -156,7 +152,7 @@ public class XHTMLNodeVisitor implements NodeVisitor {
 	 * @param attr attribute to look for
 	 * @return null when attribute is not present or empty
 	 */
-/*	private String getNonEmptyAttr(Element el, String attr) {
+	private String getNonEmptyAttr(Element el, String attr) {
 		String str = el.attr(attr);
 		if (str == null) {
 			return null;
@@ -167,7 +163,7 @@ public class XHTMLNodeVisitor implements NodeVisitor {
 		}
 		return str;
 	}
-*/
+
 	/**
 	 * Check base href element.
 	 *
@@ -181,53 +177,46 @@ public class XHTMLNodeVisitor implements NodeVisitor {
 	}
 */
 	/**
-	 * Check if the element has an xml:lang or lang attribute (in that order) for declaring the language. This is only
+	 * Check if the element has an xml:lang or lang attribute (in that order) for declaring the language. 
+	 * 
+	 * This is only
 	 * valid for the element itself and its descendants, so it must be removed when JSoup is finished with processing
 	 * the element.
 	 *
-	 * @param el    element
-	 * @param depth depth of the element in the DOM structure
+	 * @param el element
+	 * @return language tag or null
 	 */
-/*	private void setLanguage(Element el, int depth) {
+	private String getLanguage(Element el) {
 		String lang = el.attr(RDFaUtil.XML_LANG);
-		if (lang == null) {
-			lang = el.attr(RDFaUtil.LANG);
-			if (lang != null) {
-				localLang.put(depth, lang);
-			}
-		}
+		return (lang != null) ? lang : el.attr(RDFaUtil.LANG);
 	}
-*/
+
 	/**
-	 * Check if the element has a vocab attribute for declaring the local vocabulary namespace. This is only valid for
+	 * Check if the element has a vocab attribute for declaring the local vocabulary namespace. 
+	 * 
+	 * This is only valid for
 	 * the element itself and its descendants, so it must be removed when JSoup is finished with processing the element.
 	 *
-	 * @param el    element
-	 * @param depth depth of the element in the DOM structure
+	 * @param el element
+	 * @return default vocabulary, can be empty or null
 	 */
-/*	private void setVocab(Element el, int depth) {
-		String vocab = getNonEmptyAttr(el, RDFaUtil.VOCAB);
-		if (vocab == null) {
-			return;
-		}
-
-		Map<String, String> ctx = localNS.getOrDefault(depth, new HashMap<>());
-		ctx.put("", vocab);
-		localNS.put(depth, ctx);
-		parser.handleNS("", vocab);
+	private String getVocab(Element el) {
+		return getNonEmptyAttr(el, RDFaUtil.VOCAB);
 	}
-*/
+
 	/**
-	 * Check if the element has a prefix attribute for declaring local namespaces. They are only valid for the element
+	 * Check if the element has a prefix attribute for declaring local namespaces. 
+	 * 
+	 * They are only valid for the element
 	 * itself and its descendants, so they must be removed when JSoup is finished with processing the element.
 	 *
-	 * @param el    element
-	 * @param depth depth in DOM structure
+	 * @param el element
+	 * @return map of prefixes or null
 	 */
-/*	private void setPrefixes(Element el, int depth) {
+	private Map<String,String> getPrefixes(Element el) {
 		String prefixes = getNonEmptyAttr(el, RDFaUtil.PREFIX);
 		if (prefixes == null) {
-			return;
+			return null;
 		}
 
 		// look for prefix and namespace, separated with whitespace
@@ -236,25 +225,25 @@ public class XHTMLNodeVisitor implements NodeVisitor {
 		int len = splits.length;
 		if (len % 2 != 0) {
 			parser.fatalError("Error processing namespaces " + el.tagName() + " " + prefixes);
-			return;
+			return null;
 		}
 
 		// Keep track of depth: namespaces are valid for the element itself and descendants,
 		// so they must be removed at the end of the element.
 		// The prefix can also locally hide/change a prefix previously set by an ancestor element.
-		Map<String, String> ctx = localNS.getOrDefault(depth, new HashMap<>());
+		Map<String, String> map = new HashMap<>();
 		for (int i = 0; i < len; i += 2) {
 			if (splits[i].endsWith(":")) {
 				String prefix = splits[i].substring(0, splits[i].length() - 1).toLowerCase();
-				ctx.put(prefix, splits[i + 1]);
-				localNS.put(depth, ctx);
+				map.put(prefix, splits[i + 1]);
 				parser.handleNS(prefix, splits[i + 1]);
 			} else {
 				parser.error("Prefix doesn't end with ':' " + el.tagName() + " " + splits[i]);
 			}
 		}
+		return map;
 	}
-*/
+
 	/**
 	 * Get subject, based on various attributes and/or subjects set by ancestor elements.
 	 *
@@ -369,12 +358,16 @@ public class XHTMLNodeVisitor implements NodeVisitor {
 			return;
 		}
 
+		EvaluationContext localContext = new EvaluationContext();
+		localContexts.put(i, localContext);
+		localContext.setSkipElement(false);
+		
 		// basic context settings
 		// 7.5.2 - 7.5.4
-/*		setVocab(el, i);
-		setPrefixes(el, i);
-		setLanguage(el, i);
-*/
+		localContext.setDefaultVocabulary(getVocab(el));
+		localContext.setIriMappings(getPrefixes(el));
+		localContext.setLanguage(getLanguage(el));
+
 		// check "special" attributes
 		String about = el.attr(RDFaUtil.ABOUT);
 		String href = el.attr(RDFaUtil.HREF);
@@ -390,7 +383,7 @@ public class XHTMLNodeVisitor implements NodeVisitor {
 		if (RDFaUtil.firstNonNull(about, href, inlist, prop, rel, rev, res, src, typeof) != null) {
 			return;
 		}
-/*
+
 		// used for (typed) literals
 		String content = getNonEmptyAttr(el, RDFaUtil.CONTENT);
 		String datatype = getNonEmptyAttr(el, RDFaUtil.DATATYPE);
@@ -455,18 +448,14 @@ public class XHTMLNodeVisitor implements NodeVisitor {
 			}
 		} else {
 			// 7.5.10
-		} */
+		}
 	}
 
 	@Override
 	public void tail(Node node, int i) {
 		if (node instanceof Element) {
 			// remove "out-of-scope" namespaces and languages etc
-/*			for (TreeMap<Integer, Object> ctx : contexts) {
-				if (i == ctx.lastKey()) {
-					ctx.remove(i);
-				}
-			}
-*/		}
+			localContexts.remove(i);
+		}
 	}
 }

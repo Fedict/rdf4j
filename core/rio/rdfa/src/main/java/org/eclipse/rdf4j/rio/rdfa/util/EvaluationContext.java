@@ -28,10 +28,10 @@ public class EvaluationContext {
 	private Resource subject;
 	private Resource object;
 	private Resource typedResource;
-	private Map<String, IRI> iriMappings;
-	private Map<String, IRI> termMappings;
+	private Map<String, String> iriMappings;
+	private Map<String, String> termMappings;
 	private Map<IRI, List<IRI>> listMappings;
-	private IRI defaultVocabulary;
+	private String defaultVocabulary;
 	private String language;
 	private boolean skipElement;
 	private List<CompletableStatement> incompleteTriples;
@@ -68,19 +68,19 @@ public class EvaluationContext {
 		this.typedResource = typedResource;
 	}
 
-	public Map<String, IRI> getIriMappings() {
+	public Map<String, String> getIriMappings() {
 		return iriMappings;
 	}
 
-	public void setIriMappings(Map<String, IRI> iriMappings) {
+	public void setIriMappings(Map<String, String> iriMappings) {
 		this.iriMappings = iriMappings;
 	}
 
-	public Map<String, IRI> getTermMappings() {
+	public Map<String, String> getTermMappings() {
 		return termMappings;
 	}
 
-	public void setTermMappings(Map<String, IRI> termMappings) {
+	public void setTermMappings(Map<String, String> termMappings) {
 		this.termMappings = termMappings;
 	}
 
@@ -92,11 +92,11 @@ public class EvaluationContext {
 		this.listMappings = listMappings;
 	}
 
-	public IRI getDefaultVocabulary() {
+	public String getDefaultVocabulary() {
 		return defaultVocabulary;
 	}
 
-	public void setDefaultVocabulary(IRI defaultVocabulary) {
+	public void setDefaultVocabulary(String defaultVocabulary) {
 		this.defaultVocabulary = defaultVocabulary;
 	}
 
@@ -122,30 +122,5 @@ public class EvaluationContext {
 
 	public void setSkipElement(boolean skipElement) {
 		this.skipElement = skipElement;
-	}
-	
-	public void initInitial(String base, Map<String,IRI> iriMappings, Map<String,IRI> termMappings, IRI vocabulary) {
-		this.base = base;
-		this.subject = Values.iri(base);
-		this.object = null;
-		this.incompleteTriples = new ArrayList<>();
-		this.listMappings = new HashMap<>();
-		this.language = null;
-		this.iriMappings = iriMappings;
-		this.termMappings = termMappings;
-		this.defaultVocabulary = vocabulary;
-	}
-	
-	public void initLocal(EvaluationContext initialContext) {
-		this.skipElement = false;
-		this.subject = null;
-		this.object = null;
-		this.typedResource = null;
-		this.iriMappings = initialContext.getIriMappings();
-		this.incompleteTriples = new ArrayList<>();
-		this.listMappings = initialContext.getListMappings();
-		this.language = initialContext.getLanguage();
-		this.termMappings = initialContext.getTermMappings();
-		this.defaultVocabulary = initialContext.getDefaultVocabulary();
 	}
 }
