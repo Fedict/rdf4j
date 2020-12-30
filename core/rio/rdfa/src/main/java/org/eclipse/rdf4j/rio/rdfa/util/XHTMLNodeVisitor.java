@@ -33,7 +33,7 @@ public class XHTMLNodeVisitor implements NodeVisitor {
 	private final Element root;
 	private final RDFaParser parser;
 	private final EvaluationContext initialContext;
-	private final Map<Integer, EvaluationContext> localContexts = new TreeMap<>();
+	private final TreeMap<Integer, EvaluationContext> localContexts = new TreeMap<>();
 	
 	/**
 	 * Constructor
@@ -63,24 +63,6 @@ public class XHTMLNodeVisitor implements NodeVisitor {
 		return localLang.get(localLang.lastKey());
 	}
 */
-	/**
-	 * Get namespace associated with a prefix. This namespace could be defined on the element itself or on an ancestor
-	 * element.
-	 *
-	 * @param prefix prefix
-	 * @return URI of the namespace as string, or null if not found
-	 */
-	private String getNamespace(String prefix) {
-		String ns;
-		// a prefix may "hide" a previously set prefix, especially the empty prrefix
-		for (Map.Entry<Integer, Map<String, String>> e : localNS.descendingMap().entrySet()) {
-			ns = e.getValue().get(prefix);
-			if (ns != null) {
-				return ns;
-			}
-		}
-		return null;
-	}
 
 	/**
 	 * Get absolute URL, using baseURL to convert relative URLs.
@@ -400,14 +382,14 @@ public class XHTMLNodeVisitor implements NodeVisitor {
 			// 7.5.5
 			if (prop != null && content == null && datatype == null) {
 				// 7.5.5.1
-				Resource subject;
+				Resource subject = null;
 				if (about != null) {
-					subject = about;
+					subject = parser.createIRI(RDFaUtil.expand(about, initialContext, localContexts));
 				} else {
 					if (el.equals(root)) {
-						subject = initialContext.getBase();
+						subject = initialContext.getBaseIRI();
 					} else {
-						parent = initialContext.getSubject();
+						Resource parent = initialContext.getSubject();
 						if (parent != null) {
 							subject = parent;						
 						}

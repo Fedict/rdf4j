@@ -25,6 +25,7 @@ import org.eclipse.rdf4j.model.util.Values;
 @InternalUseOnly
 public class EvaluationContext {
 	private String base;
+	private IRI baseIRI;
 	private Resource subject;
 	private Resource object;
 	private Resource typedResource;
@@ -40,8 +41,13 @@ public class EvaluationContext {
 		return base;
 	}
 
+	public IRI getBaseIRI() {
+		return baseIRI;
+	}
+
 	public void setBase(String base) {
 		this.base = base;
+		this.baseIRI = (base != null) ? Values.iri(base) : null;
 	}
 
 	public Resource getSubject() {

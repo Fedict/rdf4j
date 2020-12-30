@@ -8,7 +8,10 @@
 package org.eclipse.rdf4j.rio.rdfa.util;
 
 
+import java.util.Map;
+import java.util.TreeMap;
 import org.eclipse.rdf4j.common.annotation.InternalUseOnly;
+import org.eclipse.rdf4j.model.IRI;
 
 /**
  *
@@ -39,6 +42,12 @@ class RDFaUtil {
 	public final static String XML_LANG = "xml:lang";
 	public final static String XMLNS = "xmlns";
 
+	public enum Direction {
+		REVERSE,
+		NONE,
+		FORWARD;
+	}
+	
 	/**
 	 * Return first non null value
 	 * 
@@ -54,9 +63,37 @@ class RDFaUtil {
 		return null;
 	}
 
-	public enum Direction {
-		REVERSE,
-		NONE,
-		FORWARD;
+	/**
+	 * Get namespace associated with a prefix. 
+	 * 
+	 * This namespace could be defined on the element itself or on an ancestor element.
+	 *
+	 * @param prefix prefix
+	 * @return URI of the namespace as string, or null if not found
+	 */
+	public static String getNamespace(String prefix, EvaluationContext initial, TreeMap<Integer, EvaluationContext> locals) {
+		String ns;
+		// a prefix may "hide" a previously set prefix, especially the empty prrefix
+		for (Map.Entry<Integer, EvaluationContext> e : locals.descendingMap().entrySet()) {
+			ns = e.getValue().getIriMappings().get(prefix);
+			if (ns != null) {
+				return ns;
+			}
+		}
+		return initial.getIriMappings().get(prefix);
+	}
+
+	/**
+	 * Expand string to IRI
+	 * 
+	 * @param str
+	 * @param initialContext
+	 * @param localContexts
+	 * @return 
+	 */
+	public static String expand(String str, EvaluationContext initialContext, TreeMap<Integer, EvaluationContext> localContexts) {
+		String s = CURIEUtil.toString(str);
+		String ns = getNamespace(s, initialContext, localContexts);
+		return ns + s;
 	}
 }
