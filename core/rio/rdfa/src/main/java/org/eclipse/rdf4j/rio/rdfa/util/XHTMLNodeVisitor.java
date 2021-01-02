@@ -252,12 +252,9 @@ public class XHTMLNodeVisitor implements NodeVisitor {
 		return (typeof != null) ? parser.createBlank() : getParentObj();
 	}
 */
-	private Resource getTypeSubj(String about, String res, String href, String src, String typeof, int depth) {
+	private Resource getSubj(String about, String res, String href, String src, String typeof) {
 		if (about != null) {
 			return parser.createIRI(absoluteURL(expandPrefix(about)));
-		}
-		if (depth == 0) {
-			return parser.createIRI(parser.baseURL);
 		}
 		String str = RDFaUtil.firstNonNull(res, href, src);
 		return (str != null) ? parser.createIRI(absoluteURL(expandPrefix(str))) : parser.createBlank();
@@ -327,6 +324,57 @@ public class XHTMLNodeVisitor implements NodeVisitor {
 				.toArray(IRI[]::new);
 	}
 */
+	/**
+	 * 
+	 * @param el
+	 * @param about
+	 * @return 
+	 */
+	private Resource getSubject(Element el, String about) {
+		if (about != null) {
+			return parser.createIRI(RDFaUtil.expand(about, initialContext, localContexts));
+		}
+		if (el.equals(root)) {
+			return initialContext.getBaseIRI();
+		}
+
+		Resource parent = initialContext.getObject();
+		return (parent != null) ? parent: null;
+	}
+
+	/**
+	 * 
+	 * @param el
+	 * @param about
+	 * @return 
+	 */
+	private Resource getTypedResAbout(Element el, String about) {
+		if (about != null) {
+			return parser.createIRI(RDFaUtil.expand(about, initialContext, localContexts));
+		}
+		return el.equals(root) ? initialContext.getBaseIRI() : null;
+	}
+
+	/**
+	 * 
+	 * @param res
+	 * @param href
+	 * @param src
+	 * @param about
+	 * @return 
+	 */
+	private Resource getTypedRes(String res, String href, String src, String about) {
+		String attr = RDFaUtil.firstNonNull(res, href, src);
+		return (attr != null) ? parser.createIRI(RDFaUtil.expand(about, initialContext, localContexts))
+								: parser.createBlank();
+	}
+
+	/**
+	 * 
+	 * @param el
+	 * @param i
+	 * @return 
+	 */
 	private EvaluationContext getLocalContext(Element el, int i) {
 		// 7.5.1
 		EvaluationContext localContext = new EvaluationContext();
@@ -382,27 +430,17 @@ public class XHTMLNodeVisitor implements NodeVisitor {
 			// 7.5.5
 			if (prop != null && content == null && datatype == null) {
 				// 7.5.5.1
-				Resource subject = null;
-				if (about != null) {
-					subject = parser.createIRI(RDFaUtil.expand(about, initialContext, localContexts));
-				} else {
-					if (el.equals(root)) {
-						subject = initialContext.getBaseIRI();
-					} else {
-						Resource parent = initialContext.getSubject();
-						if (parent != null) {
-							subject = parent;						
-						}
-					}
-				}
-				localContext.setSubject(subject);
+				Resource subj = getSubject(el, about);
+				localContext.setSubject(subj);
 
 				if (typeof != null) {
-					typedRes = getTypeSubj(about, res, href, src, typeof, i);
-					if (about == null) {
-						currObjRes = typedRes;
+					Resource typedRes = getTypedResAbout(el, about);
+					if (typedRes == null) {
+						typedRes = getTypedRes(res, href, src, about);
+						localContext.setObject(typedRes);
 					}
 				}
+
 			} else {
 				newSubject = getNewSubj(about, res, href, src, typeof, i);
 				if (typeof != null) {
