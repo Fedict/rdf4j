@@ -13,6 +13,7 @@ import java.util.Map;
 import java.util.TreeMap;
 
 import org.eclipse.rdf4j.common.annotation.InternalUseOnly;
+import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.rio.rdfa.RDFaParser;
 
@@ -267,7 +268,7 @@ public class XHTMLNodeVisitor implements NodeVisitor {
 		}
 		return (typeof != null) ? parser.createBlank() : null;
 	}
-*/
+
 	/**
 	 * Check if the element has a property attribute for declaring the predicate of a triple.
 	 *
@@ -325,10 +326,11 @@ public class XHTMLNodeVisitor implements NodeVisitor {
 	}
 */
 	/**
+	 * Get new subject
 	 * 
-	 * @param el
-	 * @param about
-	 * @return 
+	 * @param el element
+	 * @param about about attribute
+	 * @return subject or null
 	 */
 	private Resource getSubject(Element el, String about) {
 		if (about != null) {
@@ -343,10 +345,11 @@ public class XHTMLNodeVisitor implements NodeVisitor {
 	}
 
 	/**
+	 * Get types resource from the value of about attribute
 	 * 
-	 * @param el
-	 * @param about
-	 * @return 
+	 * @param el element
+	 * @param about value of about attribute
+	 * @return typed resource
 	 */
 	private Resource getTypedResAbout(Element el, String about) {
 		if (about != null) {
@@ -356,24 +359,25 @@ public class XHTMLNodeVisitor implements NodeVisitor {
 	}
 
 	/**
+	 * Get typed resource from one of the several attribute values
 	 * 
-	 * @param res
-	 * @param href
-	 * @param src
-	 * @param about
-	 * @return 
+	 * @param res resource attribute value
+	 * @param href href attribute value
+	 * @param src srf attribute value
+	 * @return typed resource
 	 */
-	private Resource getTypedRes(String res, String href, String src, String about) {
+	private Resource getTypedRes(String res, String href, String src) {
 		String attr = RDFaUtil.firstNonNull(res, href, src);
-		return (attr != null) ? parser.createIRI(RDFaUtil.expand(about, initialContext, localContexts))
+		return (attr != null) ? parser.createIRI(RDFaUtil.expand(attr, initialContext, localContexts))
 								: parser.createBlank();
 	}
 
 	/**
+	 * Local evaluation context
 	 * 
-	 * @param el
-	 * @param i
-	 * @return 
+	 * @param el element
+	 * @param i depth
+	 * @return new local evaluation context
 	 */
 	private EvaluationContext getLocalContext(Element el, int i) {
 		// 7.5.1
@@ -390,20 +394,13 @@ public class XHTMLNodeVisitor implements NodeVisitor {
 		return localContext;
 	}
 
-	@Override
-	public void head(Node node, int i) {
-		if (!(node instanceof Element)) {
-			return;
-		}
-
-		// See processing rules 7.5 https://www.w3.org/TR/rdfa-core/#s_sequence
-		Element el = (Element) node;
-
-		int attrs = el.attributes().size();
-		if (attrs == 0) {
-			return;
-		}
-
+	/**
+	 * Process element
+	 * 
+	 * @param el element
+	 * @parem i depth
+	 */
+	private void processElement(Element el, int i) {
 		// check "special" attributes
 		String about = el.attr(RDFaUtil.ABOUT);
 		String href = el.attr(RDFaUtil.HREF);
@@ -436,12 +433,13 @@ public class XHTMLNodeVisitor implements NodeVisitor {
 				if (typeof != null) {
 					Resource typedRes = getTypedResAbout(el, about);
 					if (typedRes == null) {
-						typedRes = getTypedRes(res, href, src, about);
+						typedRes = getTypedRes(res, href, src);
 						localContext.setObject(typedRes);
 					}
 				}
-
 			} else {
+				String subj = RDFaUtil.firstNonNull(about, res, href, src);
+				
 				newSubject = getNewSubj(about, res, href, src, typeof, i);
 				if (typeof != null) {
 					typedRes = newSubject;
@@ -492,6 +490,23 @@ public class XHTMLNodeVisitor implements NodeVisitor {
 		} else {
 			// 7.5.10
 		}
+	}
+
+	@Override
+	public void head(Node node, int i) {
+		if (!(node instanceof Element)) {
+			return;
+		}
+
+		// See processing rules 7.5 https://www.w3.org/TR/rdfa-core/#s_sequence
+		Element el = (Element) node;
+
+		int attrs = el.attributes().size();
+		if (attrs == 0) {
+			return;
+		}
+
+		processElement(el, i);
 	}
 
 	@Override
