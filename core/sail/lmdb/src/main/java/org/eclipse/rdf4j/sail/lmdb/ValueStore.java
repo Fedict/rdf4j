@@ -9,7 +9,6 @@ package org.eclipse.rdf4j.sail.lmdb;
 
 import static org.eclipse.rdf4j.sail.lmdb.LmdbUtil.E;
 import static org.eclipse.rdf4j.sail.lmdb.LmdbUtil.openDatabase;
-import static org.eclipse.rdf4j.sail.lmdb.LmdbUtil.readTransaction;
 import static org.lwjgl.system.MemoryStack.stackPush;
 import static org.lwjgl.system.MemoryUtil.NULL;
 import static org.lwjgl.util.lmdb.LMDB.MDB_CREATE;
@@ -25,26 +24,28 @@ import static org.lwjgl.util.lmdb.LMDB.mdb_cursor_get;
 import static org.lwjgl.util.lmdb.LMDB.mdb_cursor_open;
 import static org.lwjgl.util.lmdb.LMDB.mdb_env_close;
 import static org.lwjgl.util.lmdb.LMDB.mdb_env_create;
+import static org.lwjgl.util.lmdb.LMDB.mdb_env_info;
 import static org.lwjgl.util.lmdb.LMDB.mdb_env_open;
 import static org.lwjgl.util.lmdb.LMDB.mdb_env_set_mapsize;
 import static org.lwjgl.util.lmdb.LMDB.mdb_get;
 import static org.lwjgl.util.lmdb.LMDB.mdb_put;
+import static org.lwjgl.util.lmdb.LMDB.mdb_stat;
 import static org.lwjgl.util.lmdb.LMDB.mdb_txn_abort;
 import static org.lwjgl.util.lmdb.LMDB.mdb_txn_begin;
 import static org.lwjgl.util.lmdb.LMDB.mdb_txn_commit;
+import static org.lwjgl.util.lmdb.LMDB.mdb_txn_renew;
+import static org.lwjgl.util.lmdb.LMDB.mdb_txn_reset;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Optional;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.zip.CRC32;
 
-import org.eclipse.rdf4j.common.concurrent.locks.Lock;
-import org.eclipse.rdf4j.common.concurrent.locks.ReadWriteLockManager;
-import org.eclipse.rdf4j.common.concurrent.locks.WritePrefReadWriteLockManager;
 import org.eclipse.rdf4j.common.io.ByteArrayUtil;
 import org.eclipse.rdf4j.model.BNode;
 import org.eclipse.rdf4j.model.IRI;
@@ -63,6 +64,8 @@ import org.eclipse.rdf4j.sail.lmdb.model.LmdbResource;
 import org.eclipse.rdf4j.sail.lmdb.model.LmdbValue;
 import org.lwjgl.PointerBuffer;
 import org.lwjgl.system.MemoryStack;
+import org.lwjgl.util.lmdb.MDBEnvInfo;
+import org.lwjgl.util.lmdb.MDBStat;
 import org.lwjgl.util.lmdb.MDBVal;
 
 /**
@@ -93,11 +96,6 @@ class ValueStore extends AbstractValueFactory {
 	 */
 	private final File dir;
 	/**
-	 * Lock manager used to prevent the removal of values over multiple method calls. Note that values can still be
-	 * added when read locks are active.
-	 */
-	private final ReadWriteLockManager lockManager = new WritePrefReadWriteLockManager();
-	/**
 	 * A simple cache containing the [VALUE_CACHE_SIZE] most-recently used values stored by their ID.
 	 */
 	private final LmdbValue[] valueCache;
@@ -118,10 +116,14 @@ class ValueStore extends AbstractValueFactory {
 	 * Used to do the actual storage of values, once they're translated to byte arrays.
 	 */
 	private long env;
+	private int pageSize;
+	private long mapSize;
 	private int dbi;
 	private long writeTxn;
 	private final boolean forceSync;
-	private final long dbSize;
+	private final boolean autoGrow;
+	/** This lock is required to block transactions while auto-growing the map size. */
+	private final ReadWriteLock txnLock = new ReentrantReadWriteLock();
 
 	/**
 	 * An object that indicates the revision of the value store, which is used to check if cached value IDs are still
@@ -136,7 +138,8 @@ class ValueStore extends AbstractValueFactory {
 	ValueStore(File dir, LmdbStoreConfig config) throws IOException {
 		this.dir = dir;
 		this.forceSync = config.getForceSync();
-		this.dbSize = config.getValueDBSize();
+		this.autoGrow = config.getAutoGrow();
+		this.mapSize = config.getValueDBSize();
 		open();
 
 		valueCache = new LmdbValue[config.getValueCacheSize()];
@@ -147,7 +150,7 @@ class ValueStore extends AbstractValueFactory {
 		setNewRevision();
 
 		// read maximum id from store
-		LmdbUtil.<Long>readTransaction(env, (stack, txn) -> {
+		readTransaction(env, (stack, txn) -> {
 			long cursor = 0;
 			try {
 				PointerBuffer pp = stack.mallocPointer(1);
@@ -184,8 +187,6 @@ class ValueStore extends AbstractValueFactory {
 			env = pp.get(0);
 		}
 
-		mdb_env_set_mapsize(env, dbSize);
-
 		// Open environment
 		int flags = MDB_NOTLS;
 		if (!forceSync) {
@@ -195,6 +196,30 @@ class ValueStore extends AbstractValueFactory {
 
 		// Open database
 		dbi = openDatabase(env, null, MDB_CREATE, null);
+
+		// initialize page size and set map size for env
+		readTransaction(env, (stack, txn) -> {
+			MDBStat stat = MDBStat.malloc(stack);
+			mdb_stat(txn, dbi, stat);
+
+			boolean isEmpty = stat.ms_entries() == 0;
+			pageSize = stat.ms_psize();
+			// align map size with page size
+			long configMapSize = (mapSize / pageSize) * pageSize;
+			if (isEmpty) {
+				// this is an empty db, use configured map size
+				mdb_env_set_mapsize(env, configMapSize);
+			}
+			MDBEnvInfo info = MDBEnvInfo.malloc(stack);
+			mdb_env_info(env, info);
+			mapSize = info.me_mapsize();
+			if (mapSize < configMapSize) {
+				// configured map size is larger than map size stored in env, increase map size
+				mdb_env_set_mapsize(env, configMapSize);
+				mapSize = configMapSize;
+			}
+			return null;
+		});
 	}
 
 	private long nextId(byte type) throws IOException {
@@ -233,16 +258,8 @@ class ValueStore extends AbstractValueFactory {
 		return revision;
 	}
 
-	/**
-	 * Gets a read lock on this value store that can be used to prevent values from being removed while the lock is
-	 * active.
-	 */
-	public Lock getReadLock() throws InterruptedException {
-		return lockManager.getReadLock();
-	}
-
 	protected byte[] getData(long id) throws IOException {
-		return readTransaction(env, writeTxn, (stack, txn) -> {
+		return readTransaction(env, (stack, txn) -> {
 			MDBVal keyData = MDBVal.calloc(stack);
 			keyData.mv_data(id2data(idBuffer(stack), id).flip());
 			MDBVal valueData = MDBVal.calloc(stack);
@@ -363,8 +380,39 @@ class ValueStore extends AbstractValueFactory {
 		return false;
 	}
 
+	private void resizeMap(long txn, int requiredSize) throws IOException {
+		if (autoGrow) {
+			if (LmdbUtil.requiresResize(mapSize, pageSize, txn, requiredSize)) {
+				// map is full, resize
+				txnLock.readLock().unlock();
+				txnLock.writeLock().lock();
+				try {
+					boolean activeWriteTxn = writeTxn != 0;
+					boolean txnIsRead = txn != writeTxn;
+					if (txnIsRead) {
+						mdb_txn_reset(txn);
+					}
+					if (activeWriteTxn) {
+						endTransaction(true);
+					}
+					mapSize = LmdbUtil.autoGrowMapSize(mapSize, pageSize, requiredSize);
+					E(mdb_env_set_mapsize(env, mapSize));
+					if (activeWriteTxn) {
+						startTransaction();
+					}
+					if (txnIsRead) {
+						E(mdb_txn_renew(txn));
+					}
+				} finally {
+					txnLock.writeLock().unlock();
+					txnLock.readLock().lock();
+				}
+			}
+		}
+	}
+
 	private long findId(byte[] data, boolean create) throws IOException {
-		Long id = LmdbUtil.<Long>readTransaction(env, writeTxn, (stack, txn) -> {
+		Long id = readTransaction(env, (stack, txn) -> {
 			if (data.length < MAX_KEY_SIZE) {
 				MDBVal dataVal = MDBVal.calloc(stack);
 				dataVal.mv_data(stack.bytes(data));
@@ -376,12 +424,14 @@ class ValueStore extends AbstractValueFactory {
 					return null;
 				}
 				// id was not found, create a new one
+				resizeMap(txn, 2 * data.length + 2 * (2 + Long.BYTES));
+
 				long newId = nextId(data[0]);
 				writeTransaction((stack2, writeTxn) -> {
 					idVal.mv_data(id2data(idBuffer(stack), newId).flip());
 
-					mdb_put(writeTxn, dbi, dataVal, idVal, 0);
-					mdb_put(writeTxn, dbi, idVal, dataVal, 0);
+					E(mdb_put(writeTxn, dbi, dataVal, idVal, 0));
+					E(mdb_put(writeTxn, dbi, idVal, dataVal, 0));
 					return null;
 				});
 				return newId;
@@ -390,7 +440,8 @@ class ValueStore extends AbstractValueFactory {
 
 				ByteBuffer dataBb = ByteBuffer.wrap(data);
 				long dataHash = hash(data);
-				ByteBuffer hashBb = stack.malloc(2 + 2 * Long.BYTES + 2);
+				int maxHashKeyLength = 2 + 2 * Long.BYTES + 2;
+				ByteBuffer hashBb = stack.malloc(maxHashKeyLength);
 				hashBb.put(HASH_KEY);
 				Varint.writeUnsigned(hashBb, dataHash);
 				int hashLength = hashBb.position();
@@ -412,15 +463,18 @@ class ValueStore extends AbstractValueFactory {
 					if (!create) {
 						return null;
 					}
+
+					resizeMap(txn, 2 * data.length + 2 * (2 + Long.BYTES));
+
 					long newId = nextId(data[0]);
 					writeTransaction((stack2, writeTxn) -> {
 						dataVal.mv_size(data.length);
 						idVal.mv_data(id2data(idBuffer(stack), newId).flip());
 
 						// store mapping of hash -> ID
-						mdb_put(txn, dbi, hashVal, idVal, 0);
+						E(mdb_put(txn, dbi, hashVal, idVal, 0));
 						// store mapping of ID -> data
-						mdb_put(writeTxn, dbi, idVal, dataVal, MDB_RESERVE);
+						E(mdb_put(writeTxn, dbi, idVal, dataVal, MDB_RESERVE));
 						dataVal.mv_data().put(data);
 						return null;
 					});
@@ -466,6 +520,8 @@ class ValueStore extends AbstractValueFactory {
 				}
 
 				// id was not found, create a new one
+				resizeMap(txn, 1 + Long.BYTES + maxHashKeyLength + 2 * data.length);
+
 				long newId = nextId(data[0]);
 				writeTransaction((stack2, writeTxn) -> {
 					// encode ID
@@ -482,11 +538,11 @@ class ValueStore extends AbstractValueFactory {
 
 					// store mapping of hash+ID -> []
 					dataVal.mv_data(stack.bytes());
-					mdb_put(txn, dbi, hashVal, dataVal, 0);
+					E(mdb_put(txn, dbi, hashVal, dataVal, 0));
 
 					dataVal.mv_size(data.length);
 					// store mapping of ID -> data
-					mdb_put(txn, dbi, idVal, dataVal, MDB_RESERVE);
+					E(mdb_put(txn, dbi, idVal, dataVal, MDB_RESERVE));
 					dataVal.mv_data().put(data);
 					return null;
 				});
@@ -494,6 +550,15 @@ class ValueStore extends AbstractValueFactory {
 			}
 		});
 		return id != null ? id : LmdbValue.UNKNOWN_ID;
+	}
+
+	<T> T readTransaction(long env, Transaction<T> transaction) throws IOException {
+		txnLock.readLock().lock();
+		try {
+			return LmdbUtil.readTransaction(env, writeTxn, transaction);
+		} finally {
+			txnLock.readLock().unlock();
+		}
 	}
 
 	<T> T writeTransaction(Transaction<T> transaction) throws IOException {
@@ -606,7 +671,7 @@ class ValueStore extends AbstractValueFactory {
 	void endTransaction(boolean commit) throws IOException {
 		if (writeTxn != 0) {
 			if (commit) {
-				mdb_txn_commit(writeTxn);
+				E(mdb_txn_commit(writeTxn));
 			} else {
 				mdb_txn_abort(writeTxn);
 			}
@@ -652,28 +717,19 @@ class ValueStore extends AbstractValueFactory {
 	 * @throws IOException If an I/O error occurred.
 	 */
 	public void clear() throws IOException {
-		try {
-			Lock writeLock = lockManager.getWriteLock();
-			try {
-				close();
+		close();
 
-				new File(dir, "data.mdb").delete();
-				new File(dir, "lock.mdb").delete();
+		new File(dir, "data.mdb").delete();
+		new File(dir, "lock.mdb").delete();
 
-				Arrays.fill(valueCache, null);
-				valueIDCache.clear();
-				namespaceCache.clear();
-				namespaceIDCache.clear();
+		Arrays.fill(valueCache, null);
+		valueIDCache.clear();
+		namespaceCache.clear();
+		namespaceIDCache.clear();
 
-				open();
+		open();
 
-				setNewRevision();
-			} finally {
-				writeLock.release();
-			}
-		} catch (InterruptedException e) {
-			throw new IOException("Failed to acquire write lock", e);
-		}
+		setNewRevision();
 	}
 
 	/**

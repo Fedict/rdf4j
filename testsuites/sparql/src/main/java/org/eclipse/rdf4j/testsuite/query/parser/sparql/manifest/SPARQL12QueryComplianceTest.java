@@ -32,7 +32,7 @@ public abstract class SPARQL12QueryComplianceTest extends SPARQLQueryComplianceT
 
 	private static final String[] defaultIgnoredTests = {};
 
-	private static final List<String> excludedSubdirs = Arrays.asList();
+	private static final List<String> excludedSubdirs = List.of();
 
 	@Parameterized.Parameters(name = "{0}")
 	public static Collection<Object[]> data() {
@@ -62,8 +62,8 @@ public abstract class SPARQL12QueryComplianceTest extends SPARQLQueryComplianceT
 	}
 
 	public SPARQL12QueryComplianceTest(String displayName, String testURI, String name, String queryFileURL,
-			String resultFileURL, Dataset dataset, boolean ordered) {
-		super(displayName, testURI, name, queryFileURL, resultFileURL, dataset, ordered);
+			String resultFileURL, Dataset dataset, boolean ordered, boolean laxCardinality) {
+		super(displayName, testURI, name, queryFileURL, resultFileURL, dataset, ordered, laxCardinality);
 	}
 
 	@Override

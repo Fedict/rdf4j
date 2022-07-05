@@ -13,8 +13,6 @@ import org.eclipse.rdf4j.sail.SailException;
 import org.eclipse.rdf4j.sail.memory.MemoryStore;
 import org.eclipse.rdf4j.sail.shacl.ShaclSail;
 import org.eclipse.rdf4j.testsuite.sail.SailConcurrencyTest;
-import org.junit.Ignore;
-import org.junit.Test;
 
 public class ShaclConcurrencyTest extends SailConcurrencyTest {
 
@@ -27,10 +25,4 @@ public class ShaclConcurrencyTest extends SailConcurrencyTest {
 		return new ShaclSail(new MemoryStore());
 	}
 
-	@Ignore
-	@Test
-	@Override
-	public void testConcurrentAddLargeTxnRollback() throws Exception {
-		// empty since this test is ignored
-	}
 }

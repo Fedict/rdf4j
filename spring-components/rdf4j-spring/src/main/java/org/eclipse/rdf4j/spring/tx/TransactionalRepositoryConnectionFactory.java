@@ -16,7 +16,11 @@ import java.lang.invoke.MethodHandles;
 import org.eclipse.rdf4j.repository.RepositoryConnection;
 import org.eclipse.rdf4j.sail.shacl.ShaclSailValidationReportHelper;
 import org.eclipse.rdf4j.spring.support.connectionfactory.RepositoryConnectionFactory;
-import org.eclipse.rdf4j.spring.tx.exception.*;
+import org.eclipse.rdf4j.spring.tx.exception.CommitException;
+import org.eclipse.rdf4j.spring.tx.exception.ConnectionClosedException;
+import org.eclipse.rdf4j.spring.tx.exception.NoTransactionException;
+import org.eclipse.rdf4j.spring.tx.exception.RDF4JTransactionException;
+import org.eclipse.rdf4j.spring.tx.exception.RollbackException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -29,7 +33,7 @@ public class TransactionalRepositoryConnectionFactory implements RepositoryConne
 
 	private static final Logger logger = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
-	private RepositoryConnectionFactory delegateFactory;
+	private final RepositoryConnectionFactory delegateFactory;
 
 	private final ThreadLocal<TransactionObject> transactionData = new ThreadLocal<>();
 

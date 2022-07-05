@@ -11,19 +11,18 @@ package org.eclipse.rdf4j.sail.shacl.ast.constraintcomponents;
 import static org.eclipse.rdf4j.model.util.Values.literal;
 
 import java.math.BigInteger;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
-import java.util.stream.Collectors;
-import java.util.stream.LongStream;
 
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Model;
 import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.vocabulary.SHACL;
-import org.eclipse.rdf4j.sail.shacl.ConnectionsGroup;
 import org.eclipse.rdf4j.sail.shacl.SourceConstraintComponent;
+import org.eclipse.rdf4j.sail.shacl.ValidationSettings;
 import org.eclipse.rdf4j.sail.shacl.ast.StatementMatcher;
 import org.eclipse.rdf4j.sail.shacl.ast.ValidationApproach;
 import org.eclipse.rdf4j.sail.shacl.ast.ValidationQuery;
@@ -40,6 +39,7 @@ import org.eclipse.rdf4j.sail.shacl.ast.planNodes.UnionNode;
 import org.eclipse.rdf4j.sail.shacl.ast.planNodes.Unique;
 import org.eclipse.rdf4j.sail.shacl.ast.planNodes.ValidationTuple;
 import org.eclipse.rdf4j.sail.shacl.ast.targets.EffectiveTarget;
+import org.eclipse.rdf4j.sail.shacl.wrapper.data.ConnectionsGroup;
 
 public class MaxCountConstraintComponent extends AbstractConstraintComponent {
 
@@ -60,30 +60,34 @@ public class MaxCountConstraintComponent extends AbstractConstraintComponent {
 	}
 
 	@Override
-	public PlanNode generateTransactionalValidationPlan(ConnectionsGroup connectionsGroup, boolean logValidationPlans,
+	public PlanNode generateTransactionalValidationPlan(ConnectionsGroup connectionsGroup,
+			ValidationSettings validationSettings,
 			PlanNodeProvider overrideTargetNode, Scope scope) {
 
 		StatementMatcher.StableRandomVariableProvider stableRandomVariableProvider = new StatementMatcher.StableRandomVariableProvider();
 
-		EffectiveTarget effectiveTarget = getTargetChain().getEffectiveTarget("_target", scope,
-				connectionsGroup.getRdfsSubClassOfReasoner());
+		EffectiveTarget effectiveTarget = getTargetChain().getEffectiveTarget(scope,
+				connectionsGroup.getRdfsSubClassOfReasoner(), stableRandomVariableProvider);
 		Optional<Path> path = getTargetChain().getPath();
 
 		PlanNode mergeNode;
 
 		if (overrideTargetNode != null) {
-			mergeNode = effectiveTarget.extend(overrideTargetNode.getPlanNode(), connectionsGroup, scope,
+			mergeNode = effectiveTarget.extend(overrideTargetNode.getPlanNode(), connectionsGroup,
+					validationSettings.getDataGraph(), scope,
 					EffectiveTarget.Extend.right, false, null);
 		} else {
 
-			PlanNode addedTargets = effectiveTarget.getPlanNode(connectionsGroup, scope, false, null);
+			PlanNode addedTargets = effectiveTarget.getPlanNode(connectionsGroup, validationSettings.getDataGraph(),
+					scope, false, null);
 
-			PlanNode addedByPath = path.get().getAdded(connectionsGroup, null);
+			PlanNode addedByPath = path.get().getAdded(connectionsGroup, validationSettings.getDataGraph(), null);
 
 			addedByPath = effectiveTarget.getTargetFilter(connectionsGroup,
-					Unique.getInstance(new TrimToTarget(addedByPath), false));
+					validationSettings.getDataGraph(), Unique.getInstance(new TrimToTarget(addedByPath), false));
 
-			addedByPath = effectiveTarget.extend(addedByPath, connectionsGroup, scope, EffectiveTarget.Extend.left,
+			addedByPath = effectiveTarget.extend(addedByPath, connectionsGroup, validationSettings.getDataGraph(),
+					scope, EffectiveTarget.Extend.left,
 					false,
 					null);
 
@@ -98,27 +102,26 @@ public class MaxCountConstraintComponent extends AbstractConstraintComponent {
 			relevantTargetsWithPath = new BulkedExternalInnerJoin(
 					mergeNode,
 					connectionsGroup.getBaseConnection(),
-					getTargetChain().getPath()
+					validationSettings.getDataGraph(), getTargetChain().getPath()
 							.get()
 							.getTargetQueryFragment(new StatementMatcher.Variable("a"),
 									new StatementMatcher.Variable("c"),
 									connectionsGroup.getRdfsSubClassOfReasoner(), stableRandomVariableProvider),
 					false,
 					null,
-					(b) -> new ValidationTuple(b.getValue("a"), b.getValue("c"), scope, true)
+					BulkedExternalInnerJoin.getMapper("a", "c", scope, validationSettings.getDataGraph())
 			);
 		} else {
 			relevantTargetsWithPath = new BulkedExternalLeftOuterJoin(
 					mergeNode,
 					connectionsGroup.getBaseConnection(),
-					getTargetChain().getPath()
+					validationSettings.getDataGraph(), getTargetChain().getPath()
 							.get()
 							.getTargetQueryFragment(new StatementMatcher.Variable("a"),
 									new StatementMatcher.Variable("c"),
 									connectionsGroup.getRdfsSubClassOfReasoner(), stableRandomVariableProvider),
-					false,
-					null,
-					(b) -> new ValidationTuple(b.getValue("a"), b.getValue("c"), scope, true)
+					(b) -> new ValidationTuple(b.getValue("a"), b.getValue("c"), scope, true,
+							validationSettings.getDataGraph())
 			);
 		}
 
@@ -129,11 +132,13 @@ public class MaxCountConstraintComponent extends AbstractConstraintComponent {
 	}
 
 	@Override
-	public PlanNode getAllTargetsPlan(ConnectionsGroup connectionsGroup, Scope scope) {
+	public PlanNode getAllTargetsPlan(ConnectionsGroup connectionsGroup, Resource[] dataGraph, Scope scope,
+			StatementMatcher.StableRandomVariableProvider stableRandomVariableProvider) {
 		if (scope == Scope.propertyShape) {
 			PlanNode allTargetsPlan = getTargetChain()
-					.getEffectiveTarget("target_", Scope.nodeShape, connectionsGroup.getRdfsSubClassOfReasoner())
-					.getPlanNode(connectionsGroup, Scope.nodeShape, true, null);
+					.getEffectiveTarget(Scope.nodeShape, connectionsGroup.getRdfsSubClassOfReasoner(),
+							stableRandomVariableProvider)
+					.getPlanNode(connectionsGroup, dataGraph, Scope.nodeShape, true, null);
 
 			return Unique.getInstance(new ShiftToPropertyShape(allTargetsPlan), true);
 		}
@@ -147,17 +152,16 @@ public class MaxCountConstraintComponent extends AbstractConstraintComponent {
 
 	@Override
 	public ValidationQuery generateSparqlValidationQuery(ConnectionsGroup connectionsGroup,
-			boolean logValidationPlans, boolean negatePlan, boolean negateChildren, Scope scope) {
+			ValidationSettings validationSettings, boolean negatePlan, boolean negateChildren, Scope scope) {
 
-		String targetVarPrefix = "target_";
 		StatementMatcher.StableRandomVariableProvider stableRandomVariableProvider = new StatementMatcher.StableRandomVariableProvider();
 
-		EffectiveTarget effectiveTarget = getTargetChain().getEffectiveTarget(targetVarPrefix, scope,
-				connectionsGroup.getRdfsSubClassOfReasoner());
+		EffectiveTarget effectiveTarget = getTargetChain().getEffectiveTarget(scope,
+				connectionsGroup.getRdfsSubClassOfReasoner(), stableRandomVariableProvider);
 		String query = effectiveTarget.getQuery(false);
 
 		if (maxCount == 0) {
-			StatementMatcher.Variable value = new StatementMatcher.Variable("value");
+			StatementMatcher.Variable value = StatementMatcher.Variable.VALUE;
 
 			String pathQuery = getTargetChain().getPath()
 					.map(p -> p.getTargetQueryFragment(effectiveTarget.getTargetVar(), value,
@@ -169,11 +173,11 @@ public class MaxCountConstraintComponent extends AbstractConstraintComponent {
 		} else if (maxCount > 0) {
 
 			StringBuilder paths = new StringBuilder();
-			String valuePrefix = "value_";
+			ArrayList<StatementMatcher.Variable> valueVariables = new ArrayList<>();
 
 			for (int i = 0; i < maxCount + 1; i++) {
-				StatementMatcher.Variable value = new StatementMatcher.Variable(valuePrefix + i);
-
+				StatementMatcher.Variable value = stableRandomVariableProvider.next();
+				valueVariables.add(value);
 				String pathQuery = getTargetChain().getPath()
 						.map(p -> p.getTargetQueryFragment(effectiveTarget.getTargetVar(), value,
 								connectionsGroup.getRdfsSubClassOfReasoner(), stableRandomVariableProvider))
@@ -182,22 +186,19 @@ public class MaxCountConstraintComponent extends AbstractConstraintComponent {
 				paths.append(pathQuery).append("\n");
 			}
 
-			List<String> collect = LongStream.range(0, maxCount + 1)
-					.mapToObj(i -> "?" + valuePrefix + i)
-					.collect(Collectors.toList());
-
 			Set<String> notEquals = new HashSet<>();
 
-			for (String left : collect) {
-				for (String right : collect) {
-					if (left == right) {
+			for (int i = 0; i < valueVariables.size(); i++) {
+				for (int j = 0; j < valueVariables.size(); j++) {
+					if (i == j) {
 						continue;
 					}
-					if (left.compareTo(right) < 0) {
-						notEquals.add(left + " != " + right);
+					if (i > j) {
+						notEquals.add(valueVariables.get(i).asSparqlVariable() + " != "
+								+ valueVariables.get(j).asSparqlVariable());
 					} else {
-						notEquals.add(right + " != " + left);
-
+						notEquals.add(valueVariables.get(j).asSparqlVariable() + " != "
+								+ valueVariables.get(i).asSparqlVariable());
 					}
 				}
 			}

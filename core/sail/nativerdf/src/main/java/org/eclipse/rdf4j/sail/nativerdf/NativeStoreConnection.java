@@ -17,12 +17,13 @@ import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.sail.SailException;
 import org.eclipse.rdf4j.sail.SailReadOnlyException;
 import org.eclipse.rdf4j.sail.base.SailSourceConnection;
+import org.eclipse.rdf4j.sail.features.ThreadSafetyAware;
 import org.eclipse.rdf4j.sail.helpers.DefaultSailChangedEvent;
 
 /**
  * @author Arjohn Kampman
  */
-public class NativeStoreConnection extends SailSourceConnection {
+public class NativeStoreConnection extends SailSourceConnection implements ThreadSafetyAware {
 
 	/*-----------*
 	 * Constants *
@@ -51,6 +52,7 @@ public class NativeStoreConnection extends SailSourceConnection {
 		super(sail, sail.getSailStore(), sail.getEvaluationStrategyFactory());
 		this.nativeStore = sail;
 		sailChangedEvent = new DefaultSailChangedEvent(sail);
+		useConnectionLock = false;
 	}
 
 	/*---------*
@@ -102,19 +104,27 @@ public class NativeStoreConnection extends SailSourceConnection {
 		sailChangedEvent.setStatementsAdded(true);
 
 		if (getTransactionIsolation() == IsolationLevels.NONE) {
-			addedCount++;
-			if (addedCount % 10000 == 0) {
+			if (++addedCount % 100000 == 0) {
 				flushUpdates();
 				addedCount = 0;
 			}
 		}
+
 	}
 
 	@Override
 	public boolean addInferredStatement(Resource subj, IRI pred, Value obj, Resource... contexts) throws SailException {
+
 		boolean ret = super.addInferredStatement(subj, pred, obj, contexts);
 		// assume the triple is not yet present in the triple store
 		sailChangedEvent.setStatementsAdded(true);
+		if (getTransactionIsolation() == IsolationLevels.NONE) {
+			if (++addedCount % 100000 == 0) {
+				flushUpdates();
+				addedCount = 0;
+			}
+		}
+
 		return ret;
 	}
 
@@ -142,6 +152,11 @@ public class NativeStoreConnection extends SailSourceConnection {
 	public void clearInferred(Resource... contexts) throws SailException {
 		super.clearInferred(contexts);
 		sailChangedEvent.setStatementsRemoved(true);
+	}
+
+	@Override
+	public boolean supportsConcurrentReads() {
+		return getTransactionIsolation() != null && getTransactionIsolation() != IsolationLevels.SERIALIZABLE;
 	}
 
 }

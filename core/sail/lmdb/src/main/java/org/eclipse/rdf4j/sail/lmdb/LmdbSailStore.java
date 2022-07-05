@@ -39,6 +39,7 @@ import org.eclipse.rdf4j.sail.base.SailDataset;
 import org.eclipse.rdf4j.sail.base.SailSink;
 import org.eclipse.rdf4j.sail.base.SailSource;
 import org.eclipse.rdf4j.sail.base.SailStore;
+import org.eclipse.rdf4j.sail.lmdb.TxnManager.Txn;
 import org.eclipse.rdf4j.sail.lmdb.config.LmdbStoreConfig;
 import org.eclipse.rdf4j.sail.lmdb.model.LmdbValue;
 import org.slf4j.Logger;
@@ -64,7 +65,7 @@ class LmdbSailStore implements SailStore {
 	private volatile boolean asyncTransactionFinished;
 	private volatile boolean nextTransactionAsync;
 
-	private boolean enableMultiThreading = true;
+	private final boolean enableMultiThreading = true;
 
 	/**
 	 * A fast non-blocking circular buffer backed by an array.
@@ -110,9 +111,15 @@ class LmdbSailStore implements SailStore {
 	}
 
 	/**
-	 * Special operation that marks the end of a transaction.
+	 * Special operation that commits the current transaction.
 	 */
-	static final Operation END_TRANSACTION = () -> {
+	static final Operation COMMIT_TRANSACTION = () -> {
+	};
+
+	/**
+	 * Special operation that rolls the current transaction back.
+	 */
+	static final Operation ROLLBACK_TRANSACTION = () -> {
 	};
 
 	/**
@@ -178,6 +185,33 @@ class LmdbSailStore implements SailStore {
 		return valueStore;
 	}
 
+	void rollback() throws SailException {
+		sinkStoreAccessLock.lock();
+		try {
+			try {
+				valueStore.rollback();
+			} finally {
+				if (multiThreadingActive) {
+					while (!opQueue.add(ROLLBACK_TRANSACTION)) {
+						if (tripleStoreException != null) {
+							throw wrapTripleStoreException();
+						} else {
+							Thread.yield();
+						}
+					}
+				} else {
+					tripleStore.rollback();
+				}
+			}
+		} catch (Exception e) {
+			logger.warn("Failed to rollback LMDB transaction", e);
+			throw e instanceof SailException ? (SailException) e : new SailException(e);
+		} finally {
+			tripleStoreException = null;
+			sinkStoreAccessLock.unlock();
+		}
+	}
+
 	@Override
 	public void close() throws SailException {
 		try {
@@ -214,6 +248,11 @@ class LmdbSailStore implements SailStore {
 		}
 	}
 
+	SailException wrapTripleStoreException() {
+		return tripleStoreException instanceof SailException ? (SailException) tripleStoreException
+				: new SailException(tripleStoreException);
+	}
+
 	@Override
 	public EvaluationStatistics getEvaluationStatistics() {
 		return new LmdbEvaluationStatistics(valueStore, tripleStore);
@@ -230,11 +269,12 @@ class LmdbSailStore implements SailStore {
 	}
 
 	CloseableIteration<Resource, SailException> getContexts() throws IOException {
-		RecordIterator records = tripleStore.getAllTriplesSortedByContext();
+		Txn txn = tripleStore.getTxnManager().createReadTxn();
+		RecordIterator records = tripleStore.getAllTriplesSortedByContext(txn);
 		CloseableIteration<? extends Statement, SailException> stIter1;
 		if (records == null) {
 			// Iterator over all statements
-			stIter1 = createStatementIterator(null, null, null, true);
+			stIter1 = createStatementIterator(txn, null, null, null, true);
 		} else {
 			stIter1 = new LmdbStatementIterator(records, valueStore);
 		}
@@ -252,6 +292,13 @@ class LmdbSailStore implements SailStore {
 			protected Resource convert(Statement sourceObject) throws SailException {
 				return sourceObject.getContext();
 			}
+
+			@Override
+			protected void handleClose() throws SailException {
+				// correctly close read txn
+				txn.close();
+				super.handleClose();
+			}
 		};
 	}
 
@@ -265,8 +312,8 @@ class LmdbSailStore implements SailStore {
 	 *                 no contexts are supplied the method operates on the entire repository.
 	 * @return A StatementIterator that can be used to iterate over the statements that match the specified pattern.
 	 */
-	CloseableIteration<? extends Statement, SailException> createStatementIterator(Resource subj, IRI pred, Value obj,
-			boolean explicit, Resource... contexts) throws IOException {
+	CloseableIteration<? extends Statement, SailException> createStatementIterator(
+			Txn txn, Resource subj, IRI pred, Value obj, boolean explicit, Resource... contexts) throws IOException {
 		long subjID = LmdbValue.UNKNOWN_ID;
 		if (subj != null) {
 			subjID = valueStore.getId(subj);
@@ -312,7 +359,7 @@ class LmdbSailStore implements SailStore {
 		ArrayList<LmdbStatementIterator> perContextIterList = new ArrayList<>(contextIDList.size());
 
 		for (long contextID : contextIDList) {
-			RecordIterator records = tripleStore.getTriples(subjID, predID, objID, contextID, explicit);
+			RecordIterator records = tripleStore.getTriples(txn, subjID, predID, objID, contextID, explicit);
 			perContextIterList.add(new LmdbStatementIterator(records, valueStore));
 		}
 
@@ -358,7 +405,7 @@ class LmdbSailStore implements SailStore {
 
 		@Override
 		public void close() {
-			// no-op
+			// do nothing
 		}
 
 		@Override
@@ -372,9 +419,9 @@ class LmdbSailStore implements SailStore {
 			boolean activeTxn = storeTxnStarted.get();
 			try {
 				if (multiThreadingActive) {
-					while (!opQueue.add(END_TRANSACTION)) {
+					while (!opQueue.add(COMMIT_TRANSACTION)) {
 						if (tripleStoreException != null) {
-							throw new SailException(tripleStoreException);
+							throw wrapTripleStoreException();
 						} else {
 							Thread.yield();
 						}
@@ -387,7 +434,7 @@ class LmdbSailStore implements SailStore {
 					if (multiThreadingActive) {
 						while (!asyncTransactionFinished) {
 							if (tripleStoreException != null) {
-								throw new SailException(tripleStoreException);
+								throw wrapTripleStoreException();
 							} else {
 								Thread.yield();
 							}
@@ -407,10 +454,12 @@ class LmdbSailStore implements SailStore {
 					}
 				}
 			} catch (IOException e) {
+				rollback();
 				running.set(false);
 				logger.error("Encountered an unexpected problem while trying to commit", e);
 				throw new SailException(e);
 			} catch (RuntimeException e) {
+				rollback();
 				running.set(false);
 				logger.error("Encountered an unexpected problem while trying to commit", e);
 				throw e;
@@ -496,8 +545,13 @@ class LmdbSailStore implements SailStore {
 											while (true) {
 												Operation op = opQueue.remove();
 												if (op != null) {
-													if (op == END_TRANSACTION) {
+													if (op == COMMIT_TRANSACTION) {
 														tripleStore.commit();
+														nextTransactionAsync = false;
+														asyncTransactionFinished = true;
+														break;
+													} else if (op == ROLLBACK_TRANSACTION) {
+														tripleStore.rollback();
 														nextTransactionAsync = false;
 														asyncTransactionFinished = true;
 														break;
@@ -527,6 +581,9 @@ class LmdbSailStore implements SailStore {
 										}
 									} catch (Throwable e) {
 										tripleStoreException = e;
+										synchronized (storeTxnStarted) {
+											running.set(false);
+										}
 									}
 								});
 							}
@@ -559,7 +616,7 @@ class LmdbSailStore implements SailStore {
 				if (multiThreadingActive) {
 					while (!opQueue.add(q)) {
 						if (tripleStoreException != null) {
-							throw new SailException(tripleStoreException);
+							throw wrapTripleStoreException();
 						} else {
 							Thread.yield();
 						}
@@ -568,8 +625,10 @@ class LmdbSailStore implements SailStore {
 					q.execute();
 				}
 			} catch (IOException e) {
+				rollback();
 				throw new SailException(e);
 			} catch (RuntimeException e) {
+				rollback();
 				logger.error("Encountered an unexpected problem while trying to add a statement", e);
 				throw e;
 			} finally {
@@ -581,8 +640,7 @@ class LmdbSailStore implements SailStore {
 				throws IOException {
 			long removeCount = 0;
 			for (long contextId : contexts) {
-				Map<Long, Long> result = tripleStore.removeTriplesByContext(subj, pred, obj, contextId,
-						explicit);
+				Map<Long, Long> result = tripleStore.removeTriplesByContext(subj, pred, obj, contextId, explicit);
 
 				for (Entry<Long, Long> entry : result.entrySet()) {
 					Long entryContextId = entry.getKey();
@@ -664,7 +722,7 @@ class LmdbSailStore implements SailStore {
 
 					while (!opQueue.add(removeOp)) {
 						if (tripleStoreException != null) {
-							throw new SailException(tripleStoreException);
+							throw wrapTripleStoreException();
 						} else {
 							Thread.yield();
 						}
@@ -672,7 +730,7 @@ class LmdbSailStore implements SailStore {
 
 					while (!removeOp.finished) {
 						if (tripleStoreException != null) {
-							throw new SailException(tripleStoreException);
+							throw wrapTripleStoreException();
 						} else {
 							Thread.yield();
 						}
@@ -682,8 +740,10 @@ class LmdbSailStore implements SailStore {
 					return removeStatements(subjID, predID, objID, explicit, contextIds);
 				}
 			} catch (IOException e) {
+				rollback();
 				throw new SailException(e);
 			} catch (RuntimeException e) {
+				rollback();
 				logger.error("Encountered an unexpected problem while trying to remove statements", e);
 				throw e;
 			} finally {
@@ -705,14 +765,21 @@ class LmdbSailStore implements SailStore {
 	private final class LmdbSailDataset implements SailDataset {
 
 		private final boolean explicit;
+		private final Txn txn;
 
 		public LmdbSailDataset(boolean explicit) throws SailException {
 			this.explicit = explicit;
+			try {
+				this.txn = tripleStore.getTxnManager().createReadTxn();
+			} catch (IOException e) {
+				throw new SailException(e);
+			}
 		}
 
 		@Override
 		public void close() {
-			// no-op
+			// close the associated txn
+			txn.close();
 		}
 
 		@Override
@@ -734,7 +801,7 @@ class LmdbSailStore implements SailStore {
 		public CloseableIteration<? extends Statement, SailException> getStatements(Resource subj, IRI pred, Value obj,
 				Resource... contexts) throws SailException {
 			try {
-				return createStatementIterator(subj, pred, obj, explicit, contexts);
+				return createStatementIterator(txn, subj, pred, obj, explicit, contexts);
 			} catch (IOException e) {
 				throw new SailException("Unable to get statements", e);
 			}

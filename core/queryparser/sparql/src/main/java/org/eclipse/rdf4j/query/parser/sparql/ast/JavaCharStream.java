@@ -9,16 +9,25 @@
 /* JavaCCOptions:STATIC=false,SUPPORT_CLASS_VISIBILITY_PUBLIC=true */
 package org.eclipse.rdf4j.query.parser.sparql.ast;
 
+import java.io.IOException;
+
 /**
  * An implementation of interface CharStream, where the stream is assumed to contain only ASCII characters (with
  * java-like unicode escape processing).
  */
 
-public class JavaCharStream {
+public class JavaCharStream implements CharStream {
 	/** Whether parser is static. */
 	public static final boolean staticFlag = false;
+	public static final IOException IO_EXCEPTION = new IOException() {
+		@Override
+		public synchronized Throwable fillInStackTrace() {
+			// no-op
+			return this;
+		}
+	};
 
-	static final int hexval(char c) throws java.io.IOException {
+	static int hexval(char c) throws java.io.IOException {
 		switch (c) {
 		case '0':
 			return 0;
@@ -69,36 +78,39 @@ public class JavaCharStream {
 	int bufsize;
 	int available;
 	int tokenBegin;
-	protected int bufline[];
-	protected int bufcolumn[];
+	protected int[] bufline;
+	protected int[] bufcolumn;
 
-	protected int column = 0;
-	protected int line = 1;
+	protected int column;
+	protected int line;
 
-	protected boolean prevCharIsCR = false;
-	protected boolean prevCharIsLF = false;
+	protected boolean prevCharIsCR;
+	protected boolean prevCharIsLF;
 
 	protected java.io.Reader inputStream;
 
 	protected char[] nextCharBuf;
 	protected char[] buffer;
-	protected int maxNextCharInd = 0;
+	protected int maxNextCharInd;
 	protected int nextCharInd = -1;
-	protected int inBuf = 0;
+	protected int inBuf;
 	protected int tabSize = 8;
+	private boolean trackLineColumn;
 
-	protected void setTabSize(int i) {
+	@Override
+	public void setTabSize(int i) {
 		tabSize = i;
 	}
 
-	protected int getTabSize(int i) {
+	@Override
+	public int getTabSize() {
 		return tabSize;
 	}
 
 	protected void ExpandBuff(boolean wrapAround) {
 		char[] newbuffer = new char[bufsize + 2048];
-		int newbufline[] = new int[bufsize + 2048];
-		int newbufcolumn[] = new int[bufsize + 2048];
+		int[] newbufline = new int[bufsize + 2048];
+		int[] newbufcolumn = new int[bufsize + 2048];
 
 		try {
 			if (wrapAround) {
@@ -137,18 +149,17 @@ public class JavaCharStream {
 
 	protected void FillBuff() throws java.io.IOException {
 		int i;
-		if (maxNextCharInd == 4096) {
+		if (maxNextCharInd == nextCharBuf.length) {
 			maxNextCharInd = nextCharInd = 0;
 		}
 
 		try {
-			if ((i = inputStream.read(nextCharBuf, maxNextCharInd, 4096 - maxNextCharInd)) == -1) {
+			if ((i = inputStream.read(nextCharBuf, maxNextCharInd, nextCharBuf.length - maxNextCharInd)) == -1) {
 				inputStream.close();
-				throw new java.io.IOException();
+				throw IO_EXCEPTION;
 			} else {
 				maxNextCharInd += i;
 			}
-			return;
 		} catch (java.io.IOException e) {
 			if (bufpos != 0) {
 				--bufpos;
@@ -170,6 +181,7 @@ public class JavaCharStream {
 	}
 
 	/** @return starting character for token. */
+	@Override
 	public char BeginToken() throws java.io.IOException {
 		if (inBuf > 0) {
 			--inBuf;
@@ -240,6 +252,7 @@ public class JavaCharStream {
 	}
 
 	/** Read a character. */
+	@Override
 	public char readChar() throws java.io.IOException {
 		if (inBuf > 0) {
 			--inBuf;
@@ -322,45 +335,52 @@ public class JavaCharStream {
 		}
 	}
 
-	@Deprecated
 	/**
 	 * @deprecated
 	 * @see #getEndColumn
 	 */
+	@Override
+	@Deprecated
 	public int getColumn() {
 		return bufcolumn[bufpos];
 	}
 
-	@Deprecated
 	/**
 	 * @deprecated
 	 * @see #getEndLine
 	 */
+	@Override
+	@Deprecated
 	public int getLine() {
 		return bufline[bufpos];
 	}
 
 	/** Get end column. */
+	@Override
 	public int getEndColumn() {
 		return bufcolumn[bufpos];
 	}
 
 	/** Get end line. */
+	@Override
 	public int getEndLine() {
 		return bufline[bufpos];
 	}
 
 	/** @return column of token start */
+	@Override
 	public int getBeginColumn() {
 		return bufcolumn[tokenBegin];
 	}
 
 	/** @return line number of token start */
+	@Override
 	public int getBeginLine() {
 		return bufline[tokenBegin];
 	}
 
 	/** Retreat. */
+	@Override
 	public void backup(int amount) {
 
 		inBuf += amount;
@@ -379,7 +399,7 @@ public class JavaCharStream {
 		buffer = new char[buffersize];
 		bufline = new int[buffersize];
 		bufcolumn = new int[buffersize];
-		nextCharBuf = new char[4096];
+		nextCharBuf = new char[buffersize];
 	}
 
 	/** Constructor. */
@@ -403,7 +423,7 @@ public class JavaCharStream {
 			buffer = new char[buffersize];
 			bufline = new int[buffersize];
 			bufcolumn = new int[buffersize];
-			nextCharBuf = new char[4096];
+			nextCharBuf = new char[buffersize];
 		}
 		prevCharIsLF = prevCharIsCR = false;
 		tokenBegin = inBuf = maxNextCharInd = 0;
@@ -429,7 +449,7 @@ public class JavaCharStream {
 
 	/** Constructor. */
 	public JavaCharStream(java.io.InputStream dstream, int startline, int startcolumn, int buffersize) {
-		this(new java.io.InputStreamReader(dstream), startline, startcolumn, 4096);
+		this(new java.io.InputStreamReader(dstream), startline, startcolumn, buffersize);
 	}
 
 	/** Constructor. */
@@ -487,6 +507,7 @@ public class JavaCharStream {
 	}
 
 	/** @return token image as String */
+	@Override
 	public String GetImage() {
 		if (bufpos >= tokenBegin) {
 			return new String(buffer, tokenBegin, bufpos - tokenBegin + 1);
@@ -496,6 +517,7 @@ public class JavaCharStream {
 	}
 
 	/** @return suffix */
+	@Override
 	public char[] GetSuffix(int len) {
 		char[] ret = new char[len];
 
@@ -510,6 +532,7 @@ public class JavaCharStream {
 	}
 
 	/** Set buffers back to null when finished. */
+	@Override
 	public void Done() {
 		nextCharBuf = null;
 		buffer = null;
@@ -530,8 +553,8 @@ public class JavaCharStream {
 			len = bufsize - tokenBegin + bufpos + 1 + inBuf;
 		}
 
-		int i = 0, j = 0, k = 0;
-		int nextColDiff = 0, columnDiff = 0;
+		int i = 0, j = 0, k;
+		int nextColDiff, columnDiff = 0;
 
 		while (i < len && bufline[j = start % bufsize] == bufline[k = ++start % bufsize]) {
 			bufline[j] = newLine;
@@ -556,6 +579,16 @@ public class JavaCharStream {
 
 		line = bufline[j];
 		column = bufcolumn[j];
+	}
+
+	@Override
+	public boolean getTrackLineColumn() {
+		return trackLineColumn;
+	}
+
+	@Override
+	public void setTrackLineColumn(boolean trackLineColumn) {
+		this.trackLineColumn = trackLineColumn;
 	}
 
 }

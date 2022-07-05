@@ -41,6 +41,7 @@ import org.eclipse.rdf4j.query.QueryEvaluationException;
  * @author James Leigh
  * @author Arjohn Kampman
  */
+@Deprecated(since = "4.1.0")
 public class OrderIterator extends DelayedIteration<BindingSet, QueryEvaluationException> {
 
 	private static class SerializedQueue<E extends Serializable> extends AbstractQueue<E> implements Closeable {
@@ -209,7 +210,7 @@ public class OrderIterator extends DelayedIteration<BindingSet, QueryEvaluationE
 			while (iterators.get(i).hasNext()) {
 				E key = iterators.get(i).next();
 				if (!head.containsKey(key)) {
-					head.put(key, new LinkedList<>(Arrays.asList(i)));
+					head.put(key, new LinkedList<>(List.of(i)));
 					break;
 				} else if (!distinct) {
 					head.get(key).add(i);

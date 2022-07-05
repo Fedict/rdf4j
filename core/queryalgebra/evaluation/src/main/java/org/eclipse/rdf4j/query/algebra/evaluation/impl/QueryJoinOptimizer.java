@@ -35,6 +35,7 @@ import org.eclipse.rdf4j.query.algebra.helpers.TupleExprs;
  * @author Arjohn Kampman
  * @author James Leigh
  */
+@Deprecated(forRemoval = true, since = "4.1.0")
 public class QueryJoinOptimizer implements QueryOptimizer {
 
 	protected final EvaluationStatistics statistics;
@@ -86,6 +87,17 @@ public class QueryJoinOptimizer implements QueryOptimizer {
 		public void meet(StatementPattern node) throws RuntimeException {
 			super.meet(node);
 			node.setResultSizeEstimate(Math.max(statistics.getCardinality(node), node.getResultSizeEstimate()));
+		}
+
+		private void optimizePriorityJoin(Set<String> origBoundVars, TupleExpr join) {
+
+			Set<String> saveBoundVars = boundVars;
+			try {
+				boundVars = new HashSet<>(origBoundVars);
+				join.visit(this);
+			} finally {
+				boundVars = saveBoundVars;
+			}
 		}
 
 		@Override
@@ -178,6 +190,13 @@ public class QueryJoinOptimizer implements QueryOptimizer {
 
 					// Replace old join hierarchy
 					node.replaceWith(replacement);
+
+					// we optimize after the replacement call above in case the optimize call below
+					// recurses back into this function and we need all the node's parent/child pointers
+					// set up correctly for replacement to work on subsequent calls
+					if (priorityJoins != null) {
+						optimizePriorityJoin(origBoundVars, priorityJoins);
+					}
 
 				} else {
 					// only subselect/priority joins involved in this query.
@@ -288,7 +307,7 @@ public class QueryJoinOptimizer implements QueryOptimizer {
 						maxJoinSize = joinSize;
 					}
 
-					List<TupleExpr[]> l = null;
+					List<TupleExpr[]> l;
 
 					if (joinSizes.containsKey(joinSize)) {
 						l = joinSizes.get(joinSize);

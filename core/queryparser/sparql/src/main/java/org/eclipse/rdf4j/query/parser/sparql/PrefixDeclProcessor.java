@@ -121,17 +121,17 @@ public class PrefixDeclProcessor {
 			sb.append("PREFIX");
 			final String prefix = entry.getKey();
 			if (prefix != null) {
-				sb.append(" " + prefix);
+				sb.append(" ").append(prefix);
 			}
 			sb.append(":");
-			sb.append(" <" + entry.getValue() + "> \n");
+			sb.append(" <").append(entry.getValue()).append("> \n");
 		}
 		return sb.toString();
 	}
 
 	private static class QNameProcessor extends AbstractASTVisitor {
 
-		private Map<String, String> prefixMap;
+		private final Map<String, String> prefixMap;
 
 		public QNameProcessor(Map<String, String> prefixMap) {
 			this.prefixMap = prefixMap;
@@ -165,9 +165,9 @@ public class PrefixDeclProcessor {
 		private String processEscapes(String localName) {
 
 			// process escaped special chars.
-			StringBuffer unescaped = new StringBuffer();
+			StringBuilder unescaped = new StringBuilder();
 			Pattern escapedCharPattern = Pattern
-					.compile("\\\\[_~\\.\\-!\\$\\&\\'\\(\\)\\*\\+\\,\\;\\=\\:\\/\\?#\\@\\%]");
+					.compile("\\\\[_~.\\-!$&'()*+,;=:/?#@%]");
 			Matcher m = escapedCharPattern.matcher(localName);
 			boolean result = m.find();
 			while (result) {

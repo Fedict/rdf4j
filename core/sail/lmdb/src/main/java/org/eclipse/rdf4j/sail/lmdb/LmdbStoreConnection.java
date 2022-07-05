@@ -41,8 +41,6 @@ public class LmdbStoreConnection extends SailSourceConnection {
 	 */
 	private volatile Lock txnLock;
 
-	private int addedCount;
-
 	/*--------------*
 	 * Constructors *
 	 *--------------*/
@@ -51,6 +49,7 @@ public class LmdbStoreConnection extends SailSourceConnection {
 		super(sail, sail.getSailStore(), sail.getEvaluationStrategyFactory());
 		this.lmdbStore = sail;
 		sailChangedEvent = new DefaultSailChangedEvent(sail);
+		useConnectionLock = false;
 	}
 
 	/*---------*
@@ -59,7 +58,6 @@ public class LmdbStoreConnection extends SailSourceConnection {
 
 	@Override
 	protected void startTransactionInternal() throws SailException {
-		addedCount = 0;
 		if (!lmdbStore.isWritable()) {
 			throw new SailReadOnlyException("Unable to start transaction: data file is locked or read-only");
 		}
@@ -113,11 +111,6 @@ public class LmdbStoreConnection extends SailSourceConnection {
 	protected void addStatementInternal(Resource subj, IRI pred, Value obj, Resource... contexts) throws SailException {
 		// assume the triple is not yet present in the triple store
 		sailChangedEvent.setStatementsAdded(true);
-
-		/*
-		 * if (getTransactionIsolation() == IsolationLevels.NONE) { addedCount++; if (addedCount % 10000 == 0) {
-		 * flushUpdates(); addedCount = 0; } }
-		 */
 	}
 
 	@Override

@@ -55,9 +55,8 @@ public class Literals {
 		return v instanceof Literal ? getLabel((Literal) v, fallback) : fallback;
 	}
 
-	public static String getLabel(Optional v, String fallback) {
-
-		return v != null ? getLabel((Value) v.orElseGet(null), fallback) : fallback;
+	public static String getLabel(Optional<Value> v, String fallback) {
+		return v != null ? getLabel(v.orElseGet(null), fallback) : fallback;
 	}
 
 	/**
@@ -502,20 +501,49 @@ public class Literals {
 
 	/**
 	 * Normalizes the given <a href="https://tools.ietf.org/html/bcp47">BCP47</a> language tag according to the rules
-	 * defined by the JDK in the {@link Locale} API.
+	 * defined in <a href="https://www.rfc-editor.org/rfc/rfc5646.html#section-2.1.1">RFC 5646, section 2.1.1</a>:
+	 * <p>
+	 * <blockquote> All subtags, including extension and private use subtags, use lowercase letters with two exceptions:
+	 * two-letter and four-letter subtags that neither appear at the start of the tag nor occur after singletons. Such
+	 * two-letter subtags are all uppercase (as in the tags "en-CA-x-ca" or "sgn-BE-FR") and four- letter subtags are
+	 * titlecase (as in the tag "az-Latn-x-latn"). </blockquote>
 	 *
 	 * @param languageTag An unnormalized, valid, language tag
 	 * @return A normalized version of the given language tag
 	 * @throws IllformedLocaleException If the given language tag is ill-formed according to the rules specified in
-	 *                                  BCP47.
+	 *                                  BCP47 (RFC 5646).
 	 */
 	public static String normalizeLanguageTag(String languageTag) throws IllformedLocaleException {
-		return new Locale.Builder().setLanguageTag(languageTag).build().toLanguageTag().intern();
+		// check if language tag is well-formed
+		new Locale.Builder().setLanguageTag(languageTag);
+
+		// all subtags are case-insensitive
+		String normalizedTag = languageTag.toLowerCase();
+
+		String[] subtags = normalizedTag.split("-");
+		for (int i = 1; i < subtags.length; i++) {
+			String subtag = subtags[i];
+
+			if (subtag.length() == 2) {
+				// exception 1: two-letter subtags not at the starte and not preceded by a singleton are upper case
+				if (subtags[i - 1].length() > 1 && subtag.matches("\\w\\w")) {
+					subtags[i] = subtag.toUpperCase();
+				}
+			} else if (subtag.length() == 4) {
+				// exception 2: four-letter subtags not at the start and not preceded by a singleton are title case
+				if (subtags[i - 1].length() > 1 && subtag.matches("\\w\\w\\w\\w")) {
+					subtags[i] = subtag.substring(0, 1).toUpperCase() + subtag.substring(1);
+				}
+			}
+		}
+
+		return String.join("-", subtags);
 	}
 
 	/**
-	 * Checks if the given string is a <a href="https://tools.ietf.org/html/bcp47">BCP47</a> language tag according to
-	 * the rules defined by the JDK in the {@link Locale} API.
+	 * Checks if the given string is a well-formed <a href="https://tools.ietf.org/html/bcp47">BCP47</a> language tag
+	 * according to the rules defined in <a href="https://www.rfc-editor.org/rfc/rfc5646.html#section-2.1.1">RFC 5646,
+	 * section 2.1.1</a>.
 	 *
 	 * @param languageTag A language tag
 	 * @return <code>true</code> if the given language tag is well-formed according to the rules specified in BCP47.

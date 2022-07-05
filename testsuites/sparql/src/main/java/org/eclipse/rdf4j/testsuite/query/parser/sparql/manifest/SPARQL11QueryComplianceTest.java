@@ -41,7 +41,7 @@ public abstract class SPARQL11QueryComplianceTest extends SPARQLQueryComplianceT
 			"sq03 - Subquery within graph pattern, graph variable is not bound"
 	};
 
-	private static final List<String> excludedSubdirs = Arrays.asList("service");
+	private static final List<String> excludedSubdirs = List.of("service");
 
 	@Parameterized.Parameters(name = "{0}")
 	public static Collection<Object[]> data() {
@@ -72,8 +72,8 @@ public abstract class SPARQL11QueryComplianceTest extends SPARQLQueryComplianceT
 	}
 
 	public SPARQL11QueryComplianceTest(String displayName, String testURI, String name, String queryFileURL,
-			String resultFileURL, Dataset dataset, boolean ordered) {
-		super(displayName, testURI, name, queryFileURL, resultFileURL, dataset, ordered);
+			String resultFileURL, Dataset dataset, boolean ordered, boolean laxCardinality) {
+		super(displayName, testURI, name, queryFileURL, resultFileURL, dataset, ordered, laxCardinality);
 	}
 
 	@Override

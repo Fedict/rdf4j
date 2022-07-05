@@ -10,14 +10,12 @@ package org.eclipse.rdf4j.sail.shacl.benchmark;
 
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Stream;
 
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.model.vocabulary.RDF;
 import org.eclipse.rdf4j.model.vocabulary.RDFS;
-import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.repository.sail.SailRepository;
 import org.eclipse.rdf4j.repository.sail.SailRepositoryConnection;
 import org.eclipse.rdf4j.sail.memory.MemoryStore;
@@ -44,11 +42,11 @@ import ch.qos.logback.classic.Logger;
  * @author Håvard Ottestad
  */
 @State(Scope.Benchmark)
-@Warmup(iterations = 20)
+@Warmup(iterations = 5)
 @BenchmarkMode({ Mode.AverageTime })
-@Fork(value = 1, jvmArgs = { "-Xmx64M", "-XX:+UseSerialGC" })
+@Fork(value = 1, jvmArgs = { "-Xmx64M" })
 //@Fork(value = 1, jvmArgs = { "-Xms8G", "-Xmx8G", "-XX:StartFlightRecording=delay=15s,duration=120s,filename=recording.jfr,settings=profile", "-XX:FlightRecorderOptions=samplethreads=true,stackdepth=1024", "-XX:+UnlockDiagnosticVMOptions", "-XX:+DebugNonSafepoints" })
-@Measurement(iterations = 10)
+@Measurement(iterations = 5)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 public class MinCountBenchmarkEmpty {
 
@@ -74,7 +72,7 @@ public class MinCountBenchmarkEmpty {
 	@Benchmark
 	public void shacl() throws Exception {
 
-		SailRepository repository = new SailRepository(Utils.getInitializedShaclSail("shacl.ttl"));
+		SailRepository repository = new SailRepository(Utils.getInitializedShaclSail("shacl.trig"));
 
 		try (SailRepositoryConnection connection = repository.getConnection()) {
 			for (List<Statement> statements : allStatements) {
@@ -90,7 +88,7 @@ public class MinCountBenchmarkEmpty {
 	@Benchmark
 	public void shaclBulk() throws Exception {
 
-		SailRepository repository = new SailRepository(Utils.getInitializedShaclSail("shacl.ttl"));
+		SailRepository repository = new SailRepository(Utils.getInitializedShaclSail("shacl.trig"));
 
 		try (SailRepositoryConnection connection = repository.getConnection()) {
 			connection.begin(ShaclSail.TransactionSettings.ValidationApproach.Bulk);
@@ -106,7 +104,7 @@ public class MinCountBenchmarkEmpty {
 	@Benchmark
 	public void shaclClear() throws Exception {
 
-		SailRepository repository = new SailRepository(Utils.getInitializedShaclSail("shacl.ttl"));
+		SailRepository repository = new SailRepository(Utils.getInitializedShaclSail("shacl.trig"));
 
 		try (SailRepositoryConnection connection = repository.getConnection()) {
 			for (List<Statement> statements : allStatements) {
@@ -123,52 +121,9 @@ public class MinCountBenchmarkEmpty {
 	}
 
 	@Benchmark
-	public void noShacl() {
-
-		SailRepository repository = new SailRepository(new TestNotifyingSail(new MemoryStore()));
-
-		repository.init();
-
-		try (SailRepositoryConnection connection = repository.getConnection()) {
-			for (List<Statement> statements : allStatements) {
-				connection.begin();
-				connection.add(statements);
-				connection.commit();
-			}
-		}
-		repository.shutDown();
-
-	}
-
-	@Benchmark
-	public void sparqlInsteadOfShacl() {
-
-		SailRepository repository = new SailRepository(new MemoryStore());
-
-		repository.init();
-
-		try (SailRepositoryConnection connection = repository.getConnection()) {
-			for (List<Statement> statements : allStatements) {
-				connection.begin();
-				connection.add(statements);
-				try (Stream<BindingSet> stream = connection
-						.prepareTupleQuery("select * where {?a a <" + RDFS.RESOURCE + ">. FILTER(! EXISTS {?a <"
-								+ RDFS.LABEL + "> ?c})}")
-						.evaluate()
-						.stream()) {
-					stream.forEach(System.out::println);
-				}
-				connection.commit();
-			}
-		}
-		repository.shutDown();
-
-	}
-
-	@Benchmark
 	public void shaclMinCountZero() throws Exception {
 
-		SailRepository repository = new SailRepository(Utils.getInitializedShaclSail("shaclMinCountZero.ttl"));
+		SailRepository repository = new SailRepository(Utils.getInitializedShaclSail("shaclMinCountZero.trig"));
 
 		try (SailRepositoryConnection connection = repository.getConnection()) {
 			for (List<Statement> statements : allStatements) {

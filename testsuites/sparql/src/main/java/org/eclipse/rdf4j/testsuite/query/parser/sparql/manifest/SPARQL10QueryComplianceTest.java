@@ -44,7 +44,7 @@ public abstract class SPARQL10QueryComplianceTest extends SPARQLQueryComplianceT
 			"SELECT REDUCED ?x with strings"
 	};
 
-	private static final List<String> excludedSubdirs = Arrays.asList("service");
+	private static final List<String> excludedSubdirs = List.of("service");
 
 	/**
 	 * @param displayName
@@ -56,8 +56,8 @@ public abstract class SPARQL10QueryComplianceTest extends SPARQLQueryComplianceT
 	 * @param ordered
 	 */
 	public SPARQL10QueryComplianceTest(String displayName, String testURI, String name, String queryFileURL,
-			String resultFileURL, Dataset dataset, boolean ordered) {
-		super(displayName, testURI, name, queryFileURL, resultFileURL, dataset, ordered);
+			String resultFileURL, Dataset dataset, boolean ordered, boolean laxCardinality) {
+		super(displayName, testURI, name, queryFileURL, resultFileURL, dataset, ordered, laxCardinality);
 	}
 
 	@Parameterized.Parameters(name = "{0}")

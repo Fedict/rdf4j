@@ -8,15 +8,13 @@
 
 package org.eclipse.rdf4j.sail.shacl;
 
-import static junit.framework.TestCase.assertEquals;
-import static junit.framework.TestCase.assertTrue;
-
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.sail.shacl.ast.constraintcomponents.ConstraintComponent;
@@ -25,60 +23,62 @@ import org.eclipse.rdf4j.sail.shacl.ast.planNodes.PlanNode;
 import org.eclipse.rdf4j.sail.shacl.ast.planNodes.ValidationTuple;
 import org.eclipse.rdf4j.sail.shacl.mock.MockConsumePlanNode;
 import org.eclipse.rdf4j.sail.shacl.mock.MockInputPlanNode;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 /**
  * @author Håvard Ottestad
  */
 public class EqualsJoinTest {
+	public static final Resource[] CONTEXTS = { null };
 
 	@Test
 	public void testSimple01() {
 
-		PlanNode left = new MockInputPlanNode(Arrays.asList("a"));
-		PlanNode right = new MockInputPlanNode(Arrays.asList("a"), Arrays.asList("b"));
+		PlanNode left = new MockInputPlanNode(List.of("a"));
+		PlanNode right = new MockInputPlanNode(List.of("a"), List.of("b"));
 
 		EqualsJoin equalsJoin = new EqualsJoin(left, right, false);
 
 		List<ValidationTuple> tuples = new MockConsumePlanNode(equalsJoin).asList();
 
-		verify(tuples, Arrays.asList("a"));
+		verify(tuples, List.of("a"));
 
 	}
 
 	@Test
 	public void testSimple02() {
 
-		PlanNode left = new MockInputPlanNode(Arrays.asList("a"), Arrays.asList("c"));
-		PlanNode right = new MockInputPlanNode(Arrays.asList("a"), Arrays.asList("b"), Arrays.asList("c"));
+		PlanNode left = new MockInputPlanNode(List.of("a"), List.of("c"));
+		PlanNode right = new MockInputPlanNode(List.of("a"), List.of("b"), List.of("c"));
 
 		EqualsJoin equalsJoin = new EqualsJoin(left, right, false);
 
 		List<ValidationTuple> tuples = new MockConsumePlanNode(equalsJoin).asList();
 
-		verify(tuples, Arrays.asList("a"), Arrays.asList("c"));
+		verify(tuples, List.of("a"), List.of("c"));
 
 	}
 
 	@Test
 	public void testSimple03() {
 
-		PlanNode right = new MockInputPlanNode(Arrays.asList("a"), Arrays.asList("c"));
-		PlanNode left = new MockInputPlanNode(Arrays.asList("a"), Arrays.asList("b"), Arrays.asList("c"));
+		PlanNode right = new MockInputPlanNode(List.of("a"), List.of("c"));
+		PlanNode left = new MockInputPlanNode(List.of("a"), List.of("b"), List.of("c"));
 
 		EqualsJoin equalsJoin = new EqualsJoin(left, right, false);
 
 		List<ValidationTuple> tuples = new MockConsumePlanNode(equalsJoin).asList();
 
-		verify(tuples, Arrays.asList("a"), Arrays.asList("c"));
+		verify(tuples, List.of("a"), List.of("c"));
 
 	}
 
 	@Test
 	public void testSimple04() {
 
-		PlanNode left = new MockInputPlanNode(Arrays.asList("b"), Arrays.asList("c"));
-		PlanNode right = new MockInputPlanNode(Arrays.asList("a"), Arrays.asList("d"), Arrays.asList("e"));
+		PlanNode left = new MockInputPlanNode(List.of("b"), List.of("c"));
+		PlanNode right = new MockInputPlanNode(List.of("a"), List.of("d"), List.of("e"));
 
 		EqualsJoin equalsJoin = new EqualsJoin(left, right, false);
 
@@ -91,14 +91,14 @@ public class EqualsJoinTest {
 	@Test
 	public void testSimple05() {
 
-		PlanNode left = new MockInputPlanNode(Arrays.asList("b"), Arrays.asList("c"));
-		PlanNode right = new MockInputPlanNode(Arrays.asList("a"), Arrays.asList("d"), Arrays.asList("c"));
+		PlanNode left = new MockInputPlanNode(List.of("b"), List.of("c"));
+		PlanNode right = new MockInputPlanNode(List.of("a"), List.of("d"), List.of("c"));
 
 		EqualsJoin equalsJoin = new EqualsJoin(left, right, false);
 
 		List<ValidationTuple> tuples = new MockConsumePlanNode(equalsJoin).asList();
 
-		verify(tuples, Arrays.asList("c"));
+		verify(tuples, List.of("c"));
 
 	}
 
@@ -119,7 +119,7 @@ public class EqualsJoinTest {
 	}
 
 	@SafeVarargs
-	private final void verify(List<ValidationTuple> actual, List<String>... expect) {
+	private void verify(List<ValidationTuple> actual, List<String>... expect) {
 
 //		System.out.println(actual);
 
@@ -130,19 +130,19 @@ public class EqualsJoinTest {
 						.collect(Collectors.toList()))
 				.map(v -> {
 					if (v.size() > 1) {
-						return new ValidationTuple(v, ConstraintComponent.Scope.propertyShape, true);
+						return new ValidationTuple(v, ConstraintComponent.Scope.propertyShape, true, CONTEXTS);
 					} else {
-						return new ValidationTuple(v, ConstraintComponent.Scope.propertyShape, false);
+						return new ValidationTuple(v, ConstraintComponent.Scope.propertyShape, false, CONTEXTS);
 					}
 				})
 				.collect(Collectors.toSet());
 
 		Set<ValidationTuple> actualSet = new HashSet<>(actual);
 
-		assertEquals(collect, actualSet);
+		Assertions.assertEquals(collect, actualSet);
 
-		assertTrue(collect.containsAll(actualSet));
-		assertTrue(actualSet.containsAll(collect));
+		Assertions.assertTrue(collect.containsAll(actualSet));
+		Assertions.assertTrue(actualSet.containsAll(collect));
 
 	}
 

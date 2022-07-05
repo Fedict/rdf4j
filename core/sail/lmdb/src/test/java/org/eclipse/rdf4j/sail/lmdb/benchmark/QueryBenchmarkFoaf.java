@@ -11,12 +11,10 @@ package org.eclipse.rdf4j.sail.lmdb.benchmark;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
-import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.io.IOUtils;
 import org.eclipse.rdf4j.common.transaction.IsolationLevels;
-import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.repository.sail.SailRepositoryConnection;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
@@ -63,7 +61,6 @@ public class QueryBenchmarkFoaf extends BenchmarkBaseFoaf {
 	public static void main(String[] args) throws RunnerException {
 		Options opt = new OptionsBuilder()
 				.include("QueryBenchmarkFoaf") // adapt to control which benchmark tests to run
-				// .addProfiler("stack", "lines=20;period=1;top=20")
 				.forks(1)
 				.build();
 

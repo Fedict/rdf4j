@@ -38,43 +38,38 @@ public class UnionNode implements PlanNode {
 	}
 
 	public static PlanNode getInstance(PlanNode... nodes) {
-		PlanNode[] planNodes = Arrays.stream(nodes)
-				.filter(n -> !(n instanceof EmptyNode))
-				.flatMap(n -> {
-					if (n instanceof UnionNode) {
-						return Arrays.stream(((UnionNode) n).nodes);
-					}
-					return Stream.of(n);
-				})
-				.map(n -> PlanNodeHelper.handleSorting(true, n))
-				.toArray(PlanNode[]::new);
+		PlanNode[] planNodes = Arrays.stream(nodes).filter(n -> !(n instanceof EmptyNode)).flatMap(n -> {
+			if (n instanceof UnionNode) {
+				return Arrays.stream(((UnionNode) n).nodes);
+			}
+			return Stream.of(n);
+		}).map(n -> PlanNodeHelper.handleSorting(true, n)).toArray(PlanNode[]::new);
 
-		if (planNodes.length == 1)
+		if (planNodes.length == 1) {
 			return planNodes[0];
-		if (planNodes.length == 0)
+		}
+		if (planNodes.length == 0) {
 			return EmptyNode.getInstance();
+		}
 
 		return new UnionNode(planNodes);
 
 	}
 
 	public static PlanNode getInstanceDedupe(PlanNode... nodes) {
-		PlanNode[] planNodes = Arrays.stream(nodes)
-				.filter(n -> !(n instanceof EmptyNode))
-				.distinct()
-				.flatMap(n -> {
-					if (n instanceof UnionNode) {
-						return Arrays.stream(((UnionNode) n).nodes);
-					}
-					return Stream.of(n);
-				})
-				.map(n -> PlanNodeHelper.handleSorting(true, n))
-				.toArray(PlanNode[]::new);
+		PlanNode[] planNodes = Arrays.stream(nodes).filter(n -> !(n instanceof EmptyNode)).distinct().flatMap(n -> {
+			if (n instanceof UnionNode) {
+				return Arrays.stream(((UnionNode) n).nodes);
+			}
+			return Stream.of(n);
+		}).map(n -> PlanNodeHelper.handleSorting(true, n)).toArray(PlanNode[]::new);
 
-		if (planNodes.length == 1)
+		if (planNodes.length == 1) {
 			return planNodes[0];
-		if (planNodes.length == 0)
+		}
+		if (planNodes.length == 0) {
 			return EmptyNode.getInstance();
+		}
 
 		return new UnionNode(planNodes);
 
@@ -160,7 +155,22 @@ public class UnionNode implements PlanNode {
 
 			@Override
 			public void localClose() throws SailException {
-				iterators.forEach(CloseableIteration::close);
+				Throwable thrown = null;
+				for (CloseableIteration<? extends ValidationTuple, SailException> iterator : iterators) {
+					try {
+						iterator.close();
+					} catch (Throwable t) {
+						if (thrown != null) {
+							thrown.addSuppressed(t);
+						} else {
+							thrown = t;
+						}
+					}
+				}
+
+				if (thrown != null) {
+					throw new SailException(thrown);
+				}
 			}
 
 			@Override

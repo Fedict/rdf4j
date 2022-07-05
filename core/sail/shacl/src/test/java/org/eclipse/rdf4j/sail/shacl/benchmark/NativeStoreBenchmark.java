@@ -14,7 +14,6 @@ import static org.eclipse.rdf4j.sail.shacl.ShaclSail.TransactionSettings.Perform
 import static org.eclipse.rdf4j.sail.shacl.ShaclSail.TransactionSettings.PerformanceHint.SerialValidation;
 import static org.eclipse.rdf4j.sail.shacl.ShaclSail.TransactionSettings.ValidationApproach.Bulk;
 
-import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -54,16 +53,14 @@ import ch.qos.logback.classic.Logger;
 @State(Scope.Benchmark)
 @Warmup(iterations = 0)
 @BenchmarkMode({ Mode.AverageTime })
-@Fork(value = 1, jvmArgs = { "-Xms35M", "-Xmx35M", "-XX:+UseSerialGC" })
-//@Fork(value = 1, jvmArgs = { "-Xms35M", "-Xmx35M", "-XX:+UseSerialGC", "-XX:StartFlightRecording=delay=15s,duration=120s,filename=recording.jfr,settings=profile", "-XX:FlightRecorderOptions=samplethreads=true,stackdepth=1024", "-XX:+UnlockDiagnosticVMOptions", "-XX:+DebugNonSafepoints"})
+@Fork(value = 1, jvmArgs = { "-Xms35M", "-Xmx35M" })
+//@Fork(value = 1, jvmArgs = { "-Xms35M", "-Xmx35M", "-XX:StartFlightRecording=delay=15s,duration=120s,filename=recording.jfr,settings=profile", "-XX:FlightRecorderOptions=samplethreads=true,stackdepth=1024", "-XX:+UnlockDiagnosticVMOptions", "-XX:+DebugNonSafepoints"})
 @Measurement(iterations = 1)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 public class NativeStoreBenchmark {
 
-	@Setup(Level.Iteration)
+	@Setup(Level.Trial)
 	public void setUp() throws InterruptedException {
-		System.gc();
-		Thread.sleep(100);
 		((Logger) LoggerFactory.getLogger(ShaclSailConnection.class.getName()))
 				.setLevel(ch.qos.logback.classic.Level.ERROR);
 		((Logger) LoggerFactory.getLogger(ShaclSail.class.getName())).setLevel(ch.qos.logback.classic.Level.ERROR);
@@ -132,26 +129,26 @@ public class NativeStoreBenchmark {
 
 			if (singleTransaction) {
 				connection.begin(transactionSettings);
-				try (InputStream inputStream = getFile("complexBenchmark/shacl.ttl")) {
-					connection.add(inputStream, "", RDFFormat.TURTLE, RDF4J.SHACL_SHAPE_GRAPH);
+				try (InputStream inputStream = getFile("complexBenchmark/shacl.trig")) {
+					connection.add(inputStream, "", RDFFormat.TRIG, RDF4J.SHACL_SHAPE_GRAPH);
 				}
 
 				try (InputStream inputStream = getFile("complexBenchmark/generated.ttl")) {
-					connection.add(inputStream, "", RDFFormat.TURTLE);
+					connection.add(inputStream, "", RDFFormat.TRIG);
 				}
 				connection.commit();
 
 			} else {
 				connection.begin(transactionSettings);
-				try (InputStream inputStream = getFile("complexBenchmark/shacl.ttl")) {
-					connection.add(inputStream, "", RDFFormat.TURTLE, RDF4J.SHACL_SHAPE_GRAPH);
+				try (InputStream inputStream = getFile("complexBenchmark/shacl.trig")) {
+					connection.add(inputStream, "", RDFFormat.TRIG, RDF4J.SHACL_SHAPE_GRAPH);
 				}
 
 				connection.commit();
 				connection.begin(transactionSettings);
 
 				try (InputStream inputStream = getFile("complexBenchmark/generated.ttl")) {
-					connection.add(inputStream, "", RDFFormat.TURTLE);
+					connection.add(inputStream, "", RDFFormat.TRIG);
 				}
 				connection.commit();
 			}
@@ -177,8 +174,8 @@ public class NativeStoreBenchmark {
 
 			connection.begin(IsolationLevels.NONE);
 
-			try (InputStream inputStream = getFile("complexBenchmark/shacl.ttl")) {
-				connection.add(inputStream, "", RDFFormat.TURTLE, RDF4J.SHACL_SHAPE_GRAPH);
+			try (InputStream inputStream = getFile("complexBenchmark/shacl.trig")) {
+				connection.add(inputStream, "", RDFFormat.TRIG, RDF4J.SHACL_SHAPE_GRAPH);
 			}
 
 			try (InputStream inputStream = getFile("complexBenchmark/generated.ttl")) {
@@ -197,21 +194,19 @@ public class NativeStoreBenchmark {
 	@Benchmark // this should always run out of memory, as proof that we need the native store
 	public void memoryStore() throws IOException {
 
-		NotifyingSail shaclSail = new MemoryStore();
-
-		SailRepository sailRepository = new SailRepository(shaclSail);
+		SailRepository sailRepository = new SailRepository(new MemoryStore());
 		sailRepository.init();
 
 		try (SailRepositoryConnection connection = sailRepository.getConnection()) {
 
 			connection.begin(IsolationLevels.NONE);
 
-			try (InputStream inputStream = getFile("complexBenchmark/shacl.ttl")) {
-				connection.add(inputStream, "", RDFFormat.TURTLE, RDF4J.SHACL_SHAPE_GRAPH);
+			try (InputStream inputStream = getFile("complexBenchmark/shacl.trig")) {
+				connection.add(inputStream, "", RDFFormat.TRIG, RDF4J.SHACL_SHAPE_GRAPH);
 			}
 
 			try (InputStream inputStream = getFile("complexBenchmark/generated.ttl")) {
-				connection.add(inputStream, "", RDFFormat.TURTLE);
+				connection.add(inputStream, "", RDFFormat.TRIG);
 			}
 			connection.commit();
 
@@ -222,7 +217,7 @@ public class NativeStoreBenchmark {
 	}
 
 	private InputStream getFile(String s) {
-		return new BufferedInputStream(NativeStoreBenchmark.class.getClassLoader().getResourceAsStream(s));
+		return NativeStoreBenchmark.class.getClassLoader().getResourceAsStream(s);
 	}
 
 }

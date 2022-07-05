@@ -15,11 +15,6 @@ import static org.eclipse.rdf4j.sail.shacl.ShaclSail.TransactionSettings.Perform
 import static org.eclipse.rdf4j.sail.shacl.ShaclSail.TransactionSettings.ValidationApproach.Auto;
 import static org.eclipse.rdf4j.sail.shacl.ShaclSail.TransactionSettings.ValidationApproach.Bulk;
 import static org.eclipse.rdf4j.sail.shacl.ShaclSail.TransactionSettings.ValidationApproach.Disabled;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertSame;
-import static org.junit.Assert.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.InputStream;
@@ -35,6 +30,7 @@ import org.eclipse.rdf4j.repository.sail.SailRepository;
 import org.eclipse.rdf4j.repository.sail.SailRepositoryConnection;
 import org.eclipse.rdf4j.rio.RDFFormat;
 import org.eclipse.rdf4j.sail.memory.MemoryStore;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
@@ -56,9 +52,9 @@ public class TransactionSettingsTest {
 			ShaclSailConnection sailConnection = (ShaclSailConnection) connection.getSailConnection();
 			ShaclSailConnection.Settings transactionSettings = sailConnection.getTransactionSettings();
 
-			assertSame(transactionSettings.getValidationApproach(), Bulk);
-			assertFalse(transactionSettings.isCacheSelectNodes());
-			assertFalse(transactionSettings.isParallelValidation());
+			Assertions.assertSame(transactionSettings.getValidationApproach(), Bulk);
+			Assertions.assertFalse(transactionSettings.isCacheSelectNodes());
+			Assertions.assertFalse(transactionSettings.isParallelValidation());
 
 			connection.commit();
 
@@ -84,9 +80,9 @@ public class TransactionSettingsTest {
 			ShaclSailConnection sailConnection = (ShaclSailConnection) connection.getSailConnection();
 			ShaclSailConnection.Settings transactionSettings = sailConnection.getTransactionSettings();
 
-			assertSame(transactionSettings.getValidationApproach(), Bulk);
-			assertFalse(transactionSettings.isCacheSelectNodes());
-			assertTrue(transactionSettings.isParallelValidation());
+			Assertions.assertSame(transactionSettings.getValidationApproach(), Bulk);
+			Assertions.assertFalse(transactionSettings.isCacheSelectNodes());
+			Assertions.assertTrue(transactionSettings.isParallelValidation());
 
 			connection.commit();
 
@@ -111,9 +107,9 @@ public class TransactionSettingsTest {
 			ShaclSailConnection sailConnection = (ShaclSailConnection) connection.getSailConnection();
 			ShaclSailConnection.Settings transactionSettings = sailConnection.getTransactionSettings();
 
-			assertSame(transactionSettings.getValidationApproach(), Bulk);
-			assertTrue(transactionSettings.isCacheSelectNodes());
-			assertTrue(transactionSettings.isParallelValidation());
+			Assertions.assertSame(transactionSettings.getValidationApproach(), Bulk);
+			Assertions.assertTrue(transactionSettings.isCacheSelectNodes());
+			Assertions.assertTrue(transactionSettings.isParallelValidation());
 
 			connection.commit();
 
@@ -137,9 +133,9 @@ public class TransactionSettingsTest {
 			ShaclSailConnection sailConnection = (ShaclSailConnection) connection.getSailConnection();
 			ShaclSailConnection.Settings transactionSettings = sailConnection.getTransactionSettings();
 
-			assertSame(transactionSettings.getValidationApproach(), Bulk);
-			assertTrue(transactionSettings.isCacheSelectNodes());
-			assertTrue(transactionSettings.isParallelValidation());
+			Assertions.assertSame(transactionSettings.getValidationApproach(), Bulk);
+			Assertions.assertTrue(transactionSettings.isCacheSelectNodes());
+			Assertions.assertTrue(transactionSettings.isParallelValidation());
 
 			connection.commit();
 
@@ -164,9 +160,9 @@ public class TransactionSettingsTest {
 			ShaclSailConnection sailConnection = (ShaclSailConnection) connection.getSailConnection();
 			ShaclSailConnection.Settings transactionSettings = sailConnection.getTransactionSettings();
 
-			assertSame(transactionSettings.getValidationApproach(), Auto);
-			assertTrue(transactionSettings.isCacheSelectNodes());
-			assertTrue(transactionSettings.isParallelValidation());
+			Assertions.assertSame(transactionSettings.getValidationApproach(), Auto);
+			Assertions.assertTrue(transactionSettings.isCacheSelectNodes());
+			Assertions.assertTrue(transactionSettings.isParallelValidation());
 
 			connection.commit();
 
@@ -189,9 +185,9 @@ public class TransactionSettingsTest {
 			ShaclSailConnection sailConnection = (ShaclSailConnection) connection.getSailConnection();
 			ShaclSailConnection.Settings transactionSettings = sailConnection.getTransactionSettings();
 
-			assertNotNull(transactionSettings.getValidationApproach());
-			assertTrue(transactionSettings.isCacheSelectNodes());
-			assertTrue(transactionSettings.isParallelValidation());
+			Assertions.assertNotNull(transactionSettings.getValidationApproach());
+			Assertions.assertTrue(transactionSettings.isCacheSelectNodes());
+			Assertions.assertTrue(transactionSettings.isParallelValidation());
 
 			connection.commit();
 
@@ -217,10 +213,10 @@ public class TransactionSettingsTest {
 			ShaclSailConnection sailConnection = (ShaclSailConnection) connection.getSailConnection();
 			ShaclSailConnection.Settings transactionSettings = sailConnection.getTransactionSettings();
 
-			assertSame(transactionSettings.getValidationApproach(), Auto);
-			assertFalse(transactionSettings.isCacheSelectNodes());
-			assertFalse(transactionSettings.isParallelValidation());
-			assertSame(transactionSettings.getIsolationLevel(), IsolationLevels.SNAPSHOT_READ);
+			Assertions.assertSame(transactionSettings.getValidationApproach(), Auto);
+			Assertions.assertFalse(transactionSettings.isCacheSelectNodes());
+			Assertions.assertFalse(transactionSettings.isParallelValidation());
+			Assertions.assertSame(transactionSettings.getIsolationLevel(), IsolationLevels.SNAPSHOT_READ);
 
 			connection.commit();
 
@@ -251,8 +247,8 @@ public class TransactionSettingsTest {
 			ShaclSailConnection sailConnection = (ShaclSailConnection) connection.getSailConnection();
 			ShaclSailConnection.Settings transactionSettings = sailConnection.getTransactionSettings();
 
-			assertSame(transactionSettings.getValidationApproach(), Auto);
-			assertFalse(transactionSettings.isParallelValidation());
+			Assertions.assertSame(transactionSettings.getValidationApproach(), Auto);
+			Assertions.assertFalse(transactionSettings.isParallelValidation());
 
 			connection.commit();
 
@@ -264,21 +260,25 @@ public class TransactionSettingsTest {
 	@Test
 	public void testPriority() {
 		// test default behaviour
-		assertEquals(Auto, ShaclSailConnection.Settings.getMostSignificantValidationApproach(null, null));
+		Assertions.assertEquals(Auto, ShaclSailConnection.Settings.getMostSignificantValidationApproach(null, null));
 
 		// test single null
-		assertEquals(Bulk, ShaclSailConnection.Settings.getMostSignificantValidationApproach(Bulk, null));
-		assertEquals(Bulk, ShaclSailConnection.Settings.getMostSignificantValidationApproach(null, Bulk));
+		Assertions.assertEquals(Bulk, ShaclSailConnection.Settings.getMostSignificantValidationApproach(Bulk, null));
+		Assertions.assertEquals(Bulk, ShaclSailConnection.Settings.getMostSignificantValidationApproach(null, Bulk));
 
 		// test base overrides transaction
-		assertEquals(Bulk, ShaclSailConnection.Settings.getMostSignificantValidationApproach(Bulk, Auto));
-		assertEquals(Disabled, ShaclSailConnection.Settings.getMostSignificantValidationApproach(Disabled, Auto));
-		assertEquals(Disabled, ShaclSailConnection.Settings.getMostSignificantValidationApproach(Disabled, Bulk));
+		Assertions.assertEquals(Bulk, ShaclSailConnection.Settings.getMostSignificantValidationApproach(Bulk, Auto));
+		Assertions.assertEquals(Disabled,
+				ShaclSailConnection.Settings.getMostSignificantValidationApproach(Disabled, Auto));
+		Assertions.assertEquals(Disabled,
+				ShaclSailConnection.Settings.getMostSignificantValidationApproach(Disabled, Bulk));
 
 		// test transaction overrides base
-		assertEquals(Bulk, ShaclSailConnection.Settings.getMostSignificantValidationApproach(Auto, Bulk));
-		assertEquals(Disabled, ShaclSailConnection.Settings.getMostSignificantValidationApproach(Auto, Disabled));
-		assertEquals(Disabled, ShaclSailConnection.Settings.getMostSignificantValidationApproach(Bulk, Disabled));
+		Assertions.assertEquals(Bulk, ShaclSailConnection.Settings.getMostSignificantValidationApproach(Auto, Bulk));
+		Assertions.assertEquals(Disabled,
+				ShaclSailConnection.Settings.getMostSignificantValidationApproach(Auto, Disabled));
+		Assertions.assertEquals(Disabled,
+				ShaclSailConnection.Settings.getMostSignificantValidationApproach(Bulk, Disabled));
 
 	}
 
@@ -292,8 +292,8 @@ public class TransactionSettingsTest {
 
 			connection.begin(Bulk, IsolationLevels.NONE);
 
-			try (InputStream shapesData = Utils.class.getClassLoader().getResourceAsStream("shacl.ttl")) {
-				connection.add(shapesData, "", RDFFormat.TURTLE, RDF4J.SHACL_SHAPE_GRAPH);
+			try (InputStream shapesData = Utils.class.getClassLoader().getResourceAsStream("shacl.trig")) {
+				connection.add(shapesData, "", RDFFormat.TRIG, RDF4J.SHACL_SHAPE_GRAPH);
 			}
 
 			connection.add(RDFS.RESOURCE, RDF.TYPE, RDFS.RESOURCE);
@@ -316,8 +316,8 @@ public class TransactionSettingsTest {
 
 			connection.begin(Bulk, IsolationLevels.NONE);
 
-			try (InputStream shapesData = Utils.class.getClassLoader().getResourceAsStream("shacl.ttl")) {
-				connection.add(shapesData, "", RDFFormat.TURTLE, RDF4J.SHACL_SHAPE_GRAPH);
+			try (InputStream shapesData = Utils.class.getClassLoader().getResourceAsStream("shacl.trig")) {
+				connection.add(shapesData, "", RDFFormat.TRIG, RDF4J.SHACL_SHAPE_GRAPH);
 			}
 
 			connection.add(RDFS.RESOURCE, RDF.TYPE, RDFS.RESOURCE);
@@ -345,8 +345,8 @@ public class TransactionSettingsTest {
 
 			connection.begin(Bulk, IsolationLevels.SNAPSHOT);
 
-			try (InputStream shapesData = Utils.class.getClassLoader().getResourceAsStream("shacl.ttl")) {
-				connection.add(shapesData, "", RDFFormat.TURTLE, RDF4J.SHACL_SHAPE_GRAPH);
+			try (InputStream shapesData = Utils.class.getClassLoader().getResourceAsStream("shacl.trig")) {
+				connection.add(shapesData, "", RDFFormat.TRIG, RDF4J.SHACL_SHAPE_GRAPH);
 			}
 
 			connection.add(RDFS.RESOURCE, RDF.TYPE, RDFS.RESOURCE);
@@ -374,8 +374,8 @@ public class TransactionSettingsTest {
 
 			connection.begin(Bulk, IsolationLevels.NONE);
 
-			try (InputStream shapesData = Utils.class.getClassLoader().getResourceAsStream("shacl.ttl")) {
-				connection.add(shapesData, "", RDFFormat.TURTLE, RDF4J.SHACL_SHAPE_GRAPH);
+			try (InputStream shapesData = Utils.class.getClassLoader().getResourceAsStream("shacl.trig")) {
+				connection.add(shapesData, "", RDFFormat.TRIG, RDF4J.SHACL_SHAPE_GRAPH);
 			}
 
 			connection.add(RDFS.RESOURCE, RDF.TYPE, RDFS.RESOURCE);
@@ -408,8 +408,8 @@ public class TransactionSettingsTest {
 
 			connection.begin(Disabled);
 
-			try (InputStream shapesData = Utils.class.getClassLoader().getResourceAsStream("shacl.ttl")) {
-				connection.add(shapesData, "", RDFFormat.TURTLE, RDF4J.SHACL_SHAPE_GRAPH);
+			try (InputStream shapesData = Utils.class.getClassLoader().getResourceAsStream("shacl.trig")) {
+				connection.add(shapesData, "", RDFFormat.TRIG, RDF4J.SHACL_SHAPE_GRAPH);
 			}
 
 			connection.add(RDFS.RESOURCE, RDF.TYPE, RDFS.RESOURCE);
@@ -444,8 +444,8 @@ public class TransactionSettingsTest {
 
 			connection.begin(Disabled, IsolationLevels.SNAPSHOT);
 
-			try (InputStream shapesData = Utils.class.getClassLoader().getResourceAsStream("shacl.ttl")) {
-				connection.add(shapesData, "", RDFFormat.TURTLE, RDF4J.SHACL_SHAPE_GRAPH);
+			try (InputStream shapesData = Utils.class.getClassLoader().getResourceAsStream("shacl.trig")) {
+				connection.add(shapesData, "", RDFFormat.TRIG, RDF4J.SHACL_SHAPE_GRAPH);
 			}
 
 			connection.commit();
@@ -480,8 +480,8 @@ public class TransactionSettingsTest {
 
 			connection.begin(Bulk);
 
-			try (InputStream shapesData = Utils.class.getClassLoader().getResourceAsStream("shacl.ttl")) {
-				connection.add(shapesData, "", RDFFormat.TURTLE, RDF4J.SHACL_SHAPE_GRAPH);
+			try (InputStream shapesData = Utils.class.getClassLoader().getResourceAsStream("shacl.trig")) {
+				connection.add(shapesData, "", RDFFormat.TRIG, RDF4J.SHACL_SHAPE_GRAPH);
 			}
 
 			connection.add(RDFS.RESOURCE, RDF.TYPE, RDFS.RESOURCE);
@@ -505,8 +505,8 @@ public class TransactionSettingsTest {
 
 			connection.begin(Auto);
 
-			try (InputStream shapesData = Utils.class.getClassLoader().getResourceAsStream("shacl.ttl")) {
-				connection.add(shapesData, "", RDFFormat.TURTLE, RDF4J.SHACL_SHAPE_GRAPH);
+			try (InputStream shapesData = Utils.class.getClassLoader().getResourceAsStream("shacl.trig")) {
+				connection.add(shapesData, "", RDFFormat.TRIG, RDF4J.SHACL_SHAPE_GRAPH);
 			}
 
 			connection.commit();
@@ -532,8 +532,8 @@ public class TransactionSettingsTest {
 
 			connection.begin(Auto);
 
-			try (InputStream shapesData = Utils.class.getClassLoader().getResourceAsStream("shacl.ttl")) {
-				connection.add(shapesData, "", RDFFormat.TURTLE, RDF4J.SHACL_SHAPE_GRAPH);
+			try (InputStream shapesData = Utils.class.getClassLoader().getResourceAsStream("shacl.trig")) {
+				connection.add(shapesData, "", RDFFormat.TRIG, RDF4J.SHACL_SHAPE_GRAPH);
 			}
 
 			connection.commit();
@@ -570,28 +570,28 @@ public class TransactionSettingsTest {
 			connection.begin(SerialValidation);
 
 			try (InputStream shapesData = Utils.class.getClassLoader()
-					.getResourceAsStream("shaclDatatypeAndMinCount.ttl")) {
-				connection.add(shapesData, "", RDFFormat.TURTLE, RDF4J.SHACL_SHAPE_GRAPH);
+					.getResourceAsStream("shaclDatatypeAndMinCount.trig")) {
+				connection.add(shapesData, "", RDFFormat.TRIG, RDF4J.SHACL_SHAPE_GRAPH);
 			}
 
 			connection.commit();
 
-			Mockito.verify(spy, Mockito.never()).submitRunnableToExecutorService(Mockito.any());
+			Mockito.verify(spy, Mockito.never()).submitToExecutorService(Mockito.any());
 
 			connection.clear(RDF4J.SHACL_SHAPE_GRAPH);
 
-			Mockito.verify(spy, Mockito.never()).submitRunnableToExecutorService(Mockito.any());
+			Mockito.verify(spy, Mockito.never()).submitToExecutorService(Mockito.any());
 
 			connection.begin(ParallelValidation);
 
 			try (InputStream shapesData = Utils.class.getClassLoader()
-					.getResourceAsStream("shaclDatatypeAndMinCount.ttl")) {
-				connection.add(shapesData, "", RDFFormat.TURTLE, RDF4J.SHACL_SHAPE_GRAPH);
+					.getResourceAsStream("shaclDatatypeAndMinCount.trig")) {
+				connection.add(shapesData, "", RDFFormat.TRIG, RDF4J.SHACL_SHAPE_GRAPH);
 			}
 
 			connection.commit();
 
-			Mockito.verify(spy, Mockito.atLeastOnce()).submitRunnableToExecutorService(Mockito.any());
+			Mockito.verify(spy, Mockito.atLeastOnce()).submitToExecutorService(Mockito.any());
 
 		} finally {
 			repository.shutDown();

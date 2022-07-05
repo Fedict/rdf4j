@@ -36,11 +36,11 @@ import ch.qos.logback.classic.Logger;
  * @author Håvard Ottestad
  */
 @State(Scope.Benchmark)
-@Warmup(iterations = 20)
+@Warmup(iterations = 5)
 @BenchmarkMode({ Mode.AverageTime })
-@Fork(value = 1, jvmArgs = { "-Xmx1G", "-XX:+UseSerialGC" })
-//@Fork(value = 1, jvmArgs = {"-Xms8G", "-Xmx8G", "-XX:+UseSerialGC", "-XX:+UnlockCommercialFeatures", "-XX:StartFlightRecording=delay=5s,duration=120s,filename=recording.jfr,settings=profile", "-XX:FlightRecorderOptions=samplethreads=true,stackdepth=1024", "-XX:+UnlockDiagnosticVMOptions", "-XX:+DebugNonSafepoints"})
-@Measurement(iterations = 10)
+@Fork(value = 1, jvmArgs = { "-Xmx1G" })
+//@Fork(value = 1, jvmArgs = {"-Xms8G", "-Xmx8G", "-XX:+UnlockCommercialFeatures", "-XX:StartFlightRecording=delay=5s,duration=120s,filename=recording.jfr,settings=profile", "-XX:FlightRecorderOptions=samplethreads=true,stackdepth=1024", "-XX:+UnlockDiagnosticVMOptions", "-XX:+DebugNonSafepoints"})
+@Measurement(iterations = 5)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 public class TargetShapeBenchmark {
 
@@ -54,7 +54,7 @@ public class TargetShapeBenchmark {
 	public void shacl() throws Exception {
 
 		SailRepository repository = new SailRepository(
-				Utils.getInitializedShaclSail("benchmark/targetShape/shapes.ttl"));
+				Utils.getInitializedShaclSail("benchmark/targetShape/shapes.trig"));
 
 		((ShaclSail) repository.getSail()).setDashDataShapes(true);
 		((ShaclSail) repository.getSail()).setEclipseRdf4jShaclExtensions(true);
@@ -63,7 +63,7 @@ public class TargetShapeBenchmark {
 
 			connection.begin(IsolationLevels.SNAPSHOT);
 			connection.add(TargetShapeBenchmark.class.getClassLoader().getResource("benchmark/targetShape/data.ttl"),
-					RDFFormat.TURTLE);
+					RDFFormat.TRIG);
 			connection.commit();
 		}
 

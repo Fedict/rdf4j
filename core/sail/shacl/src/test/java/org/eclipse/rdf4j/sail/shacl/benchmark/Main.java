@@ -19,9 +19,35 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 public class Main {
 
 	public static void main(String[] args) throws RunnerException {
-		Options opt = new OptionsBuilder().include("TargetBenchmarkInitialData.*")
-
-				// .addProfiler("stack", "lines=20;period=1;top=20")
+		Options opt = new OptionsBuilder()
+				.include("AddRemoveBenchmarkEmpty.*")
+				.include("ClassBenchmarkEmpty.*")
+				.include("ComplexBenchmark.*")
+				.include("ComplexTargetBenchmark.*")
+				.include("DatatypeBenchmarkEmpty.*")
+				.include("DatatypeBenchmarkLinear.*")
+				.include("DatatypeBenchmarkPrefilled.*")
+				.include("DatatypeBenchmarkSerializableEmpty.*")
+				.include("HasValueBenchmarkEmpty.*")
+				.include("LanguageInBenchmarkEmpty.*")
+				.include("MaxCountBenchmarkEmpty.*")
+				.include("MinCountBenchmarkEmpty.*")
+				.include("MinCountBenchmarkPrefilled.*")
+				.include("MinCountPrefilledVsEmptyBenchmark.*")
+				.include("NotClassBenchmarkEmpty.*")
+				.include("NotMaxCountBenchmarkEmpty.*")
+				.include("NotUniqueLangBenchmarkEmpty.*")
+				.include("OrDatatypeBenchmark.*")
+				.include("QualifiedValueShapeBenchmarkEmpty.*")
+				.include("RdfsReasonerBenchmarkEmpty.*")
+				.include("ShaclLoadingBenchmark.*")
+				.include("TargetBenchmarkInitialData.*")
+				.include("TargetShapeBenchmark.*")
+				.include("UniqueLangBenchmarkEmpty.*")
+				.include("ValidationTupleBenchmark.*")
+				.include("ValueInBenchmarkEmpty.*")
+				.warmupIterations(3)
+				.measurementIterations(2)
 				.build();
 
 		new Runner(opt).run();

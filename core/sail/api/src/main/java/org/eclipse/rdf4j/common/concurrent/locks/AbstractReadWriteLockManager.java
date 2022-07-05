@@ -8,6 +8,7 @@
 
 package org.eclipse.rdf4j.common.concurrent.locks;
 
+import java.lang.invoke.VarHandle;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.LongAdder;
 import java.util.concurrent.locks.StampedLock;
@@ -16,6 +17,7 @@ import org.eclipse.rdf4j.common.concurrent.locks.diagnostics.LockCleaner;
 import org.eclipse.rdf4j.common.concurrent.locks.diagnostics.LockDiagnostics;
 import org.eclipse.rdf4j.common.concurrent.locks.diagnostics.LockMonitoring;
 import org.eclipse.rdf4j.common.concurrent.locks.diagnostics.LockTracking;
+import org.eclipse.rdf4j.query.algebra.Var;
 import org.slf4j.LoggerFactory;
 
 /**
@@ -25,8 +27,8 @@ import org.slf4j.LoggerFactory;
  */
 public abstract class AbstractReadWriteLockManager implements ReadWriteLockManager {
 
-	private final LockMonitoring readLockMonitoring;
-	private final LockMonitoring writeLockMonitoring;
+	private final LockMonitoring<ReadLock> readLockMonitoring;
+	private final LockMonitoring<WriteLock> writeLockMonitoring;
 
 	// StampedLock for handling writers.
 	final StampedLock stampedLock = new StampedLock();
@@ -90,7 +92,6 @@ public abstract class AbstractReadWriteLockManager implements ReadWriteLockManag
 		}
 
 		if (lockDiagnostics.length == 0) {
-
 			readLockMonitoring = LockMonitoring
 					.wrap(Lock.ExtendedSupplier.wrap(this::createReadLockInner, this::tryReadLockInner));
 			writeLockMonitoring = LockMonitoring
@@ -98,14 +99,14 @@ public abstract class AbstractReadWriteLockManager implements ReadWriteLockManag
 
 		} else if (releaseAbandoned && !detectStalledOrDeadlock) {
 
-			readLockMonitoring = new LockCleaner(
+			readLockMonitoring = new LockCleaner<>(
 					stackTrace,
 					alias + "_READ",
 					LoggerFactory.getLogger(this.getClass()),
 					Lock.ExtendedSupplier.wrap(this::createReadLockInner, this::tryReadLockInner)
 			);
 
-			writeLockMonitoring = new LockCleaner(
+			writeLockMonitoring = new LockCleaner<>(
 					stackTrace,
 					alias + "_WRITE",
 					LoggerFactory.getLogger(this.getClass()),
@@ -114,7 +115,7 @@ public abstract class AbstractReadWriteLockManager implements ReadWriteLockManag
 
 		} else {
 
-			readLockMonitoring = new LockTracking(
+			readLockMonitoring = new LockTracking<>(
 					stackTrace,
 					alias + "_READ",
 					LoggerFactory.getLogger(this.getClass()),
@@ -122,7 +123,7 @@ public abstract class AbstractReadWriteLockManager implements ReadWriteLockManag
 					Lock.ExtendedSupplier.wrap(this::createReadLockInner, this::tryReadLockInner)
 			);
 
-			writeLockMonitoring = new LockTracking(
+			writeLockMonitoring = new LockTracking<>(
 					stackTrace,
 					alias + "_WRITE",
 					LoggerFactory.getLogger(this.getClass()),
@@ -180,7 +181,7 @@ public abstract class AbstractReadWriteLockManager implements ReadWriteLockManag
 		return readLockMonitoring.getLock();
 	}
 
-	Lock createReadLockInner() throws InterruptedException {
+	ReadLock createReadLockInner() throws InterruptedException {
 
 		readersLocked.increment();
 		while (stampedLock.isWriteLocked()) {
@@ -203,7 +204,7 @@ public abstract class AbstractReadWriteLockManager implements ReadWriteLockManag
 		return writeLockMonitoring.getLock();
 	}
 
-	private Lock createWriteLockInner() throws InterruptedException {
+	private WriteLock createWriteLockInner() throws InterruptedException {
 
 		// Acquire a write-lock.
 		long writeStamp = writeLockInterruptibly();
@@ -253,6 +254,7 @@ public abstract class AbstractReadWriteLockManager implements ReadWriteLockManag
 			}
 		}
 
+		VarHandle.releaseFence();
 		return new WriteLock(stampedLock, writeStamp);
 	}
 
@@ -288,7 +290,7 @@ public abstract class AbstractReadWriteLockManager implements ReadWriteLockManag
 		return readLockMonitoring.tryLock();
 	}
 
-	private Lock tryReadLockInner() {
+	private ReadLock tryReadLockInner() {
 		readersLocked.increment();
 		if (!stampedLock.isWriteLocked()) {
 			// Everything is good! We have acquired a read-lock and there are no active writers.
@@ -311,7 +313,7 @@ public abstract class AbstractReadWriteLockManager implements ReadWriteLockManag
 		return writeLockMonitoring.tryLock();
 	}
 
-	private Lock tryWriteLockInner() {
+	private WriteLock tryWriteLockInner() {
 		// Try to acquire a write-lock.
 		long writeStamp = stampedLock.tryWriteLock();
 
@@ -322,6 +324,7 @@ public abstract class AbstractReadWriteLockManager implements ReadWriteLockManag
 			long lockedSum = readersLocked.sum();
 			if (unlockedSum == lockedSum) {
 				// No active readers.
+				VarHandle.releaseFence();
 				return new WriteLock(stampedLock, writeStamp);
 			} else {
 				stampedLock.unlockWrite(writeStamp);
@@ -418,6 +421,7 @@ public abstract class AbstractReadWriteLockManager implements ReadWriteLockManag
 				throw new IllegalMonitorStateException("Trying to release a lock that is not locked");
 			}
 
+			VarHandle.acquireFence();
 			locked = false;
 			readersUnlocked.increment();
 

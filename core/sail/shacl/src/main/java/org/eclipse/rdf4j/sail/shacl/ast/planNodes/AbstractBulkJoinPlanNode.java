@@ -18,6 +18,7 @@ import java.util.stream.Stream;
 
 import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.query.BindingSet;
+import org.eclipse.rdf4j.query.Dataset;
 import org.eclipse.rdf4j.query.QueryLanguage;
 import org.eclipse.rdf4j.query.algebra.BindingSetAssignment;
 import org.eclipse.rdf4j.query.algebra.helpers.AbstractQueryModelVisitor;
@@ -44,26 +45,23 @@ public abstract class AbstractBulkJoinPlanNode implements PlanNode {
 	}
 
 	void runQuery(ArrayDeque<ValidationTuple> left, ArrayDeque<ValidationTuple> right, SailConnection connection,
-			ParsedQuery parsedQuery, boolean skipBasedOnPreviousConnection, SailConnection previousStateConnection,
-			Function<BindingSet, ValidationTuple> mapper) {
+			ParsedQuery parsedQuery, Dataset dataset, Resource[] dataGraph, boolean skipBasedOnPreviousConnection,
+			SailConnection previousStateConnection, Function<BindingSet, ValidationTuple> mapper) {
 		List<BindingSet> newBindindingset = buildBindingSets(left, connection, skipBasedOnPreviousConnection,
-				previousStateConnection);
+				previousStateConnection, dataGraph);
 
 		if (!newBindindingset.isEmpty()) {
 			updateQuery(parsedQuery, newBindindingset);
-			executeQuery(right, connection, parsedQuery, mapper);
+			executeQuery(right, connection, dataset, parsedQuery, mapper);
 		}
 	}
 
 	private static void executeQuery(ArrayDeque<ValidationTuple> right, SailConnection connection,
-			ParsedQuery parsedQuery,
+			Dataset dataset, ParsedQuery parsedQuery,
 			Function<BindingSet, ValidationTuple> mapper) {
 
-//		Explanation explain = connection.explain(Explanation.Level.Timed, parsedQuery.getTupleExpr(), parsedQuery.getDataset(), new MapBindingSet(), true, 10000);
-//		System.out.println(explain);
-
 		try (Stream<? extends BindingSet> stream = connection
-				.evaluate(parsedQuery.getTupleExpr(), parsedQuery.getDataset(), new MapBindingSet(), true)
+				.evaluate(parsedQuery.getTupleExpr(), dataset, new MapBindingSet(), true)
 				.stream()) {
 			stream
 					.map(mapper)
@@ -93,7 +91,7 @@ public abstract class AbstractBulkJoinPlanNode implements PlanNode {
 	}
 
 	private List<BindingSet> buildBindingSets(ArrayDeque<ValidationTuple> left, SailConnection connection,
-			boolean skipBasedOnPreviousConnection, SailConnection previousStateConnection) {
+			boolean skipBasedOnPreviousConnection, SailConnection previousStateConnection, Resource[] dataGraph) {
 		return left.stream()
 
 				.filter(tuple -> {
@@ -104,11 +102,15 @@ public abstract class AbstractBulkJoinPlanNode implements PlanNode {
 					boolean hasStatement;
 
 					if (!(tuple.getActiveTarget().isResource())) {
-						hasStatement = previousStateConnection.hasStatement(null, null, tuple.getActiveTarget(), true);
+						hasStatement = previousStateConnection.hasStatement(null, null, tuple.getActiveTarget(),
+								true, dataGraph);
+
 					} else {
-						hasStatement = previousStateConnection
-								.hasStatement(((Resource) tuple.getActiveTarget()), null, null, true) ||
-								previousStateConnection.hasStatement(null, null, tuple.getActiveTarget(), true);
+						hasStatement = previousStateConnection.hasStatement(((Resource) tuple.getActiveTarget()),
+								null, null, true, dataGraph) ||
+								previousStateConnection.hasStatement(null, null, tuple.getActiveTarget(), true,
+										dataGraph);
+
 					}
 
 					if (!hasStatement && validationExecutionLogger.isEnabled()) {
@@ -119,7 +121,7 @@ public abstract class AbstractBulkJoinPlanNode implements PlanNode {
 					return hasStatement;
 
 				})
-				.map(ValidationTuple::getActiveTarget)
+				.map(validationTuple -> validationTuple.getActiveTarget())
 				.map(r -> new SimpleBindingSet(Collections.singleton("a"), Collections.singletonList("a"),
 						Collections.singletonList(r)))
 				.collect(Collectors.toList());

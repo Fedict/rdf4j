@@ -45,7 +45,7 @@ import ch.qos.logback.classic.Logger;
 @State(Scope.Benchmark)
 @Warmup(iterations = 5)
 @BenchmarkMode({ Mode.AverageTime })
-@Fork(value = 1, jvmArgs = { "-Xmx256M", "-XX:+UseSerialGC" })
+@Fork(value = 1, jvmArgs = { "-Xmx256M" })
 @Measurement(iterations = 5)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 public class QualifiedValueShapeBenchmarkEmpty {
@@ -89,7 +89,7 @@ public class QualifiedValueShapeBenchmarkEmpty {
 	public void shacl() throws Exception {
 
 		SailRepository repository = new SailRepository(
-				Utils.getInitializedShaclSail("shaclQualifiedShapeBenchmark.ttl"));
+				Utils.getInitializedShaclSail("shaclQualifiedShapeBenchmark.trig"));
 
 		try (SailRepositoryConnection connection = repository.getConnection()) {
 			for (List<Statement> statements : allStatements) {
@@ -106,7 +106,7 @@ public class QualifiedValueShapeBenchmarkEmpty {
 	public void shaclBulk() throws Exception {
 
 		SailRepository repository = new SailRepository(
-				Utils.getInitializedShaclSail("shaclQualifiedShapeBenchmark.ttl"));
+				Utils.getInitializedShaclSail("shaclQualifiedShapeBenchmark.trig"));
 
 		try (SailRepositoryConnection connection = repository.getConnection()) {
 			connection.begin(ShaclSail.TransactionSettings.ValidationApproach.Bulk);

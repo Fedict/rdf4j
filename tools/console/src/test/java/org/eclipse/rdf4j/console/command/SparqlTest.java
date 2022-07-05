@@ -7,9 +7,13 @@
  *******************************************************************************/
 package org.eclipse.rdf4j.console.command;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import java.io.File;
 import java.io.FileReader;
@@ -89,7 +93,7 @@ public class SparqlTest extends AbstractCommandTest {
 
 		assertTrue(f.exists(), "File does not exist");
 		assertTrue(f.length() > 0, "Empty file");
-		Model m = null;
+		Model m;
 		try (Reader reader = new FileReader(f)) {
 			m = Rio.parse(reader, "", RDFFormat.TURTLE);
 		}
@@ -108,7 +112,7 @@ public class SparqlTest extends AbstractCommandTest {
 
 		assertTrue(f.exists(), "File does not exist");
 		assertTrue(f.length() > 0, "Empty file");
-		Model m = null;
+		Model m;
 		try (Reader reader = new FileReader(f)) {
 			m = Rio.parse(reader, "", RDFFormat.TURTLE);
 		}

@@ -28,7 +28,7 @@ public class TransactionValidationLimitTest {
 	@Test
 	public void testFailoverToBulkValidationSingleConnection() throws Exception {
 
-		SailRepository shaclRepository = Utils.getInitializedShaclRepository("shacl.ttl");
+		SailRepository shaclRepository = Utils.getInitializedShaclRepository("shacl.trig");
 
 		((ShaclSail) shaclRepository.getSail()).setTransactionalValidationLimit(3);
 
@@ -71,7 +71,7 @@ public class TransactionValidationLimitTest {
 	@Test
 	public void testFailoverToBulkValidationNewConnection() throws Exception {
 
-		SailRepository shaclRepository = Utils.getInitializedShaclRepository("shacl.ttl");
+		SailRepository shaclRepository = Utils.getInitializedShaclRepository("shacl.trig");
 
 		((ShaclSail) shaclRepository.getSail()).setTransactionalValidationLimit(3);
 
@@ -99,8 +99,10 @@ public class TransactionValidationLimitTest {
 			assertEquals(ShaclSail.TransactionSettings.ValidationApproach.Bulk,
 					shaclSailConnection.getTransactionSettings().getValidationApproach(),
 					"We have added more than 3 statements so the validation approach should have switched to Bulk.");
+
 			assertFalse(shaclSailConnection.getTransactionSettings().isCacheSelectNodes(),
 					"Bulk validation should by default disable caching select nodes.");
+
 			assertFalse(shaclSailConnection.getTransactionSettings().isParallelValidation(),
 					"Bulk validation should by default disable parallel validation.");
 
@@ -116,13 +118,11 @@ public class TransactionValidationLimitTest {
 	@Test
 	public void testFailoverToBulkValidationTriggersValidation() throws Exception {
 
-		SailRepository shaclRepository = Utils.getInitializedShaclRepository("shacl.ttl");
+		SailRepository shaclRepository = Utils.getInitializedShaclRepository("shacl.trig");
 
 		((ShaclSail) shaclRepository.getSail()).setTransactionalValidationLimit(3);
 
 		try (SailRepositoryConnection connection = shaclRepository.getConnection()) {
-			ShaclSailConnection shaclSailConnection = (ShaclSailConnection) connection.getSailConnection();
-
 			connection.begin();
 			connection.add(RDFS.CLASS, RDFS.COMMENT, connection.getValueFactory().createLiteral("a"));
 			connection.commit();
@@ -152,7 +152,7 @@ public class TransactionValidationLimitTest {
 	@Test
 	public void testBulkValidationForEmptySail() throws Exception {
 
-		SailRepository shaclRepository = Utils.getInitializedShaclRepository("shacl.ttl");
+		SailRepository shaclRepository = Utils.getInitializedShaclRepository("shacl.trig");
 
 		try (SailRepositoryConnection connection = shaclRepository.getConnection()) {
 			ShaclSailConnection shaclSailConnection = (ShaclSailConnection) connection.getSailConnection();

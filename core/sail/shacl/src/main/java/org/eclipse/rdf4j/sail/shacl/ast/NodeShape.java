@@ -16,11 +16,9 @@ import org.eclipse.rdf4j.model.Model;
 import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.vocabulary.RDF;
 import org.eclipse.rdf4j.model.vocabulary.SHACL;
-import org.eclipse.rdf4j.repository.RepositoryConnection;
-import org.eclipse.rdf4j.sail.shacl.ConnectionsGroup;
-import org.eclipse.rdf4j.sail.shacl.RdfsSubClassOfReasoner;
 import org.eclipse.rdf4j.sail.shacl.ShaclSail;
 import org.eclipse.rdf4j.sail.shacl.SourceConstraintComponent;
+import org.eclipse.rdf4j.sail.shacl.ValidationSettings;
 import org.eclipse.rdf4j.sail.shacl.ast.constraintcomponents.ConstraintComponent;
 import org.eclipse.rdf4j.sail.shacl.ast.planNodes.EmptyNode;
 import org.eclipse.rdf4j.sail.shacl.ast.planNodes.PlanNode;
@@ -30,35 +28,34 @@ import org.eclipse.rdf4j.sail.shacl.ast.planNodes.UnionNode;
 import org.eclipse.rdf4j.sail.shacl.ast.planNodes.Unique;
 import org.eclipse.rdf4j.sail.shacl.ast.planNodes.ValidationReportNode;
 import org.eclipse.rdf4j.sail.shacl.results.ValidationResult;
+import org.eclipse.rdf4j.sail.shacl.wrapper.data.ConnectionsGroup;
+import org.eclipse.rdf4j.sail.shacl.wrapper.data.RdfsSubClassOfReasoner;
+import org.eclipse.rdf4j.sail.shacl.wrapper.shape.ShapeSource;
 
-public class NodeShape extends Shape implements ConstraintComponent, Identifiable {
+public class NodeShape extends Shape {
 
-	protected boolean produceValidationReports;
-
-	public NodeShape(boolean produceValidationReports) {
-		this.produceValidationReports = produceValidationReports;
+	public NodeShape() {
 	}
 
 	public NodeShape(NodeShape nodeShape) {
 		super(nodeShape);
-		this.produceValidationReports = nodeShape.produceValidationReports;
 	}
 
 	public static NodeShape getInstance(ShaclProperties properties,
-			RepositoryConnection connection, Cache cache, boolean produceValidationReports, ShaclSail shaclSail) {
+			ShapeSource shapeSource, Cache cache, ShaclSail shaclSail) {
 
-		Shape shape = cache.get(properties.getId());
+		NodeShape shape = (NodeShape) cache.get(properties.getId());
 		if (shape == null) {
-			shape = new NodeShape(produceValidationReports);
+			shape = new NodeShape();
 			cache.put(properties.getId(), shape);
-			shape.populate(properties, connection, cache, shaclSail);
+			shape.populate(properties, shapeSource, cache, shaclSail);
 		}
 
-		return (NodeShape) shape;
+		return shape;
 	}
 
 	@Override
-	public void populate(ShaclProperties properties, RepositoryConnection connection,
+	public void populate(ShaclProperties properties, ShapeSource connection,
 			Cache cache, ShaclSail shaclSail) {
 		super.populate(properties, connection, cache, shaclSail);
 
@@ -112,7 +109,7 @@ public class NodeShape extends Shape implements ConstraintComponent, Identifiabl
 
 	@Override
 	public ValidationQuery generateSparqlValidationQuery(ConnectionsGroup connectionsGroup,
-			boolean logValidationPlans, boolean negatePlan, boolean negateChildren, Scope scope) {
+			ValidationSettings validationSettings, boolean negatePlan, boolean negateChildren, Scope scope) {
 
 		if (deactivated) {
 			return ValidationQuery.Deactivated.getInstance();
@@ -121,26 +118,23 @@ public class NodeShape extends Shape implements ConstraintComponent, Identifiabl
 		ValidationQuery validationQuery = constraintComponents.stream()
 				.map(c -> {
 					ValidationQuery validationQuery1 = c.generateSparqlValidationQuery(connectionsGroup,
-							logValidationPlans, negatePlan,
+							validationSettings, negatePlan,
 							negateChildren, Scope.nodeShape);
 					if (!(c instanceof PropertyShape)) {
 						return validationQuery1.withConstraintComponent(c.getConstraintComponent());
 					}
 					return validationQuery1;
 				})
-				.reduce(ValidationQuery::union)
+				.reduce((a, b) -> ValidationQuery.union(a, b, false))
 				.orElseThrow(IllegalStateException::new);
 
 		if (produceValidationReports) {
-			// since we split our shapes by constraint component we know that we will only have 1 constraint component
-			// unless we are within a logical operator like sh:not, in which case we don't need to create a validation
-			// report since sh:detail is not supported for sparql based validation
 			assert constraintComponents.size() == 1;
-			if (!(constraintComponents.get(0) instanceof PropertyShape)) {
-				validationQuery = validationQuery.withShape(this);
-				validationQuery = validationQuery.withSeverity(severity);
-				validationQuery.makeCurrentStateValidationReport();
-			}
+			assert !(constraintComponents.get(0) instanceof PropertyShape);
+
+			validationQuery = validationQuery.withShape(this);
+			validationQuery = validationQuery.withSeverity(severity);
+			validationQuery.makeCurrentStateValidationReport();
 		}
 
 		if (scope == Scope.propertyShape) {
@@ -153,7 +147,7 @@ public class NodeShape extends Shape implements ConstraintComponent, Identifiabl
 
 	@Override
 	public PlanNode generateTransactionalValidationPlan(ConnectionsGroup connectionsGroup,
-			boolean logValidationPlans, PlanNodeProvider overrideTargetNode,
+			ValidationSettings validationSettings, PlanNodeProvider overrideTargetNode,
 			Scope scope) {
 
 		if (isDeactivated()) {
@@ -164,13 +158,17 @@ public class NodeShape extends Shape implements ConstraintComponent, Identifiabl
 
 		for (ConstraintComponent constraintComponent : constraintComponents) {
 			PlanNode validationPlanNode = constraintComponent
-					.generateTransactionalValidationPlan(connectionsGroup, logValidationPlans, overrideTargetNode,
+					.generateTransactionalValidationPlan(connectionsGroup, validationSettings, overrideTargetNode,
 							Scope.nodeShape);
 
-			if (!(constraintComponent instanceof PropertyShape) && produceValidationReports) {
+			if (produceValidationReports) {
+				assert !(constraintComponent instanceof PropertyShape);
+				assert constraintComponents.size() == 1;
+
 				validationPlanNode = new ValidationReportNode(validationPlanNode, t -> {
 					return new ValidationResult(t.getActiveTarget(), t.getActiveTarget(), this,
-							constraintComponent.getConstraintComponent(), getSeverity(), t.getScope());
+							constraintComponent.getConstraintComponent(), getSeverity(), t.getScope(), t.getContexts(),
+							getContexts());
 				});
 			}
 
@@ -178,8 +176,7 @@ public class NodeShape extends Shape implements ConstraintComponent, Identifiabl
 				validationPlanNode = Unique.getInstance(new ShiftToPropertyShape(validationPlanNode), true);
 			}
 
-			union = UnionNode.getInstance(union,
-					validationPlanNode);
+			union = UnionNode.getInstance(union, validationPlanNode);
 		}
 
 		return union;
@@ -199,18 +196,24 @@ public class NodeShape extends Shape implements ConstraintComponent, Identifiabl
 	}
 
 	@Override
-	public PlanNode getAllTargetsPlan(ConnectionsGroup connectionsGroup, Scope scope) {
+	public PlanNode getAllTargetsPlan(ConnectionsGroup connectionsGroup, Resource[] dataGraph, Scope scope,
+			StatementMatcher.StableRandomVariableProvider stableRandomVariableProvider) {
 
 		PlanNode planNode = constraintComponents.stream()
-				.map(c -> c.getAllTargetsPlan(connectionsGroup, Scope.nodeShape))
+				.map(c -> c.getAllTargetsPlan(connectionsGroup, dataGraph, Scope.nodeShape,
+						new StatementMatcher.StableRandomVariableProvider()))
 				.distinct()
 				.reduce(UnionNode::getInstanceDedupe)
 				.orElse(EmptyNode.getInstance());
 
-		planNode = UnionNode.getInstanceDedupe(planNode,
-				getTargetChain()
-						.getEffectiveTarget("_target", Scope.nodeShape, connectionsGroup.getRdfsSubClassOfReasoner())
-						.getPlanNode(connectionsGroup, Scope.nodeShape, true, null));
+		if (connectionsGroup.getStats().hasRemoved()) {
+			PlanNode planNodeEffectiveTarget = getTargetChain()
+					.getEffectiveTarget(Scope.nodeShape, connectionsGroup.getRdfsSubClassOfReasoner(),
+							stableRandomVariableProvider)
+					.getPlanNode(connectionsGroup, dataGraph, Scope.nodeShape, true, null);
+
+			planNode = UnionNode.getInstanceDedupe(planNode, planNodeEffectiveTarget);
+		}
 
 		if (scope == Scope.propertyShape) {
 			planNode = Unique.getInstance(new ShiftToPropertyShape(planNode), true);

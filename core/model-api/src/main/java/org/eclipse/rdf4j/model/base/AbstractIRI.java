@@ -9,7 +9,6 @@
 package org.eclipse.rdf4j.model.base;
 
 import org.eclipse.rdf4j.model.IRI;
-import org.eclipse.rdf4j.model.Value;
 
 /**
  * Base class for {@link IRI}, offering common functionality.
@@ -57,7 +56,7 @@ public abstract class AbstractIRI implements IRI {
 
 		private static final long serialVersionUID = 2209156550690548467L;
 
-		private String iri;
+		private final String iri;
 
 		private int split;
 

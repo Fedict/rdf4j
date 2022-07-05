@@ -9,6 +9,7 @@ package org.eclipse.rdf4j.query.algebra.evaluation.impl;
 
 import java.util.Collection;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.eclipse.rdf4j.query.algebra.ArbitraryLengthPath;
 import org.eclipse.rdf4j.query.algebra.BinaryTupleOperator;
@@ -27,6 +28,7 @@ import org.eclipse.rdf4j.query.algebra.UnaryTupleOperator;
 import org.eclipse.rdf4j.query.algebra.Var;
 import org.eclipse.rdf4j.query.algebra.ZeroLengthPath;
 import org.eclipse.rdf4j.query.algebra.helpers.AbstractQueryModelVisitor;
+import org.eclipse.rdf4j.query.algebra.helpers.AbstractSimpleQueryModelVisitor;
 
 /**
  * Supplies various query model statistics to the query engine/optimizer.
@@ -35,6 +37,10 @@ import org.eclipse.rdf4j.query.algebra.helpers.AbstractQueryModelVisitor;
  * @author James Leigh
  */
 public class EvaluationStatistics {
+
+	// static UUID as prefix together with a thread safe incrementing long ensures a unique identifier.
+	private final static String uniqueIdPrefix = UUID.randomUUID().toString().replace("-", "");
+	private final static AtomicLong uniqueIdSuffix = new AtomicLong();
 
 	private CardinalityCalculator calculator;
 
@@ -59,7 +65,6 @@ public class EvaluationStatistics {
 	protected static class CardinalityCalculator extends AbstractQueryModelVisitor<RuntimeException> {
 
 		private static final double VAR_CARDINALITY = 10;
-
 		private static final double UNBOUND_SERVICE_CARDINALITY = 100000;
 
 		protected double cardinality;
@@ -107,8 +112,7 @@ public class EvaluationStatistics {
 
 		@Override
 		public void meet(ArbitraryLengthPath node) {
-			final Var pathVar = new Var("_anon_" + UUID.randomUUID().toString().replace("-", "_"));
-			pathVar.setAnonymous(true);
+			final Var pathVar = new Var("_anon_" + uniqueIdPrefix + uniqueIdSuffix.incrementAndGet(), true);
 			// cardinality of ALP is determined based on the cost of a
 			// single ?s ?p ?o ?c pattern where ?p is unbound, compensating for the fact that
 			// the length of the path is unknown but expected to be _at least_ twice that of a normal
@@ -158,8 +162,11 @@ public class EvaluationStatistics {
 		}
 
 		protected double getCardinality(StatementPattern sp) {
-			return getSubjectCardinality(sp) * getPredicateCardinality(sp) * getObjectCardinality(sp)
-					* getContextCardinality(sp);
+			if (!sp.isCardinalitySet()) {
+				sp.setCardinality(getSubjectCardinality(sp) * getPredicateCardinality(sp) * getObjectCardinality(sp)
+						* getContextCardinality(sp));
+			}
+			return sp.getCardinality();
 		}
 
 		/**
@@ -276,9 +283,13 @@ public class EvaluationStatistics {
 	}
 
 	// count the number of triple patterns
-	private static class ServiceNodeAnalyzer extends AbstractQueryModelVisitor<RuntimeException> {
+	private static class ServiceNodeAnalyzer extends AbstractSimpleQueryModelVisitor<RuntimeException> {
 
 		private int count = 0;
+
+		private ServiceNodeAnalyzer() {
+			super(true);
+		}
 
 		public int getStatementCount() {
 			return count;
