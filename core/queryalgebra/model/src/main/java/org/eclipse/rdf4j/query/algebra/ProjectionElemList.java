@@ -1,9 +1,12 @@
 /*******************************************************************************
  * Copyright (c) 2015 Eclipse RDF4J contributors, Aduna, and others.
+ *
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Distribution License v1.0
  * which accompanies this distribution, and is available at
  * http://www.eclipse.org/org/documents/edl-v10.php.
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
  *******************************************************************************/
 package org.eclipse.rdf4j.query.algebra;
 
@@ -20,16 +23,10 @@ import java.util.stream.StreamSupport;
  */
 public class ProjectionElemList extends AbstractQueryModelNode {
 
-	/*-----------*
-	 * Variables *
-	 *-----------*/
+	private static final long serialVersionUID = 167331362220688635L;
 
 	private ProjectionElem[] elements = {};
 	private List<ProjectionElem> elementsList = Collections.emptyList();
-
-	/*--------------*
-	 * Constructors *
-	 *--------------*/
 
 	public ProjectionElemList() {
 	}
@@ -42,18 +39,15 @@ public class ProjectionElemList extends AbstractQueryModelNode {
 		addElements(elements);
 	}
 
-	/*---------*
-	 * Methods *
-	 *---------*/
-
 	public List<ProjectionElem> getElements() {
 		return elementsList;
 	}
 
 	public void setElements(List<ProjectionElem> elements) {
+		elements.forEach(projectionElem -> projectionElem.setParentNode(this));
+
 		this.elementsList = Collections.unmodifiableList(elements);
 		this.elements = this.elementsList.toArray(new ProjectionElem[0]);
-
 	}
 
 	public void addElements(ProjectionElem... elements) {
@@ -70,9 +64,6 @@ public class ProjectionElemList extends AbstractQueryModelNode {
 			setElements(elements);
 		} else {
 			ArrayList<ProjectionElem> currentElementsList = new ArrayList<>(elementsList);
-			for (ProjectionElem projectionElem : elements) {
-				projectionElem.setParentNode(this);
-			}
 			currentElementsList.addAll(elements);
 			setElements(currentElementsList);
 		}
@@ -89,26 +80,44 @@ public class ProjectionElemList extends AbstractQueryModelNode {
 		pe.setParentNode(this);
 	}
 
+	/**
+	 *
+	 * @deprecated since 4.1.1. Use {@link #getProjectedNames()} instead.
+	 */
+	@Deprecated(since = "4.1.1", forRemoval = true)
 	public Set<String> getTargetNames() {
-		Set<String> targetNames = new LinkedHashSet<>(elementsList.size());
-
-		for (ProjectionElem pe : elementsList) {
-			targetNames.add(pe.getTargetName());
-		}
-
-		return targetNames;
+		return getProjectedNames();
 	}
 
-	public Set<String> getTargetNamesFor(Collection<String> sourceNames) {
-		Set<String> targetNames = new LinkedHashSet<>(elementsList.size());
+	public Set<String> getProjectedNames() {
+		Set<String> projectedNames = new LinkedHashSet<>(elementsList.size());
 
 		for (ProjectionElem pe : elementsList) {
-			if (sourceNames.contains(pe.getSourceName())) {
-				targetNames.add(pe.getTargetName());
+			projectedNames.add(pe.getProjectionAlias().orElse(pe.getName()));
+		}
+
+		return projectedNames;
+	}
+
+	/**
+	 *
+	 * @deprecated since 4.1.1. Use {@link #getProjectedNamesFor(Collection)} instead.
+	 */
+	@Deprecated(since = "4.1.1", forRemoval = true)
+	public Set<String> getTargetNamesFor(Collection<String> sourceNames) {
+		return getProjectedNamesFor(sourceNames);
+	}
+
+	public Set<String> getProjectedNamesFor(Collection<String> sourceNames) {
+		Set<String> projectedNames = new LinkedHashSet<>(elementsList.size());
+
+		for (ProjectionElem pe : elementsList) {
+			if (sourceNames.contains(pe.getName())) {
+				projectedNames.add(pe.getProjectionAlias().orElse(pe.getName()));
 			}
 		}
 
-		return targetNames;
+		return projectedNames;
 	}
 
 	@Override

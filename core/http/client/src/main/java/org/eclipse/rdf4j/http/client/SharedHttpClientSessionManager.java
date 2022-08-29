@@ -1,9 +1,12 @@
 /*******************************************************************************
  * Copyright (c) 2015 Eclipse RDF4J contributors, Aduna, and others.
+ *
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Distribution License v1.0
  * which accompanies this distribution, and is available at
  * http://www.eclipse.org/org/documents/edl-v10.php.
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
  *******************************************************************************/
 package org.eclipse.rdf4j.http.client;
 
@@ -88,15 +91,16 @@ public class SharedHttpClientSessionManager implements HttpClientSessionManager,
 			}
 			HttpClientContext clientContext = HttpClientContext.adapt(context);
 			HttpConnection conn = clientContext.getConnection();
-
-			synchronized (this) {
-				if (conn.isStale()) {
-					try {
-						logger.warn("Closing stale connection");
-						conn.close();
-						return true;
-					} catch (IOException e) {
-						logger.error("Error closing stale connection", e);
+			if (conn != null) {
+				synchronized (this) {
+					if (conn.isStale()) {
+						try {
+							logger.warn("Closing stale connection");
+							conn.close();
+							return true;
+						} catch (IOException e) {
+							logger.error("Error closing stale connection", e);
+						}
 					}
 				}
 			}

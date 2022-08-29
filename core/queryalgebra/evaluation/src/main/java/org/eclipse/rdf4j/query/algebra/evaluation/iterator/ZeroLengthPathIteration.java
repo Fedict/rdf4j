@@ -1,9 +1,12 @@
 /*******************************************************************************
  * Copyright (c) 2015 Eclipse RDF4J contributors, Aduna, and others.
+ *
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Distribution License v1.0
  * which accompanies this distribution, and is available at
  * http://www.eclipse.org/org/documents/edl-v10.php.
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
  *******************************************************************************/
 package org.eclipse.rdf4j.query.algebra.evaluation.iterator;
 
@@ -80,11 +83,14 @@ public class ZeroLengthPathIteration extends LookAheadIteration<BindingSet, Quer
 		Var startVar = createAnonVar(ANON_SUBJECT_VAR);
 		Var predicate = createAnonVar(ANON_PREDICATE_VAR);
 		Var endVar = createAnonVar(ANON_OBJECT_VAR);
-		StatementPattern subjects = new StatementPattern(startVar, predicate, endVar);
+
+		StatementPattern subjects;
 		if (contextVar != null) {
-			subjects.setScope(Scope.NAMED_CONTEXTS);
-			subjects.setContextVar(contextVar);
+			subjects = new StatementPattern(Scope.NAMED_CONTEXTS, startVar, predicate, endVar, contextVar.clone());
+		} else {
+			subjects = new StatementPattern(startVar, predicate, endVar);
 		}
+
 		precompile = evaluationStrategy.precompile(subjects, context);
 		setSubject = context.addBinding(subjectVar.getName());
 		setObject = context.addBinding(objVar.getName());

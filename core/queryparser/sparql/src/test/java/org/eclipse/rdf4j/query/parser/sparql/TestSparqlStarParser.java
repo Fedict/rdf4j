@@ -1,9 +1,12 @@
 /*******************************************************************************
  * Copyright (c) 2020 Eclipse RDF4J contributors.
+ *
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Distribution License v1.0
  * which accompanies this distribution, and is available at
  * http://www.eclipse.org/org/documents/edl-v10.php.
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
  *******************************************************************************/
 package org.eclipse.rdf4j.query.parser.sparql;
 
@@ -245,7 +248,7 @@ public class TestSparqlStarParser {
 		List<ProjectionElem> list = proj.getProjectionElemList().getElements();
 		final ArrayList<String> listNames = new ArrayList<>();
 		list.forEach(el -> {
-			listNames.add(el.getTargetName());
+			listNames.add(el.getName());
 		});
 		assertEquals("expect all bindings", 4, list.size());
 		assertTrue("expect s", listNames.contains("s"));
@@ -308,7 +311,7 @@ public class TestSparqlStarParser {
 		List<ProjectionElem> list = proj.getProjectionElemList().getElements();
 		final ArrayList<String> listNames = new ArrayList<>();
 		list.forEach(el -> {
-			listNames.add(el.getTargetName());
+			listNames.add(el.getName());
 		});
 		assertEquals("expect all bindings", 4, list.size());
 		assertTrue("expect s", listNames.contains("s"));
@@ -378,7 +381,7 @@ public class TestSparqlStarParser {
 		List<ProjectionElem> list = proj.getProjectionElemList().getElements();
 		final ArrayList<String> listNames = new ArrayList<>();
 		list.forEach(el -> {
-			listNames.add(el.getTargetName());
+			listNames.add(el.getName());
 		});
 		assertEquals("expect all bindings", 6, list.size());
 		assertTrue("expect s", listNames.contains("s"));
@@ -458,7 +461,7 @@ public class TestSparqlStarParser {
 		List<ProjectionElem> list = proj.getProjectionElemList().getElements();
 		final ArrayList<String> listTargetNames = new ArrayList<>();
 		list.forEach(el -> {
-			listTargetNames.add(el.getTargetName());
+			listTargetNames.add(el.getProjectionAlias().orElse(null));
 		});
 		assertEquals("expect all bindings", 3, list.size());
 		assertTrue("expect target subject", listTargetNames.contains("subject"));
@@ -467,7 +470,7 @@ public class TestSparqlStarParser {
 
 		final ArrayList<String> listSourceNames = new ArrayList<>();
 		list.forEach(el -> {
-			listSourceNames.add(el.getSourceName());
+			listSourceNames.add(el.getName());
 		});
 
 		assertTrue("expect extension", proj.getArg() instanceof Extension);
@@ -662,8 +665,8 @@ public class TestSparqlStarParser {
 	 *                Var (name=_anon_3ddeacea_c54c_4db0_bb6e_2f699772e5f8, anonymous)
 	 *          GroupElem
 	 *             Count (Distinct)
-	 *                Var (name=p)	 * @throws Exception
-	 *
+	 *                Var (name=p)
+	 *                	 
 	 * @throws Exception
 	 */
 	@Test
@@ -681,7 +684,7 @@ public class TestSparqlStarParser {
 		List<ProjectionElem> list = proj.getProjectionElemList().getElements();
 		final ArrayList<String> listNames = new ArrayList<>();
 		list.forEach(el -> {
-			listNames.add(el.getTargetName());
+			listNames.add(el.getName());
 		});
 		assertEquals("expect all bindings", 2, list.size());
 		assertTrue("expect ref", listNames.contains("ref"));
@@ -764,7 +767,7 @@ public class TestSparqlStarParser {
 		List<ProjectionElem> list = proj.getProjectionElemList().getElements();
 		final ArrayList<String> listNames = new ArrayList<>();
 		list.forEach(el -> {
-			listNames.add(el.getTargetName());
+			listNames.add(el.getName());
 		});
 		assertEquals("expect all bindings", 3, list.size());
 		assertTrue("expect s", listNames.contains("s"));
@@ -830,7 +833,7 @@ public class TestSparqlStarParser {
 		List<ProjectionElem> list = proj.getProjectionElemList().getElements();
 		final ArrayList<String> listNames = new ArrayList<>();
 		list.forEach(el -> {
-			listNames.add(el.getTargetName());
+			listNames.add(el.getName());
 		});
 		assertEquals("expect one binding", 1, list.size());
 		assertTrue("expect str", listNames.contains("str"));

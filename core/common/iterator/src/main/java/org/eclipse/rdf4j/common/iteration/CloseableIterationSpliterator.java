@@ -1,10 +1,13 @@
 /*******************************************************************************
  * Copyright (c) 2022 Eclipse RDF4J contributors.
+ *
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Distribution License v1.0
  * which accompanies this distribution, and is available at
  * http://www.eclipse.org/org/documents/edl-v10.php.
- ******************************************************************************/
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
+ *******************************************************************************/
 
 package org.eclipse.rdf4j.common.iteration;
 
@@ -46,9 +49,15 @@ class CloseableIterationSpliterator<T, E extends Exception> extends Spliterators
 				return false;
 			}
 		} catch (Throwable e) {
+			if (e instanceof InterruptedException) {
+				Thread.currentThread().interrupt();
+			}
 			try {
 				iteration.close();
 			} catch (Exception ex) {
+				if (e instanceof InterruptedException) {
+					Thread.currentThread().interrupt();
+				}
 				throw new RuntimeException(ex);
 			}
 			if (e instanceof Error) {
@@ -69,6 +78,9 @@ class CloseableIterationSpliterator<T, E extends Exception> extends Spliterators
 				action.accept(iteration.next());
 			}
 		} catch (Exception e) {
+			if (e instanceof InterruptedException) {
+				Thread.currentThread().interrupt();
+			}
 			if (e instanceof RuntimeException) {
 				throw (RuntimeException) e;
 			}

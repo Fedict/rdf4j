@@ -220,7 +220,6 @@ gh pr create -B develop --title "sync develop branch after release ${MVN_VERSION
 echo "It's ok to merge this PR later, so wait for the Jenkins tests to finish."
 read -n 1 -srp "Press any key to continue (ctrl+c to cancel)"; printf "\n\n";
 
-git checkout main
 mvn clean
 
 echo "Build javadocs"
@@ -228,8 +227,7 @@ read -n 1 -srp "Press any key to continue (ctrl+c to cancel)"; printf "\n\n";
 
 git checkout "${MVN_VERSION_RELEASE}"
 mvn clean
-mvn install -P quick
-mvn package -Passembly -DskipTests --batch-mode
+mvn package -Passembly -DskipTests
 
 git checkout main
 RELEASE_NOTES_BRANCH="${MVN_VERSION_RELEASE}-release-notes"

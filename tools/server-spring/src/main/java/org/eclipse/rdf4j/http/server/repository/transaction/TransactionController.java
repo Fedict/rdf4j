@@ -1,9 +1,12 @@
 /*******************************************************************************
  * Copyright (c) 2015 Eclipse RDF4J contributors, Aduna, and others.
+ *
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Distribution License v1.0
  * which accompanies this distribution, and is available at
  * http://www.eclipse.org/org/documents/edl-v10.php.
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
  *******************************************************************************/
 package org.eclipse.rdf4j.http.server.repository.transaction;
 
@@ -385,8 +388,13 @@ public class TransactionController extends AbstractController implements Disposa
 				throw new ClientHTTPException(SC_BAD_REQUEST, "Unsupported query type: " + query.getClass().getName());
 			}
 		} catch (QueryInterruptedException | InterruptedException | ExecutionException e) {
-			logger.info("Query interrupted", e);
-			throw new ServerHTTPException(SC_SERVICE_UNAVAILABLE, "Query execution interrupted");
+			if (e.getCause() != null && e.getCause() instanceof MalformedQueryException) {
+				ErrorInfo errInfo = new ErrorInfo(ErrorType.MALFORMED_QUERY, e.getCause().getMessage());
+				throw new ClientHTTPException(SC_BAD_REQUEST, errInfo.toString());
+			} else {
+				logger.info("Query interrupted", e);
+				throw new ServerHTTPException(SC_SERVICE_UNAVAILABLE, "Query execution interrupted");
+			}
 		} catch (QueryEvaluationException e) {
 			logger.info("Query evaluation error", e);
 			if (e.getCause() != null && e.getCause() instanceof HTTPException) {

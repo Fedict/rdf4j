@@ -1,10 +1,13 @@
 /*******************************************************************************
  * Copyright (c) 2022 Eclipse RDF4J contributors.
+ *
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Distribution License v1.0
  * which accompanies this distribution, and is available at
  * http://www.eclipse.org/org/documents/edl-v10.php.
- ******************************************************************************/
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
+ *******************************************************************************/
 
 package org.eclipse.rdf4j.query.algebra.evaluation.optimizer;
 
@@ -28,7 +31,6 @@ import org.eclipse.rdf4j.query.algebra.Reduced;
 import org.eclipse.rdf4j.query.algebra.StatementPattern;
 import org.eclipse.rdf4j.query.algebra.TupleExpr;
 import org.eclipse.rdf4j.query.algebra.Union;
-import org.eclipse.rdf4j.query.algebra.ValueExpr;
 import org.eclipse.rdf4j.query.algebra.evaluation.QueryOptimizer;
 import org.eclipse.rdf4j.query.algebra.helpers.AbstractQueryModelVisitor;
 import org.eclipse.rdf4j.query.algebra.helpers.AbstractSimpleQueryModelVisitor;
@@ -36,36 +38,36 @@ import org.eclipse.rdf4j.query.algebra.helpers.collectors.VarNameCollector;
 
 /**
  * Optimizes a query model by pushing {@link Filter}s as far down in the model tree as possible.
- *
+ * <p>
  * To make the first optimization succeed more often it splits filters which contains {@link And} conditions.
- *
+ * <p>
  * <code>
  * SELECT * WHERE {
- * ?s ?p ?o .
- * ?s ?p ?o2  .
- * FILTER(?o > '2'^^xsd:int && ?o2 < '4'^^xsd:int)
+ * \t?s ?p ?o .
+ * \t?s ?p ?o2  .
+ * \tFILTER(?o > '2'^^xsd:int && ?o2 < '4'^^xsd:int)
  * }
- * </code> May be more efficient when decomposed into <code>
+ * </code> May be more efficient when decomposed into: <code>
  * SELECT * WHERE {
- * ?s ?p ?o .
- * FILTER(?o > '2'^^xsd:int)
- * ?s ?p ?o2  .
- * FILTER(?o2 < '4'^^xsd:int)
+ * \t?s ?p ?o .
+ * \tFILTER(?o > '2'^^xsd:int)
+ * \t?s ?p ?o2  .
+ * \tFILTER(?o2 < '4'^^xsd:int)
  * }
  * </code>
- *
+ * <p>
  * Then it optimizes a query model by merging adjacent {@link Filter}s. e.g. <code>
  * SELECT * WHERE {
- *  ?s ?p ?o .
- *  FILTER(?o > 2) .
- *  FILTER(?o < 4) .
- *  }
- * </code> may be merged into <code>
+ * \t?s ?p ?o .
+ * \tFILTER(?o > 2) .
+ * \tFILTER(?o < 4) .
+ * }
+ * </code> May be merged into: <code>
  * SELECT * WHERE {
- *   ?s ?p ?o .
- *   FILTER(?o > 2 && ?o < 4) . }
- *  </code>
- *
+ * \t?s ?p ?o .
+ * \tFILTER(?o > 2 && ?o < 4) . }
+ * </code>
+ * <p>
  * This optimization allows for sharing evaluation costs in the future and removes an iterator. This is done as a second
  * step to not break the first optimization. In the case that the splitting was done but did not help it is now undone.
  *
@@ -76,48 +78,76 @@ public class FilterOptimizer implements QueryOptimizer {
 
 	@Override
 	public void optimize(TupleExpr tupleExpr, Dataset dataset, BindingSet bindings) {
-		tupleExpr.visit(new DeMergeFilterFinder());
-		tupleExpr.visit(new FilterFinder(tupleExpr));
-		tupleExpr.visit(new MergeFilterFinder());
+		tupleExpr.visit(new FilterUnMerger());
+		tupleExpr.visit(new FilterOrganizer());
+		tupleExpr.visit(new FilterMerger());
 	}
 
-	/*--------------------------*
-	 * Inner class FilterFinder *
-	 *--------------------------*/
+	private static class FilterUnMerger extends AbstractSimpleQueryModelVisitor<RuntimeException> {
 
-	private static class FilterFinder extends AbstractSimpleQueryModelVisitor<RuntimeException> {
-
-		protected final TupleExpr tupleExpr;
-
-		public FilterFinder(TupleExpr tupleExpr) {
+		private FilterUnMerger() {
 			super(false);
-			this.tupleExpr = tupleExpr;
+		}
+
+		@Override
+		public void meet(Filter filter) {
+			if (filter.getCondition() instanceof And) {
+				And and = (And) filter.getCondition();
+				filter.setCondition(and.getLeftArg().clone());
+				Filter newFilter = new Filter(filter.getArg().clone(), and.getRightArg().clone());
+				filter.replaceChildNode(filter.getArg(), newFilter);
+			}
+			super.meet(filter);
+		}
+	}
+
+	private static class FilterMerger extends AbstractSimpleQueryModelVisitor<RuntimeException> {
+
+		private FilterMerger() {
+			super(false);
 		}
 
 		@Override
 		public void meet(Filter filter) {
 			super.meet(filter);
-			FilterRelocator.relocate(filter);
+			if (filter.getParentNode() instanceof Filter && filter.getParentNode().getParentNode() != null) {
+
+				Filter parentFilter = (Filter) filter.getParentNode();
+				QueryModelNode grandParent = parentFilter.getParentNode();
+				And merge = new And(filter.getCondition().clone(), parentFilter.getCondition().clone());
+
+				Filter newFilter = new Filter(filter.getArg().clone(), merge);
+				grandParent.replaceChildNode(parentFilter, newFilter);
+				meet(newFilter);
+			}
 		}
 	}
 
-	/*-----------------------------*
-	 * Inner class FilterRelocator *
-	 *-----------------------------*/
+	private static class FilterOrganizer extends AbstractSimpleQueryModelVisitor<RuntimeException> {
+
+		public FilterOrganizer() {
+			super(false);
+		}
+
+		@Override
+		public void meet(Filter filter) {
+			super.meet(filter);
+			FilterRelocator.optimize(filter);
+		}
+	}
 
 	private static class FilterRelocator extends AbstractQueryModelVisitor<RuntimeException> {
 
-		public static void relocate(Filter filter) {
-			filter.visit(new FilterRelocator(filter));
-		}
+		private final Filter filter;
+		private final Set<String> filterVars;
 
-		protected final Filter filter;
-
-		protected final Set<String> filterVars;
-
-		public FilterRelocator(Filter filter) {
+		private FilterRelocator(Filter filter) {
 			this.filter = filter;
 			filterVars = VarNameCollector.process(filter.getCondition());
+		}
+
+		public static void optimize(Filter filter) {
+			filter.visit(new FilterRelocator(filter));
 		}
 
 		@Override
@@ -165,8 +195,8 @@ public class FilterOptimizer implements QueryOptimizer {
 			relocate(filter, union.getLeftArg());
 			relocate(clone, union.getRightArg());
 
-			FilterRelocator.relocate(filter);
-			FilterRelocator.relocate(clone);
+			FilterRelocator.optimize(filter);
+			FilterRelocator.optimize(clone);
 		}
 
 		@Override
@@ -177,8 +207,8 @@ public class FilterOptimizer implements QueryOptimizer {
 			relocate(filter, node.getLeftArg());
 			relocate(clone, node.getRightArg());
 
-			FilterRelocator.relocate(filter);
-			FilterRelocator.relocate(clone);
+			FilterRelocator.optimize(filter);
+			FilterRelocator.optimize(clone);
 		}
 
 		@Override
@@ -189,8 +219,8 @@ public class FilterOptimizer implements QueryOptimizer {
 			relocate(filter, node.getLeftArg());
 			relocate(clone, node.getRightArg());
 
-			FilterRelocator.relocate(filter);
-			FilterRelocator.relocate(clone);
+			FilterRelocator.optimize(filter);
+			FilterRelocator.optimize(clone);
 		}
 
 		@Override
@@ -206,7 +236,7 @@ public class FilterOptimizer implements QueryOptimizer {
 		public void meet(EmptySet node) {
 			if (filter.getParentNode() != null) {
 				// Remove filter from its original location
-				filter.replaceWith(filter.getArg());
+				filter.replaceWith(filter.getArg().clone());
 			}
 		}
 
@@ -236,7 +266,7 @@ public class FilterOptimizer implements QueryOptimizer {
 			node.getArg().visit(this);
 		}
 
-		protected void relocate(Filter filter, TupleExpr newFilterArg) {
+		private void relocate(Filter filter, TupleExpr newFilterArg) {
 			if (filter.getArg() != newFilterArg) {
 				if (filter.getParentNode() != null) {
 					// Remove filter from its original location
@@ -250,56 +280,4 @@ public class FilterOptimizer implements QueryOptimizer {
 		}
 	}
 
-	/*--------------------------*
-	 * Inner class MergeFilterFinder *
-	 *--------------------------*/
-
-	private static class MergeFilterFinder extends AbstractSimpleQueryModelVisitor<RuntimeException> {
-
-		protected MergeFilterFinder() {
-			super(false);
-		}
-
-		@Override
-		public void meet(Filter filter) {
-			super.meet(filter);
-			if (filter.getParentNode() instanceof Filter) {
-
-				Filter parentFilter = (Filter) filter.getParentNode();
-				QueryModelNode grandParent = parentFilter.getParentNode();
-				ValueExpr parentCondition = parentFilter.getCondition();
-				ValueExpr thisCondition = filter.getCondition();
-				And merge = new And(parentCondition, thisCondition);
-				filter.setCondition(merge);
-				grandParent.replaceChildNode(parentFilter, filter);
-			}
-		}
-	}
-
-	/*--------------------------*
-	 * Inner class DeMergeFilterFinder *
-	 *--------------------------*/
-
-	private static class DeMergeFilterFinder extends AbstractSimpleQueryModelVisitor<RuntimeException> {
-
-		protected DeMergeFilterFinder() {
-			super(false);
-		}
-
-		@Override
-		public void meet(Filter filter) {
-			super.meet(filter);
-			if (filter.getCondition() instanceof And) {
-
-				And and = (And) filter.getCondition();
-				ValueExpr left = and.getLeftArg();
-				ValueExpr right = and.getRightArg();
-				filter.setCondition(left);
-				Filter newFilter = new Filter(filter.getArg(), right);
-				filter.replaceChildNode(filter.getArg(), newFilter);
-				meet(newFilter);
-				meet(filter);
-			}
-		}
-	}
 }

@@ -1,9 +1,12 @@
 /*******************************************************************************
  * Copyright (c) 2022 Eclipse RDF4J contributors.
+ *
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Distribution License v1.0
  * which accompanies this distribution, and is available at
  * http://www.eclipse.org/org/documents/edl-v10.php.
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
  *******************************************************************************/
 package org.eclipse.rdf4j.federated.evaluation.iterator;
 
@@ -81,7 +84,7 @@ public class FederatedDescribeIteration extends DescribeIteration {
 		// we need to make sure that subject or object are added to the binding set
 		// Note: FedX uses prepared SELECT queries to evaluate a statement pattern and
 		// thus does not add bound values to the result bindingset
-		return new ConvertingIteration<BindingSet, BindingSet, QueryEvaluationException>(res) {
+		return new ConvertingIteration<>(res) {
 
 			@Override
 			protected BindingSet convert(BindingSet sourceObject) throws QueryEvaluationException {
@@ -95,5 +98,14 @@ public class FederatedDescribeIteration extends DescribeIteration {
 				return bs;
 			}
 		};
+	}
+
+	@Override
+	protected void handleClose() throws QueryEvaluationException {
+		try {
+			super.handleClose();
+		} finally {
+			queryInfo.close();
+		}
 	}
 }

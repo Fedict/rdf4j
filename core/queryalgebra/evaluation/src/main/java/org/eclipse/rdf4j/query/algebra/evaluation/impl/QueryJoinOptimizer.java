@@ -1,9 +1,12 @@
 /*******************************************************************************
  * Copyright (c) 2015 Eclipse RDF4J contributors, Aduna, and others.
+ *
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Distribution License v1.0
  * which accompanies this distribution, and is available at
  * http://www.eclipse.org/org/documents/edl-v10.php.
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
  *******************************************************************************/
 package org.eclipse.rdf4j.query.algebra.evaluation.impl;
 
@@ -17,7 +20,6 @@ import java.util.Set;
 import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.query.Dataset;
 import org.eclipse.rdf4j.query.algebra.BindingSetAssignment;
-import org.eclipse.rdf4j.query.algebra.Extension;
 import org.eclipse.rdf4j.query.algebra.Join;
 import org.eclipse.rdf4j.query.algebra.LeftJoin;
 import org.eclipse.rdf4j.query.algebra.StatementPattern;
@@ -117,7 +119,7 @@ public class QueryJoinOptimizer implements QueryOptimizer {
 				List<TupleExpr> priorityArgs = new ArrayList<>(joinArgs.size());
 
 				// get all extensions (BIND clause)
-				List<Extension> orderedExtensions = getExtensions(joinArgs);
+				List<TupleExpr> orderedExtensions = getExtensions(joinArgs);
 				joinArgs.removeAll(orderedExtensions);
 				priorityArgs.addAll(orderedExtensions);
 
@@ -237,11 +239,11 @@ public class QueryJoinOptimizer implements QueryOptimizer {
 			return varFreqMap;
 		}
 
-		protected List<Extension> getExtensions(List<TupleExpr> expressions) {
-			List<Extension> extensions = new ArrayList<>();
+		protected List<TupleExpr> getExtensions(List<TupleExpr> expressions) {
+			List<TupleExpr> extensions = new ArrayList<>();
 			for (TupleExpr expr : expressions) {
-				if (expr instanceof Extension) {
-					extensions.add((Extension) expr);
+				if (TupleExprs.containsExtension(expr)) {
+					extensions.add(expr);
 				}
 			}
 			return extensions;
@@ -299,10 +301,10 @@ public class QueryJoinOptimizer implements QueryOptimizer {
 				for (int j = i + 1; j < subselects.size(); j++) {
 					TupleExpr secondArg = subselects.get(j);
 
-					Set<String> names = firstArg.getBindingNames();
-					names.retainAll(secondArg.getBindingNames());
+					Set<String> firstArgBindingNames = firstArg.getBindingNames();
+					Set<String> secondArgBindingNames = secondArg.getBindingNames();
+					int joinSize = getJoinSize(secondArgBindingNames, firstArgBindingNames);
 
-					int joinSize = names.size();
 					if (joinSize > maxJoinSize) {
 						maxJoinSize = joinSize;
 					}
@@ -374,12 +376,10 @@ public class QueryJoinOptimizer implements QueryOptimizer {
 			for (TupleExpr candidate : joinArgs) {
 				if (!currentList.contains(candidate)) {
 					Set<String> names = candidate.getBindingNames();
-					names.retainAll(currentListNames);
-					int joinSize = names.size();
+					int joinSize = getJoinSize(currentListNames, names);
 
-					names = candidate.getBindingNames();
-					names.addAll(currentListNames);
-					int unionSize = names.size();
+					Set<String> candidateBindingNames = candidate.getBindingNames();
+					int unionSize = getUnionSize(currentListNames, candidateBindingNames);
 
 					if (joinSize > currentJoinSize) {
 						selected = candidate;
@@ -519,5 +519,25 @@ public class QueryJoinOptimizer implements QueryOptimizer {
 
 			return result;
 		}
+	}
+
+	private static int getUnionSize(Set<String> currentListNames, Set<String> candidateBindingNames) {
+		int count = 0;
+		for (String n : currentListNames) {
+			if (!candidateBindingNames.contains(n)) {
+				count++;
+			}
+		}
+		return candidateBindingNames.size() + count;
+	}
+
+	private static int getJoinSize(Set<String> currentListNames, Set<String> names) {
+		int count = 0;
+		for (String name : names) {
+			if (currentListNames.contains(name)) {
+				count++;
+			}
+		}
+		return count;
 	}
 }

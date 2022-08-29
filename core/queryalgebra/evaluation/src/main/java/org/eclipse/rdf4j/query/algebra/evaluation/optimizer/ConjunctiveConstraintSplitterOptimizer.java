@@ -1,10 +1,13 @@
 /*******************************************************************************
  * Copyright (c) 2022 Eclipse RDF4J contributors.
+ *
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Distribution License v1.0
  * which accompanies this distribution, and is available at
  * http://www.eclipse.org/org/documents/edl-v10.php.
- ******************************************************************************/
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
+ *******************************************************************************/
 
 package org.eclipse.rdf4j.query.algebra.evaluation.optimizer;
 
@@ -57,7 +60,7 @@ public class ConjunctiveConstraintSplitterOptimizer implements QueryOptimizer {
 				filterArg = newFilter;
 			}
 
-			filter.setCondition(conjunctiveConstraints.get(0));
+			filter.setCondition(conjunctiveConstraints.get(0).clone());
 			filter.setArg(filterArg);
 		}
 

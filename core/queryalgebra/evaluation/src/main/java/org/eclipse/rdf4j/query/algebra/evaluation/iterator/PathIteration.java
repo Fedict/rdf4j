@@ -1,9 +1,12 @@
 /*******************************************************************************
  * Copyright (c) 2015 Eclipse RDF4J contributors, Aduna, and others.
+ *
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Distribution License v1.0
  * which accompanies this distribution, and is available at
  * http://www.eclipse.org/org/documents/edl-v10.php.
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
  *******************************************************************************/
 package org.eclipse.rdf4j.query.algebra.evaluation.iterator;
 
@@ -414,13 +417,14 @@ public class PathIteration extends LookAheadIteration<BindingSet, QueryEvaluatio
 			if (toBeReplaced.equals(var) || (toBeReplaced.isAnonymous() && var.isAnonymous()
 					&& (toBeReplaced.hasValue() && toBeReplaced.getValue().equals(var.getValue())))) {
 				QueryModelNode parent = var.getParentNode();
+				Var replacement = this.replacement.clone();
 				parent.replaceChildNode(var, replacement);
-				replacement.setParentNode(parent);
+				assert replacement.getParentNode() == parent;
 			} else if (replaceAnons && var.isAnonymous() && !var.hasValue()) {
 				Var replacementVar = createAnonVar("anon-replace-" + var.getName() + index);
 				QueryModelNode parent = var.getParentNode();
 				parent.replaceChildNode(var, replacementVar);
-				replacementVar.setParentNode(parent);
+				assert replacementVar.getParentNode() == parent;
 			}
 		}
 

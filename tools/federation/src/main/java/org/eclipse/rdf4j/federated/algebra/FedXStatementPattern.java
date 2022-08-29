@@ -1,14 +1,16 @@
 /*******************************************************************************
  * Copyright (c) 2019 Eclipse RDF4J contributors.
+ *
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Distribution License v1.0
  * which accompanies this distribution, and is available at
  * http://www.eclipse.org/org/documents/edl-v10.php.
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
  *******************************************************************************/
 package org.eclipse.rdf4j.federated.algebra;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 
@@ -46,7 +48,8 @@ public abstract class FedXStatementPattern extends StatementPattern
 	protected long upperLimit = -1; // if set to a positive number, this upper limit is applied to any subquery
 
 	public FedXStatementPattern(StatementPattern node, QueryInfo queryInfo) {
-		super(node.getScope(), node.getSubjectVar(), node.getPredicateVar(), node.getObjectVar(), node.getContextVar());
+		super(node.getScope(), node.getSubjectVar().clone(), node.getPredicateVar().clone(),
+				node.getObjectVar().clone(), node.getContextVar() != null ? node.getContextVar().clone() : null);
 		this.id = NodeFactory.getNextId();
 		this.queryInfo = queryInfo;
 		initFreeVars();

@@ -1,9 +1,12 @@
 /*******************************************************************************
  * Copyright (c) 2015 Eclipse RDF4J contributors, Aduna, and others.
+ *
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Distribution License v1.0
  * which accompanies this distribution, and is available at
  * http://www.eclipse.org/org/documents/edl-v10.php.
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
  *******************************************************************************/
 package org.eclipse.rdf4j.query.algebra;
 
@@ -106,6 +109,7 @@ public class Var extends AbstractQueryModelNode implements ValueExpr {
 
 	@Override
 	public void setParentNode(QueryModelNode parent) {
+		assert this.parent == null;
 		this.parent = parent;
 	}
 
@@ -132,7 +136,7 @@ public class Var extends AbstractQueryModelNode implements ValueExpr {
 		sb.append(" (name=").append(name);
 
 		if (value != null) {
-			sb.append(", value=").append(value.toString());
+			sb.append(", value=").append(value);
 		}
 
 		if (anonymous) {
@@ -153,7 +157,13 @@ public class Var extends AbstractQueryModelNode implements ValueExpr {
 			return false;
 		}
 		Var var = (Var) o;
-		return anonymous == var.anonymous && Objects.equals(name, var.name) && Objects.equals(value, var.value);
+
+		if (cachedHashCode != 0 && var.cachedHashCode != 0 && cachedHashCode != var.cachedHashCode) {
+			return false;
+		}
+
+		return anonymous == var.anonymous && !(name == null && var.name != null || value == null && var.value != null)
+				&& Objects.equals(name, var.name) && Objects.equals(value, var.value);
 	}
 
 	@Override

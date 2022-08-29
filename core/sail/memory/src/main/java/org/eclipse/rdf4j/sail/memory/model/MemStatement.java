@@ -1,9 +1,12 @@
 /*******************************************************************************
  * Copyright (c) 2015 Eclipse RDF4J contributors, Aduna, and others.
+ *
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Distribution License v1.0
  * which accompanies this distribution, and is available at
  * http://www.eclipse.org/org/documents/edl-v10.php.
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
  *******************************************************************************/
 package org.eclipse.rdf4j.sail.memory.model;
 
@@ -46,6 +49,7 @@ public class MemStatement extends GenericStatement<MemResource, MemIRI, MemValue
 	/**
 	 * Identifies the snapshot in which this statement was revoked, defaults to {@link Integer#MAX_VALUE}.
 	 */
+	@SuppressWarnings("FieldMayBeFinal")
 	private volatile int tillSnapshot = Integer.MAX_VALUE;
 	private static final VarHandle TILL_SNAPSHOT;
 
@@ -137,17 +141,12 @@ public class MemStatement extends GenericStatement<MemResource, MemIRI, MemValue
 	}
 
 	public boolean matchesContext(MemResource[] memContexts) {
-		if (memContexts != null && memContexts.length > 0) {
-			for (MemResource context : memContexts) {
-				if (context == this.context) {
-					return true;
-				}
+		for (MemResource context : memContexts) {
+			if (context == this.context) {
+				return true;
 			}
-			return false;
-		} else {
-			// there is no context to check so we can return this statement
-			return true;
 		}
+		return false;
 	}
 
 	public boolean exactMatch(MemResource subject, MemIRI predicate, MemValue object, MemResource context) {

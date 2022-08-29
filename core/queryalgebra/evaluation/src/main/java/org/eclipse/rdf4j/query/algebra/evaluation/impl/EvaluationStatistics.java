@@ -1,9 +1,12 @@
 /*******************************************************************************
  * Copyright (c) 2015 Eclipse RDF4J contributors, Aduna, and others.
+ *
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Distribution License v1.0
  * which accompanies this distribution, and is available at
  * http://www.eclipse.org/org/documents/edl-v10.php.
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
  *******************************************************************************/
 package org.eclipse.rdf4j.query.algebra.evaluation.impl;
 
@@ -11,6 +14,7 @@ import java.util.Collection;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.eclipse.rdf4j.query.algebra.AbstractQueryModelNode;
 import org.eclipse.rdf4j.query.algebra.ArbitraryLengthPath;
 import org.eclipse.rdf4j.query.algebra.BinaryTupleOperator;
 import org.eclipse.rdf4j.query.algebra.BindingSetAssignment;
@@ -50,6 +54,10 @@ public class EvaluationStatistics {
 			assert calculator != null;
 		}
 
+		if (expr instanceof AbstractQueryModelNode && ((AbstractQueryModelNode) expr).isCardinalitySet()) {
+			return ((AbstractQueryModelNode) expr).getCardinality();
+		}
+
 		expr.visit(calculator);
 		return calculator.getCardinality();
 	}
@@ -87,10 +95,7 @@ public class EvaluationStatistics {
 
 		@Override
 		public void meet(BindingSetAssignment node) {
-			// actual cardinality is node.getBindingSets().size() binding sets
-			// but cost is cheap as we don't need to query the triple store
-			// so effective cardinality is 1 or a very slowly increasing function of node.getBindingSets().size().
-			cardinality = 1.0;
+			cardinality = getCardinalityInternal(node);
 		}
 
 		@Override
@@ -117,9 +122,8 @@ public class EvaluationStatistics {
 			// single ?s ?p ?o ?c pattern where ?p is unbound, compensating for the fact that
 			// the length of the path is unknown but expected to be _at least_ twice that of a normal
 			// statement pattern.
-			cardinality = 2.0 * getCardinality(
-					new StatementPattern(node.getSubjectVar().clone(), pathVar, node.getObjectVar().clone(),
-							node.getContextVar() != null ? node.getContextVar().clone() : null));
+			cardinality = 2.0 * getCardinalityInternal(new StatementPattern(node.getSubjectVar().clone(), pathVar,
+					node.getObjectVar().clone(), node.getContextVar() != null ? node.getContextVar().clone() : null));
 		}
 
 		@Override
@@ -151,22 +155,51 @@ public class EvaluationStatistics {
 
 		@Override
 		public void meet(StatementPattern sp) {
-			cardinality = getCardinality(sp);
+			cardinality = getCardinalityInternal(sp);
 		}
 
 		@Override
 		public void meet(TripleRef tripleRef) {
-			cardinality = getSubjectCardinality(tripleRef.getSubjectVar())
-					* getPredicateCardinality(tripleRef.getPredicateVar())
-					* getObjectCardinality(tripleRef.getObjectVar());
+			cardinality = getCardinalityInternal(tripleRef);
+		}
+
+		private double getCardinalityInternal(StatementPattern node) {
+			if (!node.isCardinalitySet()) {
+				node.setCardinality(getCardinality(node));
+			}
+			return node.getCardinality();
+		}
+
+		private double getCardinalityInternal(TripleRef node) {
+			if (!node.isCardinalitySet()) {
+				node.setCardinality(getCardinality(node));
+			}
+			return node.getCardinality();
+		}
+
+		private double getCardinalityInternal(BindingSetAssignment node) {
+			if (!node.isCardinalitySet()) {
+				node.setCardinality(getCardinality(node));
+			}
+			return node.getCardinality();
 		}
 
 		protected double getCardinality(StatementPattern sp) {
-			if (!sp.isCardinalitySet()) {
-				sp.setCardinality(getSubjectCardinality(sp) * getPredicateCardinality(sp) * getObjectCardinality(sp)
-						* getContextCardinality(sp));
-			}
-			return sp.getCardinality();
+			return getSubjectCardinality(sp) * getPredicateCardinality(sp) * getObjectCardinality(sp)
+					* getContextCardinality(sp);
+		}
+
+		protected double getCardinality(BindingSetAssignment bindingSetAssignment) {
+			// actual cardinality is node.getBindingSets().size() binding sets
+			// but cost is cheap as we don't need to query the triple store
+			// so effective cardinality is 1 or a very slowly increasing function of node.getBindingSets().size().
+			return 1.0;
+		}
+
+		protected double getCardinality(TripleRef tripleRef) {
+			return getSubjectCardinality(tripleRef.getSubjectVar())
+					* getPredicateCardinality(tripleRef.getPredicateVar())
+					* getObjectCardinality(tripleRef.getObjectVar());
 		}
 
 		/**

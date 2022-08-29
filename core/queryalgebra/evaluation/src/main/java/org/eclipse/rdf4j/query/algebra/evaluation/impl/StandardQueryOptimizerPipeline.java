@@ -1,9 +1,12 @@
 /*******************************************************************************
  * Copyright (c) 2019 Eclipse RDF4J contributors.
+ *
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Distribution License v1.0
  * which accompanies this distribution, and is available at
  * http://www.eclipse.org/org/documents/edl-v10.php.
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
  *******************************************************************************/
 package org.eclipse.rdf4j.query.algebra.evaluation.impl;
 
@@ -57,9 +60,9 @@ public class StandardQueryOptimizerPipeline implements QueryOptimizerPipeline {
 				new UnionScopeChangeOptimizer(),
 				new QueryModelNormalizer(),
 				new ProjectionRemovalOptimizer(), // Make sure this is after the UnionScopeChangeOptimizer
+				new FilterOptimizer(),
 				new QueryJoinOptimizer(evaluationStatistics),
 				new IterativeEvaluationOptimizer(),
-				new FilterOptimizer(),
 				new OrderLimitOptimizer(),
 				new ParentReferenceCleaner());
 	}

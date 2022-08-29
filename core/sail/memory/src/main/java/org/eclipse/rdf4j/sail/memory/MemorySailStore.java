@@ -1,9 +1,12 @@
 /*******************************************************************************
  * Copyright (c) 2015 Eclipse RDF4J contributors, Aduna, and others.
+ *
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Distribution License v1.0
  * which accompanies this distribution, and is available at
  * http://www.eclipse.org/org/documents/edl-v10.php.
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
  *******************************************************************************/
 package org.eclipse.rdf4j.sail.memory;
 
@@ -266,30 +269,6 @@ class MemorySailStore implements SailStore {
 		return getMemStatementIterator(memSubj, memPred, memObj, explicit, snapshot, memContexts, smallestList);
 	}
 
-	private CloseableIteration<MemStatement, SailException> createStatementIterator(MemResource subj, MemIRI pred,
-			MemValue obj, Boolean explicit, int snapshot, MemResource... contexts) throws InterruptedException {
-
-		if (statements.isEmpty()) {
-			return EMPTY_ITERATION;
-		}
-
-		MemResource[] memContexts;
-		MemStatementList smallestList;
-
-		if (contexts.length == 0) {
-			memContexts = EMPTY_CONTEXT;
-			smallestList = statements;
-		} else if (contexts.length == 1 && contexts[0] != null) {
-			memContexts = contexts;
-			smallestList = contexts[0].getContextStatementList();
-		} else {
-			memContexts = contexts;
-			smallestList = statements;
-		}
-
-		return getMemStatementIterator(subj, pred, obj, explicit, snapshot, memContexts, smallestList);
-	}
-
 	private CloseableIteration<MemStatement, SailException> getMemStatementIterator(MemResource subj, MemIRI pred,
 			MemValue obj, Boolean explicit, int snapshot, MemResource[] memContexts, MemStatementList statementList)
 			throws InterruptedException {
@@ -307,6 +286,8 @@ class MemorySailStore implements SailStore {
 			smallestList = statementList;
 		} else if (smallestList.isEmpty()) {
 			return EMPTY_ITERATION;
+		} else if (smallestList.size() > statementList.size()) {
+			smallestList = statementList;
 		}
 
 		return MemStatementIterator.cacheAwareInstance(smallestList, subj, pred, obj, explicit, snapshot, memContexts,
@@ -1064,8 +1045,8 @@ class MemorySailStore implements SailStore {
 
 			// Filter more thoroughly by considering snapshot and read-mode
 			// parameters
-			try (MemStatementIterator<SailException> iter = new MemStatementIterator<>(contextStatements, null, null,
-					null, null, snapshot)) {
+			try (MemStatementIterator iter = new MemStatementIterator(contextStatements, null, null,
+					null, null, snapshot, null)) {
 				return iter.hasNext();
 			}
 		}

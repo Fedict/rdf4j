@@ -1,13 +1,17 @@
 /*******************************************************************************
  * Copyright (c) 2022 Eclipse RDF4J contributors.
+ *
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Distribution License v1.0
  * which accompanies this distribution, and is available at
  * http://www.eclipse.org/org/documents/edl-v10.php.
- ******************************************************************************/
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
+ *******************************************************************************/
 
 package org.eclipse.rdf4j.query.algebra.evaluation.optimizer;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import org.eclipse.rdf4j.query.algebra.evaluation.EvaluationStrategy;
@@ -28,6 +32,12 @@ import org.eclipse.rdf4j.query.algebra.evaluation.impl.StrictEvaluationStrategy;
  * @see EvaluationStrategyFactory#setOptimizerPipeline(QueryOptimizerPipeline)
  */
 public class StandardQueryOptimizerPipeline implements QueryOptimizerPipeline {
+
+	private static boolean assertsEnabled = false;
+	static {
+		// noinspection AssertWithSideEffects
+		assert assertsEnabled = true;
+	}
 
 	public static final BindingAssignerOptimizer BINDING_ASSIGNER = new BindingAssignerOptimizer();
 	public static final BindingSetAssignmentInlinerOptimizer BINDING_SET_ASSIGNMENT_INLINER = new BindingSetAssignmentInlinerOptimizer();
@@ -60,7 +70,7 @@ public class StandardQueryOptimizerPipeline implements QueryOptimizerPipeline {
 	 */
 	@Override
 	public Iterable<QueryOptimizer> getOptimizers() {
-		return List.of(
+		List<QueryOptimizer> optimizers = List.of(
 				BINDING_ASSIGNER,
 				BINDING_SET_ASSIGNMENT_INLINER,
 				new ConstantOptimizer(strategy),
@@ -75,9 +85,19 @@ public class StandardQueryOptimizerPipeline implements QueryOptimizerPipeline {
 				new QueryJoinOptimizer(evaluationStatistics, strategy.isTrackResultSize()),
 				ITERATIVE_EVALUATION_OPTIMIZER,
 				FILTER_OPTIMIZER,
-				ORDER_LIMIT_OPTIMIZER,
-				PARENT_REFERENCE_CLEANER
-		);
+				ORDER_LIMIT_OPTIMIZER);
+
+		if (assertsEnabled) {
+			List<QueryOptimizer> optimizersWithReferenceCleaner = new ArrayList<>();
+			optimizersWithReferenceCleaner.add(new ParentReferenceChecker(null));
+			for (QueryOptimizer optimizer : optimizers) {
+				optimizersWithReferenceCleaner.add(optimizer);
+				optimizersWithReferenceCleaner.add(new ParentReferenceChecker(optimizer));
+			}
+			optimizers = optimizersWithReferenceCleaner;
+		}
+
+		return optimizers;
 	}
 
 }

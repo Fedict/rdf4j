@@ -1,9 +1,12 @@
 /*******************************************************************************
  * Copyright (c) 2019 Eclipse RDF4J contributors.
+ *
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Distribution License v1.0
  * which accompanies this distribution, and is available at
  * http://www.eclipse.org/org/documents/edl-v10.php.
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
  *******************************************************************************/
 package org.eclipse.rdf4j.federated.evaluation.union;
 
@@ -12,6 +15,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.eclipse.rdf4j.federated.evaluation.concurrent.ControlledWorkerScheduler;
 import org.eclipse.rdf4j.federated.structures.QueryInfo;
+import org.eclipse.rdf4j.query.QueryEvaluationException;
 
 /**
  * Execution of union tasks with {@link ControlledWorkerScheduler}. Tasks can be added using the provided functions.
@@ -19,7 +23,6 @@ import org.eclipse.rdf4j.federated.structures.QueryInfo;
  * Results are then contained in this iteration.
  *
  * @author Andreas Schwarte
- *
  */
 public class ControlledWorkerUnion<T> extends WorkerUnionBase<T> {
 
@@ -58,4 +61,15 @@ public class ControlledWorkerUnion<T> extends WorkerUnionBase<T> {
 		super.toss(e);
 		phaser.arriveAndDeregister();
 	}
+
+	@Override
+	public void handleClose() throws QueryEvaluationException {
+		try {
+			super.handleClose();
+		} finally {
+			// signal the phaser to close (if currently being blocked)
+			phaser.forceTermination();
+		}
+	}
+
 }

@@ -1,9 +1,12 @@
 /*******************************************************************************
  * Copyright (c) 2015 Eclipse RDF4J contributors, Aduna, and others.
+ *
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Distribution License v1.0
  * which accompanies this distribution, and is available at
  * http://www.eclipse.org/org/documents/edl-v10.php.
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
  *******************************************************************************/
 package org.eclipse.rdf4j.query.parser.sparql;
 
@@ -29,7 +32,6 @@ import org.eclipse.rdf4j.query.algebra.Var;
  * A graph pattern consisting of (required and optional) tuple expressions, binding assignments and boolean constraints.
  *
  * @author Arjohn Kampman
- *
  * @apiNote This feature is for internal use only: its existence, signature or behavior may change without warning from
  *          one release to the next.
  */
@@ -97,7 +99,9 @@ public class GraphPattern {
 	}
 
 	public void addRequiredSP(Var subjVar, Var predVar, Var objVar) {
-		addRequiredTE(new StatementPattern(spScope, subjVar, predVar, objVar, contextVar));
+
+		addRequiredTE(new StatementPattern(spScope, subjVar, predVar, objVar,
+				contextVar != null ? contextVar.clone() : null));
 	}
 
 	public List<TupleExpr> getRequiredTEs() {

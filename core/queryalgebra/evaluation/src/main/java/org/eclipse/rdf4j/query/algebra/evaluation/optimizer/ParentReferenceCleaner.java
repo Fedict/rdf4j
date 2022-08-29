@@ -1,10 +1,13 @@
 /*******************************************************************************
  * Copyright (c) 2022 Eclipse RDF4J contributors.
+ *
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Distribution License v1.0
  * which accompanies this distribution, and is available at
  * http://www.eclipse.org/org/documents/edl-v10.php.
- ******************************************************************************/
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
+ *******************************************************************************/
 
 package org.eclipse.rdf4j.query.algebra.evaluation.optimizer;
 
@@ -42,8 +45,11 @@ public class ParentReferenceCleaner implements QueryOptimizer {
 		protected void meetNode(QueryModelNode node) throws RuntimeException {
 			QueryModelNode expectedParent = ancestors.peekLast();
 			if (node.getParentNode() != expectedParent) {
-				logger.debug("unexpected parent for node {}: {} (expected {})", node, node.getParentNode(),
-						expectedParent);
+				String message = "unexpected parent for node " + node + ": " + node.getParentNode() + " (expected "
+						+ expectedParent + ")";
+				assert node.getParentNode() == expectedParent : message;
+				logger.debug(message);
+
 				node.setParentNode(expectedParent);
 			}
 

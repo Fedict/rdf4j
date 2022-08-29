@@ -1,11 +1,13 @@
 /*******************************************************************************
  * Copyright (c) 2022 Eclipse RDF4J contributors.
- *  All rights reserved. This program and the accompanying materials
- *  are made available under the terms of the Eclipse Distribution License v1.0
- *  which accompanies this distribution, and is available at
- *  http://www.eclipse.org/org/documents/edl-v10.php.
- ******************************************************************************/
-
+ *
+ * All rights reserved. This program and the accompanying materials
+ * are made available under the terms of the Eclipse Distribution License v1.0
+ * which accompanies this distribution, and is available at
+ * http://www.eclipse.org/org/documents/edl-v10.php.
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
+ *******************************************************************************/
 package org.eclipse.rdf4j.sail.helpers;
 
 import java.lang.ref.Cleaner;
@@ -67,6 +69,9 @@ final class CleanerIteration<E, X extends Exception> implements CloseableIterati
 							"Forced closing of unclosed iteration. Set the system property 'org.eclipse.rdf4j.repository.debug' to 'true' to get stack traces.");
 					iteration.close();
 				} catch (Exception e) {
+					if (e instanceof InterruptedException) {
+						Thread.currentThread().interrupt();
+					}
 					throw new RuntimeException(e);
 				}
 			}

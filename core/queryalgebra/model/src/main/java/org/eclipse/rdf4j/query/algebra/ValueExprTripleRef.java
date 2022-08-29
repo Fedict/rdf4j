@@ -1,9 +1,12 @@
 /*******************************************************************************
  * Copyright (c) 2020 Eclipse RDF4J contributors.
+ *
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Distribution License v1.0
  * which accompanies this distribution, and is available at
  * http://www.eclipse.org/org/documents/edl-v10.php.
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
  *******************************************************************************/
 package org.eclipse.rdf4j.query.algebra;
 
@@ -11,33 +14,34 @@ package org.eclipse.rdf4j.query.algebra;
 public class ValueExprTripleRef extends AbstractQueryModelNode implements ValueExpr {
 
 	private final String exprVarName;
-	private final org.eclipse.rdf4j.query.algebra.Var subjectVar;
-	private final org.eclipse.rdf4j.query.algebra.Var predicateVar;
-	private final org.eclipse.rdf4j.query.algebra.Var objectVar;
+	private Var subjectVar;
+	private Var predicateVar;
+	private Var objectVar;
 
-	public ValueExprTripleRef(String extName,
-			org.eclipse.rdf4j.query.algebra.Var s,
-			org.eclipse.rdf4j.query.algebra.Var p,
-			org.eclipse.rdf4j.query.algebra.Var o) {
+	public ValueExprTripleRef(String extName, Var s, Var p, Var o) {
 		this.exprVarName = extName;
 		subjectVar = s;
 		predicateVar = p;
 		objectVar = o;
+
+		subjectVar.setParentNode(this);
+		predicateVar.setParentNode(this);
+		objectVar.setParentNode(this);
 	}
 
 	public String getExtVarName() {
 		return exprVarName;
 	}
 
-	public org.eclipse.rdf4j.query.algebra.Var getSubjectVar() {
+	public Var getSubjectVar() {
 		return subjectVar;
 	}
 
-	public org.eclipse.rdf4j.query.algebra.Var getPredicateVar() {
+	public Var getPredicateVar() {
 		return predicateVar;
 	}
 
-	public org.eclipse.rdf4j.query.algebra.Var getObjectVar() {
+	public Var getObjectVar() {
 		return objectVar;
 	}
 
@@ -83,4 +87,16 @@ public class ValueExprTripleRef extends AbstractQueryModelNode implements ValueE
 		// visitChildren(visitor);
 	}
 
+	@Override
+	public void replaceChildNode(QueryModelNode current, QueryModelNode replacement) {
+		if (subjectVar == current) {
+			subjectVar = (Var) replacement;
+		} else if (predicateVar == current) {
+			predicateVar = (Var) replacement;
+		} else if (objectVar == current) {
+			objectVar = (Var) replacement;
+		} else {
+			super.replaceChildNode(current, replacement);
+		}
+	}
 }
