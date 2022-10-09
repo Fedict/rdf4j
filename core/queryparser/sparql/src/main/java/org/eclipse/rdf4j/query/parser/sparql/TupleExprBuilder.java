@@ -33,6 +33,7 @@ import org.eclipse.rdf4j.model.vocabulary.FN;
 import org.eclipse.rdf4j.model.vocabulary.RDF;
 import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.query.MalformedQueryException;
+import org.eclipse.rdf4j.query.algebra.AggregateFunctionCall;
 import org.eclipse.rdf4j.query.algebra.AggregateOperator;
 import org.eclipse.rdf4j.query.algebra.And;
 import org.eclipse.rdf4j.query.algebra.ArbitraryLengthPath;
@@ -104,6 +105,7 @@ import org.eclipse.rdf4j.query.algebra.helpers.TupleExprs;
 import org.eclipse.rdf4j.query.algebra.helpers.VarNameCollector;
 import org.eclipse.rdf4j.query.algebra.helpers.collectors.StatementPatternCollector;
 import org.eclipse.rdf4j.query.impl.ListBindingSet;
+import org.eclipse.rdf4j.query.parser.sparql.aggregate.CustomAggregateFunctionRegistry;
 import org.eclipse.rdf4j.query.parser.sparql.ast.ASTAbs;
 import org.eclipse.rdf4j.query.parser.sparql.ast.ASTAnd;
 import org.eclipse.rdf4j.query.parser.sparql.ast.ASTAskQuery;
@@ -275,11 +277,13 @@ public class TupleExprBuilder extends AbstractASTVisitor {
 	 */
 	protected Var mapValueExprToVar(Object valueExpr) {
 		if (valueExpr instanceof Var) {
-			return (Var) valueExpr;
+			// Return a clone to prevent the Var object from being used in more than one place.
+			return ((Var) valueExpr).clone();
 		} else if (valueExpr instanceof ValueConstant) {
 			return TupleExprs.createConstVar(((ValueConstant) valueExpr).getValue());
 		} else if (valueExpr instanceof TripleRef) {
-			return ((TripleRef) valueExpr).getExprVar();
+			// Return a clone to prevent the Var object from being used in more than one place.
+			return ((TripleRef) valueExpr).getExprVar().clone();
 		} else if (valueExpr == null) {
 			throw new IllegalArgumentException("valueExpr is null");
 		} else {
@@ -1480,9 +1484,9 @@ public class TupleExprBuilder extends AbstractASTVisitor {
 			}
 			pathElementExpression = createTupleExprForNegatedPropertySets(psElems, pathSequenceContext);
 		} else {
-			final ValueExpr pred = (ValueExpr) pathElement.jjtGetChild(0).jjtAccept(this, pathSequenceContext);
-			final Var predVar = mapValueExprToVar(pred);
-			pathElementExpression = new StatementPattern(pathSequenceContext.scope, startVar.clone(), predVar, endVar,
+			Var predVar = mapValueExprToVar(pathElement.jjtGetChild(0).jjtAccept(this, pathSequenceContext));
+			pathElementExpression = new StatementPattern(pathSequenceContext.scope, startVar.clone(), predVar,
+					endVar.clone(),
 					pathSequenceContext.contextVar != null ? pathSequenceContext.contextVar.clone() : null);
 		}
 
@@ -1646,9 +1650,7 @@ public class TupleExprBuilder extends AbstractASTVisitor {
 		public void meet(Var var) {
 			if (toBeReplaced.equals(var)) {
 				QueryModelNode parent = var.getParentNode();
-				Var replacementVar = replacement.clone();
-				parent.replaceChildNode(var, replacementVar);
-				assert replacementVar.getParentNode() != null;
+				parent.replaceChildNode(var, replacement.clone());
 			}
 		}
 
@@ -1721,8 +1723,8 @@ public class TupleExprBuilder extends AbstractASTVisitor {
 		for (int i = 0; i < childCount; i++) {
 			ValueExpr childValue = (ValueExpr) node.jjtGetChild(i).jjtAccept(this, null);
 
-			Var childVar = mapValueExprToVar(childValue);
-			graphPattern.addRequiredSP(listVar.clone(), TupleExprs.createConstVar(RDF.FIRST), childVar.clone());
+			graphPattern.addRequiredSP(listVar.clone(), TupleExprs.createConstVar(RDF.FIRST),
+					mapValueExprToVar(childValue));
 
 			Var nextListVar;
 			if (i == childCount - 1) {
@@ -1853,15 +1855,26 @@ public class TupleExprBuilder extends AbstractASTVisitor {
 	public Object visit(ASTFunctionCall node, Object data) throws VisitorException {
 		ValueConstant uriNode = (ValueConstant) node.jjtGetChild(0).jjtAccept(this, null);
 		IRI functionURI = (IRI) uriNode.getValue();
-
-		FunctionCall functionCall = new FunctionCall(functionURI.stringValue());
-
-		for (int i = 1; i < node.jjtGetNumChildren(); i++) {
-			Node argNode = node.jjtGetChild(i);
-			functionCall.addArg(castToValueExpr(argNode.jjtAccept(this, null)));
+		if (CustomAggregateFunctionRegistry.getInstance().has(functionURI.stringValue()) || node.isDistinct()) {
+			AggregateFunctionCall aggregateCall = new AggregateFunctionCall(functionURI.stringValue(),
+					node.isDistinct());
+			if (node.jjtGetNumChildren() > 2) {
+				throw new IllegalArgumentException("Custom aggregate functions cannot have more than one argument");
+			}
+			Node argNode = node.jjtGetChild(1);
+			aggregateCall.setArg(castToValueExpr(argNode.jjtAccept(this, null)));
+			return aggregateCall;
+		} else {
+			if (node.isDistinct()) {
+				throw new IllegalArgumentException("Custom function calls cannot apply distinct iteration to args");
+			}
+			FunctionCall functionCall = new FunctionCall(functionURI.stringValue());
+			for (int i = 1; i < node.jjtGetNumChildren(); i++) {
+				Node argNode = node.jjtGetChild(i);
+				functionCall.addArg(castToValueExpr(argNode.jjtAccept(this, null)));
+			}
+			return functionCall;
 		}
-
-		return functionCall;
 	}
 
 	@Override
@@ -2552,6 +2565,12 @@ public class TupleExprBuilder extends AbstractASTVisitor {
 			meetAggregate(node);
 		}
 
+		@Override
+		public void meet(AggregateFunctionCall node) throws VisitorException {
+			super.meet(node);
+			meetAggregate(node);
+		}
+
 		private void meetAggregate(AggregateOperator node) {
 			operators.add(node);
 		}
@@ -2611,9 +2630,15 @@ public class TupleExprBuilder extends AbstractASTVisitor {
 			meetAggregate(node);
 		}
 
+		@Override
+		public void meet(AggregateFunctionCall node) throws VisitorException {
+			super.meet(node);
+			meetAggregate(node);
+		}
+
 		private void meetAggregate(AggregateOperator node) {
 			if (node.equals(operator)) {
-				node.getParentNode().replaceChildNode(node, replacement);
+				node.getParentNode().replaceChildNode(node, replacement.clone());
 			}
 		}
 	}
@@ -2621,9 +2646,9 @@ public class TupleExprBuilder extends AbstractASTVisitor {
 	@Override
 	public TupleExpr visit(ASTTripleRef node, Object data) throws VisitorException {
 		TripleRef ret = new TripleRef();
-		ret.setSubjectVar(mapValueExprToVar(node.getSubj().jjtAccept(this, ret)).clone());
-		ret.setPredicateVar(mapValueExprToVar(node.getPred().jjtAccept(this, ret)).clone());
-		ret.setObjectVar(mapValueExprToVar(node.getObj().jjtAccept(this, ret)).clone());
+		ret.setSubjectVar(mapValueExprToVar(node.getSubj().jjtAccept(this, ret)));
+		ret.setPredicateVar(mapValueExprToVar(node.getPred().jjtAccept(this, ret)));
+		ret.setObjectVar(mapValueExprToVar(node.getObj().jjtAccept(this, ret)));
 		ret.setExprVar(createAnonVar());
 		graphPattern.addRequiredTE(ret);
 
