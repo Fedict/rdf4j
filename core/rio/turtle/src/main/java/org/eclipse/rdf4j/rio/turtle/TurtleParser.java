@@ -1349,7 +1349,7 @@ public class TurtleParser extends AbstractRDFParser {
 
 	/**
 	 * Peeks at the next two Unicode code points without advancing the reader and returns true if they indicate the
-	 * start of an RDF-star triple value. Such values start with '<<'.
+	 * start of an RDF-star triple value. Such values start with '&lt;&lt;'.
 	 *
 	 * @return true if the next code points indicate the beginning of an RDF-star triple value, false otherwise
 	 * @throws IOException

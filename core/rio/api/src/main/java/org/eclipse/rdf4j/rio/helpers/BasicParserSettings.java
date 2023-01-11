@@ -209,7 +209,7 @@ public class BasicParserSettings {
 	 * Namespaces specified within the RDF document being parsed will override these defaults
 	 * </p>
 	 * <p>
-	 * Defaults to {@link Namespaces.DEFAULT_RDF4J} the RDFa 1.1 initial context + some additional prefixes.
+	 * Defaults to {@link Namespaces#DEFAULT_RDF4J} the RDFa 1.1 initial context + some additional prefixes.
 	 * </p>
 	 */
 	public static final RioSetting<Set<Namespace>> NAMESPACES = new RioSettingImpl<>(

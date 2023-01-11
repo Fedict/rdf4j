@@ -263,15 +263,15 @@ public interface Literal extends Value {
 	/**
 	 * CoreDatatype is an interface for natively supported datatypes in RDF4J. This includes, among others, the XML
 	 * Schema datatypes and rdf:langString. CoreDatatypes are implemented as enums and more performant and convenient to
-	 * work with than IRI-based datatypes. The constant {@link CoreDatatype#NONE)} is used to represent a datatype that
+	 * work with than IRI-based datatypes. The constant {@link CoreDatatype#NONE} is used to represent a datatype that
 	 * is not one of the supported core datatypes.
 	 *
-	 * @return The CoreDatatype or {@link CoreDatatype#NONE)} if the datatype matches none of the core datatypes. This
+	 * @return The CoreDatatype or {@link CoreDatatype#NONE} if the datatype matches none of the core datatypes. This
 	 *         method will not return null.
-	 * @implNote This method may not return null. Returning {@link CoreDatatype#NONE)} is only permitted if the datatype
+	 * @implNote This method may not return null. Returning {@link CoreDatatype#NONE} is only permitted if the datatype
 	 *           does not match any of the core datatypes. A literal with a language tag must return
-	 *           {@link CoreDatatype.RDF#LANGSTRING)}. A literal without a specified datatype must return
-	 *           {@link CoreDatatype.XSD#STRING)}.
+	 *           {@link CoreDatatype.RDF#LANGSTRING}. A literal without a specified datatype must return
+	 *           {@link CoreDatatype.XSD#STRING}.
 	 */
 	CoreDatatype getCoreDatatype();
 

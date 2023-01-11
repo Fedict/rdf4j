@@ -591,7 +591,7 @@ public class Values {
 	 * Recognized types are {@link Boolean}, {@link Byte}, {@link Double}, {@link Float}, {@link Integer}, {@link Long},
 	 * {@link Short}, {@link XMLGregorianCalendar }, {@link TemporalAccessor} and {@link Date}.
 	 *
-	 * @param valueFactory      the {@link ValueFactory}to use for creation of the {@link Literal}
+	 * @param vf      the {@link ValueFactory}to use for creation of the {@link Literal}
 	 * @param object            an object to be converted to a typed literal.
 	 * @param failOnUnknownType If no mapping is available and <code>failOnUnknownType</code> is <code>false</code> the
 	 *                          method returns a literal with the string representation of the supplied object as the

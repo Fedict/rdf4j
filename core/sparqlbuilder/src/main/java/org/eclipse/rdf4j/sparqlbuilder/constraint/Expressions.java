@@ -41,7 +41,7 @@ public class Expressions {
 	}
 
 	/**
-	 * <code>ABS(operand</code>)
+	 * <pre>{@code ABS(operand)}</pre>
 	 *
 	 * @param operand the argument to the absolute value function
 	 * @return an ABS() function
@@ -52,7 +52,7 @@ public class Expressions {
 	}
 
 	/**
-	 * <code>ABS(operand</code>)
+	 * <pre>{@code ABS(operand}</pre>
 	 *
 	 * @param operand the argument to the absolute value function
 	 * @return an ABS() function
@@ -63,7 +63,7 @@ public class Expressions {
 	}
 
 	/**
-	 * <code>BNODE()</code>
+	 * <pre>{@code BNODE()}</pre>
 	 *
 	 * @return a no-arg BNODE() function
 	 * @see <a href="http://www.w3.org/TR/2013/REC-sparql11-query-20130321/#func-bnode"> SPARQL BNODE Function</a>
@@ -73,7 +73,7 @@ public class Expressions {
 	}
 
 	/**
-	 * <code>BNODE(operand)</code>
+	 * <pre>{@code BNODE(operand)}</pre>
 	 *
 	 * @param literal the RDF literal argument to the function
 	 * @return a BNODE() function
@@ -84,7 +84,7 @@ public class Expressions {
 	}
 
 	/**
-	 * <code>BNODE(operand)</code>
+	 * <pre>{@code BNODE(operand)}</pre>
 	 *
 	 * @param literal the String literal argument to the function
 	 * @return a BNODE() function
@@ -95,7 +95,7 @@ public class Expressions {
 	}
 
 	/**
-	 * <code>BOUND(operand)</code>
+	 * <pre>{@code BOUND(operand)}</pre>
 	 *
 	 * @param var the SPARQL variable argument to the function
 	 * @return a BOUND() function
@@ -106,7 +106,7 @@ public class Expressions {
 	}
 
 	/**
-	 * <code>CEIL(operand)</code>
+	 * <pre>{@code CEIL(operand)}</pre>
 	 *
 	 * @param operand the argument to the function
 	 * @return a CEIL() function
@@ -117,7 +117,7 @@ public class Expressions {
 	}
 
 	/**
-	 * <code>COALESCE(operand1, operand2, ... , operandN)</code>
+	 * <pre>{@code COALESCE(operand1, operand2, ... , operandN)}</pre>
 	 *
 	 * @param operands the arguments to the function
 	 * @return a COALESCE() function
@@ -128,7 +128,7 @@ public class Expressions {
 	}
 
 	/**
-	 * <code>CONCAT(operand1, operand2, ... , operandN)</code>
+	 * <pre>{@code CONCAT(operand1, operand2, ... , operandN)}</pre>
 	 *
 	 * @param operands the arguments to the function
 	 * @return a CONCAT() function
@@ -139,7 +139,7 @@ public class Expressions {
 	}
 
 	/**
-	 * <code>REGEX(testString, pattern)<code>
+	 * <pre>{@code REGEX(testString, pattern)}</pre> 
 	 *
 	 * @param testString the text to match against
 	 * @param pattern    the regex pattern to match
@@ -151,7 +151,7 @@ public class Expressions {
 	}
 
 	/**
-	 * <code>REGEX(testString, pattern, flags)<code>
+	 * <pre>{@code REGEX(testString, pattern, flags)}</pre> 
 	 *
 	 * @param testString the text to match against
 	 * @param pattern    the regular expression pattern to match
@@ -164,7 +164,7 @@ public class Expressions {
 	}
 
 	/**
-	 * <code>REGEX(testString, pattern)<code>
+	 * <pre>{@code REGEX(testString, pattern)}</pre>
 	 *
 	 * @param testString the text to match against
 	 * @param pattern    the regex pattern to match
@@ -176,7 +176,7 @@ public class Expressions {
 	}
 
 	/**
-	 * <code>REGEX(testString, pattern, flags)<code>
+	 * <pre>{@code REGEX(testString, pattern, flags)}</pre> 
 	 *
 	 * @param testString the text to match against
 	 * @param pattern    the regular expression pattern to match
@@ -189,7 +189,7 @@ public class Expressions {
 	}
 
 	/**
-	 * {@code STR(literal)} or {@code STR(iri)}
+	 * <pre>{@code STR(literal)}</pre> or <pre>{@code STR(iri)}</pre>
 	 *
 	 * @param operand the arg to convert to a string
 	 * @return a {@code STR()} function
@@ -208,7 +208,7 @@ public class Expressions {
 	}
 
 	/**
-	 * {@code operand IN (expression1, expression2...)}
+	 * <pre>{@code operand IN (expression1, expression2...)}</pre>
 	 *
 	 * @param searchTerm
 	 * @param expressions
@@ -220,7 +220,7 @@ public class Expressions {
 	}
 
 	/**
-	 * {@code operand NOT IN (expression1, expression2...)}
+	 * <pre>{@code operand NOT IN (expression1, expression2...)}</pre>
 	 *
 	 * @param searchTerm
 	 * @param expressions
@@ -238,14 +238,14 @@ public class Expressions {
 	 *
 	 * @param function a SPARQL Function
 	 * @param operands arguments to the function
-	 * @return a function object of the given <code>function</code> type and <code>operands</code>
+	 * @return a function object of the given <pre>{@code function}</pre> type and <pre>{@code operands}</pre>
 	 */
 	public static Expression<?> function(SparqlFunction function, Operand... operands) {
 		return new Function(function).addOperand(operands);
 	}
 
 	/**
-	 * <code>!operand</code>
+	 * <pre>{@code !operand}</pre>
 	 *
 	 * @param operand argument to the function
 	 * @return logical not operation
@@ -256,7 +256,7 @@ public class Expressions {
 	}
 
 	/**
-	 * <code>+operand</code>
+	 * <pre>{@code +operand}</pre>
 	 *
 	 * @param operand argument to the function
 	 * @return unary plus operation
@@ -267,7 +267,7 @@ public class Expressions {
 	}
 
 	/**
-	 * <code>-operand</code>
+	 * <pre>{@code -operand}</pre>
 	 *
 	 * @param operand argument to the function
 	 * @return unary minus operation
@@ -282,7 +282,7 @@ public class Expressions {
 	}
 
 	/**
-	 * <code>left = right</code>
+	 * <pre>{@code left = right}</pre>
 	 *
 	 * @param left  the left operand
 	 * @param right the right operand
@@ -294,7 +294,7 @@ public class Expressions {
 	}
 
 	/**
-	 * <code>left != right</code>
+	 * <pre>{@code left != right}</pre>
 	 *
 	 * @param left  the left operand
 	 * @param right the right operand
@@ -314,7 +314,7 @@ public class Expressions {
 	}
 
 	/**
-	 * <code>left > right</code>
+	 * <pre>{@code left > right}</pre>
 	 *
 	 * @param left  the left operand
 	 * @param right the right operand
@@ -326,7 +326,7 @@ public class Expressions {
 	}
 
 	/**
-	 * <code>left > right</code>
+	 * <pre>{@code left > right}</pre>
 	 *
 	 * @param left  the left operand
 	 * @param right the right operand
@@ -338,7 +338,7 @@ public class Expressions {
 	}
 
 	/**
-	 * <code>left > right</code>
+	 * <pre>{@code left > right}</pre>
 	 *
 	 * @param left  the left operand
 	 * @param right the right operand
@@ -350,7 +350,7 @@ public class Expressions {
 	}
 
 	/**
-	 * <code>left > right</code>
+	 * <pre>{@code left > right}</pre>
 	 *
 	 * @param left  the left operand
 	 * @param right the right operand
@@ -362,7 +362,7 @@ public class Expressions {
 	}
 
 	/**
-	 * <code>left >= right</code>
+	 * <pre>{@code left >= right}</pre>
 	 *
 	 * @param left  the left operand
 	 * @param right the right operand
@@ -374,7 +374,7 @@ public class Expressions {
 	}
 
 	/**
-	 * <code>left < right</code>
+	 * <pre>{@code left < right}</pre>
 	 *
 	 * @param left  the left operand
 	 * @param right the right operand
@@ -386,7 +386,7 @@ public class Expressions {
 	}
 
 	/**
-	 * <code>left < right</code>
+	 * <pre>{@code left < right}</pre>
 	 *
 	 * @param left  the left operand
 	 * @param right the right operand
@@ -398,7 +398,7 @@ public class Expressions {
 	}
 
 	/**
-	 * <code>left < right</code>
+	 * <pre>{@code left < right}</pre>
 	 *
 	 * @param left  the left operand
 	 * @param right the right operand
@@ -410,7 +410,7 @@ public class Expressions {
 	}
 
 	/**
-	 * <code>left < right</code>
+	 * <pre>{@code left < right}</pre>
 	 *
 	 * @param left  the left operand
 	 * @param right the right operand
@@ -422,7 +422,7 @@ public class Expressions {
 	}
 
 	/**
-	 * <code>left <= right</code>
+	 * <pre>{@code left <= right}</pre>
 	 *
 	 * @param left  the left operand
 	 * @param right the right operand
@@ -442,7 +442,7 @@ public class Expressions {
 	}
 
 	/**
-	 * <code>operand1 && operand2 && ... operandN</code>
+	 * <pre>{@code operand1 && operand2 && ... operandN}</pre>
 	 *
 	 * @param operands the arguments
 	 * @return logical and operation
@@ -453,7 +453,7 @@ public class Expressions {
 	}
 
 	/**
-	 * <code>operand1 || operand2 || ... || operandN</code>
+	 * <pre>{@code operand1 || operand2 || ... || operandN}</pre>
 	 *
 	 * @param operands the arguments
 	 * @return logical or operation
@@ -464,7 +464,7 @@ public class Expressions {
 	}
 
 	/**
-	 * <code>operand1 + operand2 + ... + operandN</code>
+	 * <pre>{@code operand1 + operand2 + ... + operandN}</pre>
 	 *
 	 * @param operands the arguments
 	 * @return arithmetic addition operation
@@ -475,7 +475,7 @@ public class Expressions {
 	}
 
 	/**
-	 * <code>operand1 - operand2 - ... - operandN</code>
+	 * <pre>{@code operand1 - operand2 - ... - operandN}</pre>
 	 *
 	 * @param operands the arguments
 	 * @return arithmetic subtraction operation
@@ -486,7 +486,7 @@ public class Expressions {
 	}
 
 	/**
-	 * <code>operand1 * operand2 * ... * operandN</code>
+	 * <pre>{@code operand1 * operand2 * ... * operandN}</pre>
 	 *
 	 * @param operands the arguments
 	 * @return arithmetic multiplication operation
@@ -497,7 +497,7 @@ public class Expressions {
 	}
 
 	/**
-	 * <code>operand1 / operand2 / ... / operandN</code>
+	 * <pre>{@code operand1 / operand2 / ... / operandN}</pre>
 	 *
 	 * @param operands the arguments
 	 * @return arithmetic division operation
@@ -522,7 +522,7 @@ public class Expressions {
 	 */
 
 	/**
-	 * {@code avg(...)}
+	 * <pre>{@code avg(...)}</pre>
 	 *
 	 * @param operand the expression to average
 	 * @return an avg aggregate function
@@ -533,7 +533,7 @@ public class Expressions {
 	}
 
 	/**
-	 * {@code count()}
+	 * <pre>{@code count()}</pre>
 	 *
 	 * @param operand the expression to count
 	 * @return a count aggregate

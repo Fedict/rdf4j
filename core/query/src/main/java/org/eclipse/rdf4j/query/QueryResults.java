@@ -243,7 +243,7 @@ public class QueryResults extends Iterations {
 	 * @param baseURI The base URI for the RDF document.
 	 * @param format  The {@link RDFFormat} of the RDF document.
 	 * @return A {@link GraphQueryResult} that parses in the background, and must be closed to prevent resource leaks.
-	 * @deprecated WeakReference<?> callerReference argument will be removed
+	 * @deprecated WeakReference&lt;?&gt; callerReference argument will be removed
 	 */
 	@Deprecated(since = "4.1.2")
 	public static GraphQueryResult parseGraphBackground(InputStream in, String baseURI, RDFFormat format,
@@ -262,7 +262,7 @@ public class QueryResults extends Iterations {
 	 * @param baseURI The base URI for the RDF document.
 	 * @param parser  The {@link RDFParser}.
 	 * @return A {@link GraphQueryResult} that parses in the background, and must be closed to prevent resource leaks.
-	 * @deprecated WeakReference<?> callerReference argument will be removed
+	 * @deprecated WeakReference&lt;?&gt; callerReference argument will be removed
 	 */
 	@Deprecated(since = "4.1.2")
 	public static GraphQueryResult parseGraphBackground(InputStream in, String baseURI, RDFParser parser,
