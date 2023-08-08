@@ -15,7 +15,6 @@ import static org.eclipse.rdf4j.sail.lucene.LuceneSail.FUZZY_PREFIX_LENGTH_KEY;
 import java.io.IOException;
 import java.io.StringReader;
 import java.lang.reflect.UndeclaredThrowableException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -70,6 +69,7 @@ import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.search.highlight.Formatter;
 import org.apache.lucene.search.highlight.Highlighter;
+import org.apache.lucene.search.highlight.InvalidTokenOffsetsException;
 import org.apache.lucene.search.highlight.QueryScorer;
 import org.apache.lucene.search.highlight.SimpleHTMLFormatter;
 import org.apache.lucene.search.similarities.ClassicSimilarity;
@@ -79,9 +79,9 @@ import org.apache.lucene.spatial.prefix.RecursivePrefixTreeStrategy;
 import org.apache.lucene.spatial.prefix.tree.SpatialPrefixTree;
 import org.apache.lucene.spatial.prefix.tree.SpatialPrefixTreeFactory;
 import org.apache.lucene.spatial.query.SpatialOperation;
+import org.apache.lucene.store.ByteBuffersDirectory;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
-import org.apache.lucene.store.RAMDirectory;
 import org.apache.lucene.util.Bits;
 import org.eclipse.rdf4j.common.iterator.EmptyIterator;
 import org.eclipse.rdf4j.model.IRI;
@@ -221,7 +221,7 @@ public class LuceneIndex extends AbstractLuceneIndex {
 			dir = FSDirectory.open(Paths.get(parameters.getProperty(LuceneSail.LUCENE_DIR_KEY)));
 		} else if (parameters.containsKey(LuceneSail.LUCENE_RAMDIR_KEY)
 				&& "true".equals(parameters.getProperty(LuceneSail.LUCENE_RAMDIR_KEY))) {
-			dir = new RAMDirectory();
+			dir = new ByteBuffersDirectory();
 		} else {
 			throw new IOException("No luceneIndex set, and no '" + LuceneSail.LUCENE_DIR_KEY + "' or '"
 					+ LuceneSail.LUCENE_RAMDIR_KEY + "' parameter given. ");
@@ -944,7 +944,7 @@ public class LuceneIndex extends AbstractLuceneIndex {
 		try {
 			TokenStream tokenStream = getAnalyzer().tokenStream(fieldName, new StringReader(text));
 			snippet = highlighter.getBestFragments(tokenStream, text, 2, "...");
-		} catch (Exception e) {
+		} catch (IOException | InvalidTokenOffsetsException e) {
 			logger.error("Exception while getting snippet for field " + fieldName, e);
 			snippet = null;
 		}
@@ -1105,20 +1105,29 @@ public class LuceneIndex extends AbstractLuceneIndex {
 		}
 
 		@Override
-		public void stringField(FieldInfo fieldInfo, byte[] value) {
-			final String stringValue = new String(value, StandardCharsets.UTF_8);
+		public void stringField(FieldInfo fieldInfo, String value) {
 			String name = fieldInfo.name;
-			if (SearchFields.ID_FIELD_NAME.equals(name)) {
-				addIDField(stringValue, document);
-			} else if (SearchFields.CONTEXT_FIELD_NAME.equals(name)) {
-				addContextField(stringValue, document);
-			} else if (SearchFields.URI_FIELD_NAME.equals(name)) {
-				addResourceField(stringValue, document);
-			} else if (SearchFields.TEXT_FIELD_NAME.equals(name)) {
-				addTextField(stringValue, document);
-			} else {
-				addPredicateField(name, stringValue, document);
-			}
+
+			if (null == name) {
+				addPredicateField(name, value, document);
+			} else
+				switch (name) {
+				case SearchFields.ID_FIELD_NAME:
+					addIDField(value, document);
+					break;
+				case SearchFields.CONTEXT_FIELD_NAME:
+					addContextField(value, document);
+					break;
+				case SearchFields.URI_FIELD_NAME:
+					addResourceField(value, document);
+					break;
+				case SearchFields.TEXT_FIELD_NAME:
+					addTextField(value, document);
+					break;
+				default:
+					addPredicateField(name, value, document);
+					break;
+				}
 		}
 
 		Document getDocument() {

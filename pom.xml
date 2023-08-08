@@ -371,15 +371,15 @@
 		<last.japicmp.compare.version>5.0.0</last.japicmp.compare.version>
 		<jaxb.version>2.3.3</jaxb.version>
 		<lwjgl.version>3.3.1</lwjgl.version>
-		<lucene.version>8.9.0</lucene.version>
-		<solr.version>8.9.0</solr.version>
-		<elasticsearch.version>7.15.2</elasticsearch.version>
+		<lucene.version>9.7.0</lucene.version>
+		<solr.version>9.3.0</solr.version>
+		<elasticsearch.version>8.9.0</elasticsearch.version>
 		<spring.version>5.3.23</spring.version>
 		<guava.version>30.1.1-jre</guava.version>
 		<jmhVersion>1.35</jmhVersion>
 		<servlet.version>3.1.0</servlet.version>
 		<junit.version>5.8.2</junit.version>
-		<jetty.version>9.4.50.v20221201</jetty.version>
+		<jetty.version>10.0.15</jetty.version>
 	</properties>
 	<dependencyManagement>
 		<dependencies>

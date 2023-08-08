@@ -22,23 +22,18 @@ import java.util.Set;
 import org.eclipse.rdf4j.sail.lucene.SearchDocument;
 import org.eclipse.rdf4j.sail.lucene.SearchFields;
 import org.elasticsearch.common.geo.GeoPoint;
-import org.elasticsearch.common.lucene.uid.Versions;
 import org.elasticsearch.index.seqno.SequenceNumbers;
-import org.elasticsearch.search.SearchHit;
+
 import org.locationtech.spatial4j.context.SpatialContext;
 import org.locationtech.spatial4j.shape.Point;
 import org.locationtech.spatial4j.shape.Shape;
 
 import com.google.common.base.Function;
+import org.elasticsearch.search.SearchHit;
 
 public class ElasticsearchDocument implements SearchDocument {
 
 	private final String id;
-
-	private final String type;
-
-	@Deprecated
-	private long version;
 
 	private final long seqNo;
 	private final long primaryTerm;
@@ -49,19 +44,14 @@ public class ElasticsearchDocument implements SearchDocument {
 
 	private final Function<? super String, ? extends SpatialContext> geoContextMapper;
 
-	@Deprecated
-	public ElasticsearchDocument(SearchHit hit) {
-		this(hit, null);
-	}
-
 	public ElasticsearchDocument(SearchHit hit, Function<? super String, ? extends SpatialContext> geoContextMapper) {
-		this(hit.getId(), hit.getType(), hit.getIndex(), hit.getSeqNo(), hit.getPrimaryTerm(),
+		this(hit.getId(), hit.getIndex(), hit.getSeqNo(), hit.getPrimaryTerm(),
 				hit.getSourceAsMap(), geoContextMapper);
 	}
 
-	public ElasticsearchDocument(String id, String type, String index, String resourceId, String context,
+	public ElasticsearchDocument(String id, String index, String resourceId, String context,
 			Function<? super String, ? extends SpatialContext> geoContextMapper) {
-		this(id, type, index, SequenceNumbers.UNASSIGNED_SEQ_NO, SequenceNumbers.UNASSIGNED_PRIMARY_TERM,
+		this(id, index, SequenceNumbers.UNASSIGNED_SEQ_NO, SequenceNumbers.UNASSIGNED_PRIMARY_TERM,
 				new HashMap<>(), geoContextMapper);
 		fields.put(SearchFields.URI_FIELD_NAME, resourceId);
 		if (context != null) {
@@ -69,19 +59,10 @@ public class ElasticsearchDocument implements SearchDocument {
 		}
 	}
 
-	@Deprecated
-	public ElasticsearchDocument(String id, String type, String index, long version, Map<String, Object> fields,
-			Function<? super String, ? extends SpatialContext> geoContextMapper) {
-		this(id, type, index, SequenceNumbers.UNASSIGNED_SEQ_NO, SequenceNumbers.UNASSIGNED_PRIMARY_TERM,
-				new HashMap<>(), geoContextMapper);
-		this.version = version;
-	}
-
-	public ElasticsearchDocument(String id, String type, String index, long seqNo, long primaryTerm,
+	public ElasticsearchDocument(String id, String index, long seqNo, long primaryTerm,
 			Map<String, Object> fields, Function<? super String, ? extends SpatialContext> geoContextMapper) {
 		this.id = id;
-		this.type = type;
-		this.version = Versions.MATCH_ANY;
+	//	this.version = Versions.MATCH_ANY;
 		this.seqNo = seqNo;
 		this.primaryTerm = primaryTerm;
 		this.index = index;
@@ -92,15 +73,6 @@ public class ElasticsearchDocument implements SearchDocument {
 	@Override
 	public String getId() {
 		return id;
-	}
-
-	public String getType() {
-		return type;
-	}
-
-	@Deprecated
-	public long getVersion() {
-		return version;
 	}
 
 	public long getSeqNo() {
