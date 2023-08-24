@@ -27,6 +27,12 @@
 			<version>${elasticsearch.version}</version>
 			<optional>true</optional>
 		</dependency>
+		<dependency>
+			<groupId>org.elasticsearch.client</groupId>
+			<artifactId>elasticsearch-rest-client</artifactId>
+			<version>${elasticsearch.version}</version>
+			<optional>true</optional>
+		</dependency>
 		<!-- org.elasticsearch.client:transport pulls in JCL -->
 		<dependency>
 			<groupId>org.slf4j</groupId>

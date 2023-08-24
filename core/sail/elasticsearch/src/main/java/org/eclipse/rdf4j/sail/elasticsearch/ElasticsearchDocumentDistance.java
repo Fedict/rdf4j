@@ -53,7 +53,8 @@ public class ElasticsearchDocumentDistance extends ElasticsearchDocumentResult i
 		if (GEOF.UOM_METRE.equals(units)) {
 			distance = unit.toMeters(unitDist);
 		} else if (GEOF.UOM_DEGREE.equals(units)) {
-			distance = unitDist / unit.getDistancePerDegree();
+			distance = DistanceUtils.dist2Degrees(unit.convert(unitDist, DistanceUnit.KILOMETERS),
+					DistanceUtils.EARTH_MEAN_RADIUS_KM);
 		} else if (GEOF.UOM_RADIAN.equals(units)) {
 			distance = DistanceUtils.dist2Radians(unit.convert(unitDist, DistanceUnit.KILOMETERS),
 					DistanceUtils.EARTH_MEAN_RADIUS_KM);
