@@ -281,6 +281,18 @@ public class RDFFormat extends FileFormat {
 			List.of("application/vnd.hdt"), null, List.of("hdt"), null,
 			SUPPORTS_NAMESPACES, NO_CONTEXTS, NO_RDF_STAR);
 
+	/**
+	 * The <a href="https://w3c.github.io/csvw/csv2rdf/">CSV on the Web</a> file format, an RDF serialization format.
+	 * <p>
+	 * The file extension <code>.csv</code> is recommended for CSV documents.
+	 * </p>
+	 *
+	 * @see <a href="https://w3c.github.io/csvw/csv2rdf/">CSVW</a>
+	 */
+	public static final RDFFormat CSVW = new RDFFormat("CSVW",
+			List.of("application/csvm+json"), StandardCharsets.UTF_8, List.of("csv"), null,
+			SUPPORTS_NAMESPACES, NO_CONTEXTS, NO_RDF_STAR);
+
 	/*----------------*
 	 * Static methods *
 	 *----------------*/
