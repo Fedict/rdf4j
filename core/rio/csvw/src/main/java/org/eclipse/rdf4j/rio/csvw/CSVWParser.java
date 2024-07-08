@@ -40,9 +40,12 @@ import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.base.CoreDatatype.XSD;
 import org.eclipse.rdf4j.model.util.Models;
 import org.eclipse.rdf4j.model.util.RDFCollections;
+import org.eclipse.rdf4j.model.util.Statements;
+import org.eclipse.rdf4j.model.util.Values;
 import org.eclipse.rdf4j.model.vocabulary.CSVW;
 import org.eclipse.rdf4j.rio.ParserConfig;
 import org.eclipse.rdf4j.rio.RDFFormat;
+import org.eclipse.rdf4j.rio.RDFHandler;
 import org.eclipse.rdf4j.rio.RDFHandlerException;
 import org.eclipse.rdf4j.rio.RDFParseException;
 import org.eclipse.rdf4j.rio.Rio;
@@ -70,6 +73,8 @@ public class CSVWParser extends AbstractRDFParser {
 
 		clear();
 
+		RDFHandler rdfHandler = getRDFHandler();
+
 		Model metadata = parseMetadata(in, null, baseURI);
 		if (metadata == null || metadata.isEmpty()) {
 			throw new RDFParseException("No metadata found");
@@ -87,7 +92,11 @@ public class CSVWParser extends AbstractRDFParser {
 										.map(c -> getCellParser(metadata, (Resource) c))
 										.collect(Collectors.toList())
 										.toArray(new Parser[columns.size()]);
-			parseCSV(csvFile, cellParsers);
+			
+			String aboutURL = getAboutURL(metadata, (Resource) table);
+			int aboutIndex = getAboutIndex(aboutURL, cellParsers);
+			
+			parseCSV(rdfHandler, csvFile, cellParsers, aboutURL, aboutIndex);
 		}
 		clear();
 	}
@@ -228,14 +237,53 @@ public class CSVWParser extends AbstractRDFParser {
 	private IRI getDataType(Model metadata, Value col) {
 		return XSD.STRING.getIri();
 	}
-	
+
+	/**
+	 * Get "about" URL template, to be used to create the subject of the triples
+	 * 
+	 * @param metadata
+	 * @param subject
+	 * @return aboutURL or null
+	 */
+	private String getAboutURL(Model metadata, Resource subject) {
+		return Models.getPropertyString(metadata, subject, CSVW.ABOUT_URL).orElse(null);
+	}
+
+	/**
+	 * Get the index of the column name used to replace the placeholder value in the aboutURL
+	 * 
+	 * @param aboutURL
+	 * @param cellParsers
+	 * @return 0-based index or -1
+	 */
+	private int getAboutIndex(String aboutURL, Parser[] cellParsers) {
+		if (aboutURL == null || aboutURL.isEmpty()) {
+			return -1;
+		}
+
+		String s;
+		for(int i=0; i < cellParsers.length; i++) {
+			s = cellParsers[i].getName();
+			if (s != null && aboutURL.contains("{" + s + "}")) {
+				return i;
+			}
+		}
+		return -1;
+	}
+
 	/**
 	 * Parse a CSV file
 	 * 
 	 * @param csvFile URI of CSV file
 	 * @param cellParsers cell parsers
+	 * @param aboutURL
+	 * @param aboutIndex
 	 */
-	private void parseCSV(URI csvFile, Parser[] cellParsers) {
+	private void parseCSV(RDFHandler handler, URI csvFile, Parser[] cellParsers, String aboutURL, int aboutIndex) {
+		String placeholder = null;
+		if (aboutIndex > -1) {
+			placeholder = cellParsers[aboutIndex].getName();
+		}
 		CSVParser parser = new CSVParserBuilder().build();
 
 		try(InputStream is = csvFile.toURL().openStream();
@@ -251,12 +299,42 @@ public class CSVWParser extends AbstractRDFParser {
 						.parallel()
 						.forEach(i -> cellParsers[i].parse(c[i]));
 				*/
+				Resource subject = getIRIorBnode(cellParsers, cells, aboutURL, aboutIndex, placeholder);
+				Value val;
+				Statement stmt;
 				for(int i = 0; i < cells.length; i++) {
-					cellParsers[i].parse(cells[i]);	
+					if (i == aboutIndex) {
+						// already processed
+						continue;
+					}
+					val = cellParsers[i].parse(cells[i]);
+					cellParsers[i].getPropertyURL();
+					stmt = Statements.statement(subject, predicate, val, subject);
+					handler.handleStatement(stmt);
 				}	
 			}
 		} catch (IOException| CsvValidationException ex) {
 			throw new RDFParseException("Error parsing " + csvFile, ex);
+		}
+	}
+
+	/**
+	 * Get subject IRI or blank node
+	 * 
+	 * @param cellParsers
+	 * @param aboutURL
+	 * @param aboutIndex 
+	 */
+	private	Resource getIRIorBnode(Parser[] cellParsers, String[] cells, String aboutURL, int aboutIndex, String placeholder) {
+		if (aboutIndex > -1) {
+			Value val = cellParsers[aboutIndex].parse(cells[aboutIndex]);
+			if (val != null) {
+				return Values.iri(aboutURL.replace(placeholder, val.toString()));
+			} else {
+				throw new RDFParseException("NULL value in aboutURL");
+			}
+		} else {
+			return Values.bnode();
 		}
 	}
 }

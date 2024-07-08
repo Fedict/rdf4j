@@ -39,6 +39,9 @@ public class CSVW {
 	// Classes
 
 	// Properties
+	/** csvw:aboutUrl */
+	public static final IRI ABOUT_URL;
+
 	/** csvw:base */
 	public static final IRI BASE;
 
@@ -85,6 +88,7 @@ public class CSVW {
 	public static final IRI VALUE_URL;
 
 	static {
+		ABOUT_URL = Vocabularies.createIRI(NAMESPACE, "aboutUrl");
 		BASE = Vocabularies.createIRI(NAMESPACE, "base");
 		COLUMN = Vocabularies.createIRI(NAMESPACE, "column");
 		DATATYPE = Vocabularies.createIRI(NAMESPACE, "datatype");
