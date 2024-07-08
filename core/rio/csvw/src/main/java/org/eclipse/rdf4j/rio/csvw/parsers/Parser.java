@@ -10,6 +10,7 @@
  *******************************************************************************/
 package org.eclipse.rdf4j.rio.csvw.parsers;
 
+import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.util.Literals;
 import org.eclipse.rdf4j.model.util.Values;
@@ -20,12 +21,20 @@ import org.eclipse.rdf4j.rio.RDFParseException;
  * @author Bart.Hanssens
  */
 public class Parser {
+	private IRI dataType;
 	private String defaultValue;
 	private boolean isRequired;
 	private String format;
 	private String propertyUrl;
 	private String valueUrl;
 	private String separator;
+
+	/**
+	 * @param dataType
+	 */
+	public void setDataType(IRI dataType) {
+		this.dataType = dataType;
+	}
 
 	/**
 	 * @param defaultValue the defaultValue to set
