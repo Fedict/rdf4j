@@ -38,6 +38,13 @@ public class Parser {
 	}
 
 	/**
+	 * @return name
+	 */
+	public String getName() {
+		return name;
+	}
+
+	/**
 	 * @param dataType
 	 */
 	public void setDataType(IRI dataType) {
