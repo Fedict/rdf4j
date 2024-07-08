@@ -21,6 +21,7 @@ import org.eclipse.rdf4j.rio.RDFParseException;
  * @author Bart.Hanssens
  */
 public class Parser {
+	private String name;
 	private IRI dataType;
 	private String defaultValue;
 	private boolean isRequired;
@@ -28,6 +29,13 @@ public class Parser {
 	private String propertyUrl;
 	private String valueUrl;
 	private String separator;
+
+	/**
+	 * @param name
+	 */
+	public void setName(String name) {
+		this.name = name;
+	}
 
 	/**
 	 * @param dataType
@@ -60,28 +68,28 @@ public class Parser {
 	/**
 	 * @return the propertyUrl
 	 */
-	public String getPropertyUrl() {
+	public String getPropertyURL() {
 		return propertyUrl;
 	}
 
 	/**
 	 * @param propertyUrl the propertyUrl to set
 	 */
-	public void setPropertyUrl(String propertyUrl) {
+	public void setPropertyURL(String propertyUrl) {
 		this.propertyUrl = propertyUrl;
 	}
 
 	/**
 	 * @return the valueUrl
 	 */
-	public String getValueUrl() {
+	public String getValueURL() {
 		return valueUrl;
 	}
 
 	/**
 	 * @param valueUrl the valueUrl to set
 	 */
-	public void setValueUrl(String valueUrl) {
+	public void setValueURL(String valueUrl) {
 		this.valueUrl = valueUrl;
 	}
 
@@ -99,11 +107,22 @@ public class Parser {
 		this.separator = separator;
 	}
 
+	/**
+	 * Get the value from a cell
+	 *
+	 * @param cell
+	 * @return
+	 */
 	public Value parse(String cell) {
-		if (cell == null || cell.isEmpty()) {
-			return Values.literal(defaultValue);
+		String s = cell;
+		if ((s == null || s.isEmpty()) && (defaultValue != null)) {
+			s = defaultValue;
 		}
-		return Values.literal(cell);
+		if (valueUrl != null && s != null) {
+			return Values.iri(valueUrl.replace("{" + name + "}", s));
+		}
+
+		return Values.literal(s, dataType);
 	}
 
 }
