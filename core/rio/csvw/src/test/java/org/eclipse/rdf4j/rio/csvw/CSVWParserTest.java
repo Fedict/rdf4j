@@ -10,8 +10,6 @@
  *******************************************************************************/
 package org.eclipse.rdf4j.rio.csvw;
 
-import static org.junit.jupiter.api.Assertions.assertTrue;
-
 import java.io.FileInputStream;
 import java.io.IOException;
 
@@ -27,6 +25,6 @@ public class CSVWParserTest {
 	public void testCSVWParser() throws IOException {
 		CSVWParser parser = new CSVWParser();
 		parser.getParserConfig().set(BasicWriterSettings.BASE_DIRECTIVE, true);
-		parser.parse(new FileInputStream("src/test/resources/org/eclipse/rdf4j/rio/csvw/painters-metadata.json"));
+		parser.parse(new FileInputStream("src/test/resources/painters-metadata.json"));
 	}
 }

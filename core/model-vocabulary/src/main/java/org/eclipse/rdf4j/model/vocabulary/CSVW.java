@@ -39,14 +39,23 @@ public class CSVW {
 	// Classes
 
 	// Properties
-	/** csvw:basee */
+	/** csvw:base */
 	public static final IRI BASE;
+
+	/** csvw:columns */
+	public static final IRI COLUMNS;
 
 	/** csvw:datatype */
 	public static final IRI DATATYPE;
 
 	/** csvw:default */
 	public static final IRI DEFAULT;
+
+	/** csvw:dialect */
+	public static final IRI DIALECT;
+
+	/** csvw:header */
+	public static final IRI HEADER;
 
 	/** csvw:lang */
 	public static final IRI LANG;
@@ -57,6 +66,12 @@ public class CSVW {
 	/** csvw:tableSchema */
 	public static final IRI TABLE_SCHEMA;
 
+	/** csvw:tables */
+	public static final IRI TABLES;
+
+	/** csvw:titles */
+	public static final IRI TITLES;
+
 	/** csvw:url */
 	public static final IRI URL;
 
@@ -65,11 +80,16 @@ public class CSVW {
 
 	static {
 		BASE = Vocabularies.createIRI(NAMESPACE, "base");
+		COLUMNS = Vocabularies.createIRI(NAMESPACE, "columns");
 		DATATYPE = Vocabularies.createIRI(NAMESPACE, "datatype");
 		DEFAULT = Vocabularies.createIRI(NAMESPACE, "default");
+		DIALECT = Vocabularies.createIRI(NAMESPACE, "dialect");
+		HEADER = Vocabularies.createIRI(NAMESPACE, "header");
 		LANG = Vocabularies.createIRI(NAMESPACE, "lang");
 		PROPERTY_URL = Vocabularies.createIRI(NAMESPACE, "propertyUrl");
 		TABLE_SCHEMA = Vocabularies.createIRI(NAMESPACE, "tableSchema");
+		TABLES = Vocabularies.createIRI(NAMESPACE, "tables");
+		TITLES = Vocabularies.createIRI(NAMESPACE, "titles");
 		URL = Vocabularies.createIRI(NAMESPACE, "url");
 		VALUE_URL = Vocabularies.createIRI(NAMESPACE, "valueUrl");
 	}
