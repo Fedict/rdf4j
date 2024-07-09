@@ -40,8 +40,8 @@ import org.eclipse.rdf4j.rio.RDFHandler;
 import org.eclipse.rdf4j.rio.RDFHandlerException;
 import org.eclipse.rdf4j.rio.RDFParseException;
 import org.eclipse.rdf4j.rio.Rio;
-import org.eclipse.rdf4j.rio.csvw.parsers.CellParserFactory;
 import org.eclipse.rdf4j.rio.csvw.parsers.CellParser;
+import org.eclipse.rdf4j.rio.csvw.parsers.CellParserFactory;
 import org.eclipse.rdf4j.rio.helpers.AbstractRDFParser;
 import org.slf4j.LoggerFactory;
 
@@ -214,6 +214,10 @@ public class CSVWParser extends AbstractRDFParser {
 
 		CellParser parser = CellParserFactory.create(datatype);
 
+		Optional<Value> format = getFormat(metadata, column);
+		if (format.isPresent()) {
+			parser.setFormat(format.get().stringValue());
+		}
 		Optional<Value> name = Models.getProperty(metadata, column, CSVW.NAME);
 		if (!name.isPresent()) {
 			throw new RDFParseException("Metadata file does not contain name for column " + column);
@@ -260,6 +264,25 @@ public class CSVWParser extends AbstractRDFParser {
 			return (IRI) datatype;
 		}
 		return XSD.valueOf(datatype.stringValue().toUpperCase()).getIri();
+	}
+
+	/**
+	 * Get IRI of base or derived datatype
+	 *
+	 * @param metadata
+	 * @param column
+	 * @return
+	 */
+	private Optional<Value> getFormat(Model metadata, Resource column) {
+		Optional<Value> val = Models.getProperty(metadata, column, CSVW.DATATYPE);
+		if (val.isPresent()) {
+			Value datatype = val.get();
+			// derived datatype
+			if (datatype.isBNode()) {
+				val = Models.getProperty(metadata, (Resource) datatype, CSVW.FORMAT);
+			}
+		}
+		return val;
 	}
 
 	/**
