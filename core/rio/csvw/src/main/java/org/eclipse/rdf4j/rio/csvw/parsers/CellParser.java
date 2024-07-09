@@ -10,40 +10,54 @@
  *******************************************************************************/
 package org.eclipse.rdf4j.rio.csvw.parsers;
 
+import java.util.Set;
+
+import org.eclipse.rdf4j.model.IRI;
+import org.eclipse.rdf4j.model.Namespace;
+import org.eclipse.rdf4j.model.Value;
+import org.eclipse.rdf4j.model.util.Literals;
+import org.eclipse.rdf4j.model.util.Values;
 import org.eclipse.rdf4j.rio.RDFParseException;
 
 /**
  *
- * @author Bart.Hanssens
+ * @author Bart Hanssens
  */
-public class CellParser<T> {
-	private T minValue;
-	private T maxValue;
-	private T defaultValue;
+public class CellParser {
+	private String name;
+	private IRI dataType;
+	private String defaultValue;
 	private boolean isRequired;
 	private String format;
-	private String propertyUrl;
+	private IRI propertyIRI;
 	private String valueUrl;
 	private String separator;
 
 	/**
-	 * @param minValue the minValue to set
+	 * @param name
 	 */
-	public void setMinValue(T minValue) {
-		this.minValue = minValue;
+	public void setName(String name) {
+		this.name = name;
 	}
 
 	/**
-	 * @param maxValue the maxValue to set
+	 * @return name
 	 */
-	public void setMaxValue(T maxValue) {
-		this.maxValue = maxValue;
+	public String getName() {
+		return name;
+	}
+
+	/**
+	 * @param dataType
+	 */
+	public void setDataType(IRI dataType) {
+		this.dataType = dataType;
 	}
 
 	/**
 	 * @param defaultValue the defaultValue to set
 	 */
-	public void setDefaultValue(T defaultValue) {
+	public void setDefaultValue(String defaultValue) {
 		this.defaultValue = defaultValue;
 	}
 
@@ -62,30 +76,42 @@ public class CellParser<T> {
 	}
 
 	/**
-	 * @return the propertyUrl
+	 * @return the propertyUrl as IRI
 	 */
-	public String getPropertyUrl() {
-		return propertyUrl;
+	public IRI getPropertyIRI() {
+		return propertyIRI;
 	}
 
 	/**
+	 * Set property URL (predicate IRI)
+	 *
+	 * @param namespaces  set of namespaces
 	 * @param propertyUrl the propertyUrl to set
 	 */
-	public void setPropertyUrl(String propertyUrl) {
-		this.propertyUrl = propertyUrl;
+	public void setPropertyURL(Set<Namespace> namespaces, String propertyUrl) {
+		this.propertyIRI = Values.iri(namespaces, propertyUrl);
+	}
+
+	/**
+	 * Set property URL (predicate IRI) relative to document
+	 *
+	 * @param propertyUrl the propertyUrl to set
+	 */
+	public void setPropertyURL(String propertyUrl) {
+		this.propertyIRI = Values.iri("", propertyUrl);
 	}
 
 	/**
 	 * @return the valueUrl
 	 */
-	public String getValueUrl() {
+	public String getValueURL() {
 		return valueUrl;
 	}
 
 	/**
 	 * @param valueUrl the valueUrl to set
 	 */
-	public void setValueUrl(String valueUrl) {
+	public void setValueURL(String valueUrl) {
 		this.valueUrl = valueUrl;
 	}
 
@@ -103,12 +129,22 @@ public class CellParser<T> {
 		this.separator = separator;
 	}
 
-	public T parse(Object cell) {
-		return (T) cell;
-	}
+	/**
+	 * Get the value from a cell
+	 *
+	 * @param cell
+	 * @return
+	 */
+	public Value parse(String cell) {
+		String s = cell;
+		if ((s == null || s.isEmpty()) && (defaultValue != null)) {
+			s = defaultValue;
+		}
+		if (valueUrl != null && s != null) {
+			return Values.iri(valueUrl.replace("{" + name + "}", s));
+		}
 
-	public void validate(T value) throws RDFParseException {
-
+		return Values.literal(s, dataType);
 	}
 
 }
