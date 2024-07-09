@@ -49,7 +49,7 @@ public class CellParserDate extends CellParser {
 			s = defaultValue;
 		}
 		if (formatter != null) {
-			s = DateTimeFormatter.BASIC_ISO_DATE.format(formatter.parse(s));
+			s = DateTimeFormatter.ISO_DATE.format(formatter.parse(s));
 		}
 		return Values.literal(s, dataType);
 	}
