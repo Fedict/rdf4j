@@ -10,31 +10,35 @@
  *******************************************************************************/
 package org.eclipse.rdf4j.rio.csvw.parsers;
 
+import java.util.Set;
+
 import org.eclipse.rdf4j.model.IRI;
-import org.eclipse.rdf4j.model.base.CoreDatatype.XSD;
+import org.eclipse.rdf4j.model.Namespace;
+import org.eclipse.rdf4j.model.Value;
+import org.eclipse.rdf4j.model.util.Values;
 
 /**
  *
  * @author Bart Hanssens
  */
-public class CellParserFactory {
-	/**
-	 * Create a new CellParser based on datatype
-	 *
-	 * @param datatype
-	 * @return
-	 */
-	public static CellParser create(IRI datatype) {
-		CellParser p;
+public class CellParserBoolean extends CellParser {
+	private String valueTrue;
+	private String valueFalse;
 
-		if (datatype.equals(XSD.DATE.getIri())) {
-			p = new CellParserDate();
-		} else if (datatype.equals(XSD.BOOLEAN.getIri())) {
-			p = new CellParserBoolean();
-		} else {
-			p = new CellParser();
-		}
-		p.setDataType(datatype);
-		return p;
+	@Override
+	public void setFormat(String format) {
+		String[] values = format.split("\\|");
+		valueTrue = values[0];
+		valueFalse = values[1];
 	}
+
+	@Override
+	public Value parse(String cell) {
+		String s = cell;
+		if ((s == null || s.isEmpty()) && (defaultValue != null)) {
+			s = defaultValue;
+		}
+		return Values.literal(valueTrue.equals(s) ? "true" : "false", dataType);
+	}
+
 }

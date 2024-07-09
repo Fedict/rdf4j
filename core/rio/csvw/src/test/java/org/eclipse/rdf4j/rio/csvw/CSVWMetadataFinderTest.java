@@ -30,8 +30,6 @@ import org.mockserver.junit.jupiter.MockServerExtension;
  */
 @ExtendWith(MockServerExtension.class)
 public class CSVWMetadataFinderTest extends AbstractTest {
-	private MockServerClient client;
-
 	@BeforeEach
 	public void init(MockServerClient client) throws IOException {
 		this.client = client;
