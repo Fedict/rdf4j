@@ -10,11 +10,6 @@
  *******************************************************************************/
 package org.eclipse.rdf4j.rio.csvw;
 
-import com.opencsv.CSVParser;
-import com.opencsv.CSVParserBuilder;
-import com.opencsv.CSVReader;
-import com.opencsv.CSVReaderBuilder;
-import com.opencsv.exceptions.CsvValidationException;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -38,6 +33,7 @@ import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.base.CoreDatatype.XSD;
+import org.eclipse.rdf4j.model.impl.SimpleNamespace;
 import org.eclipse.rdf4j.model.util.Models;
 import org.eclipse.rdf4j.model.util.RDFCollections;
 import org.eclipse.rdf4j.model.util.Statements;
@@ -51,6 +47,13 @@ import org.eclipse.rdf4j.rio.RDFParseException;
 import org.eclipse.rdf4j.rio.Rio;
 import org.eclipse.rdf4j.rio.csvw.parsers.Parser;
 import org.eclipse.rdf4j.rio.helpers.AbstractRDFParser;
+import org.slf4j.LoggerFactory;
+
+import com.opencsv.CSVParser;
+import com.opencsv.CSVParserBuilder;
+import com.opencsv.CSVReader;
+import com.opencsv.CSVReaderBuilder;
+import com.opencsv.exceptions.CsvValidationException;
 
 /**
  * Basic (experimental) CSV on the Web Parser
@@ -61,6 +64,7 @@ import org.eclipse.rdf4j.rio.helpers.AbstractRDFParser;
  * @since 5.1.0
  */
 public class CSVWParser extends AbstractRDFParser {
+	private static final org.slf4j.Logger LOGGER = LoggerFactory.getLogger(CSVWParser.class);
 
 	@Override
 	public RDFFormat getRDFFormat() {
@@ -86,17 +90,15 @@ public class CSVWParser extends AbstractRDFParser {
 			if (csvFile == null) {
 				throw new RDFParseException("Could not find URL");
 			}
+			metadata.getNamespaces().add(new SimpleNamespace("", csvFile.toString() + "#"));
 			Resource tableSchema = getTableSchema(metadata, (Resource) table);
 			List<Value> columns = getColumns(metadata, tableSchema);
 			Parser[] cellParsers = columns.stream()
-										.map(c -> getCellParser(metadata, (Resource) c))
-										.collect(Collectors.toList())
-										.toArray(new Parser[columns.size()]);
-			
-			String aboutURL = getAboutURL(metadata, (Resource) table);
-			int aboutIndex = getAboutIndex(aboutURL, cellParsers);
-			
-			parseCSV(rdfHandler, csvFile, cellParsers, aboutURL, aboutIndex);
+					.map(c -> getCellParser(metadata, (Resource) c))
+					.collect(Collectors.toList())
+					.toArray(new Parser[columns.size()]);
+
+			parseCSV(metadata, rdfHandler, csvFile, cellParsers, (Resource) table);
 		}
 		clear();
 	}
@@ -133,7 +135,7 @@ public class CSVWParser extends AbstractRDFParser {
 	}
 
 	/**
-	 * Get the subject of the table(s)
+	 * Get (the blank nodes of) the table(s)
 	 *
 	 * @param metadata
 	 * @return
@@ -152,49 +154,52 @@ public class CSVWParser extends AbstractRDFParser {
 	}
 
 	/**
-	 * Get URL of the CSV file
-	 * 
+	 * Get the location of the CSV file
+	 *
 	 * @param metadata
 	 * @param subject
 	 * @param baseURI
 	 */
-	private URI getURL(Model metadata, Resource subject, String baseURI) {
-		Optional<String> val = Models.getPropertyString(metadata, subject, CSVW.URL);
+	private URI getURL(Model metadata, Resource table, String baseURI) {
+		Optional<String> val = Models.getPropertyString(metadata, table, CSVW.URL);
 		if (val.isPresent()) {
 			String s = val.get();
 			if (s.startsWith("http")) {
 				return URI.create(s);
 			}
-			return URI.create(baseURI).resolve(s);
+			if (baseURI != null) {
+				return URI.create(baseURI).resolve(s);
+			}
+			return URI.create(s);
 		}
 		return null;
 	}
 
 	/**
-	 * Get tableschema for a given table
+	 * Get the (blank node of the) tableschema for a given table
 	 *
 	 * @param metadata
-	 * @param subject
+	 * @param table
 	 * @return
 	 * @throws RDFParseException
 	 */
-	private Resource getTableSchema(Model metadata, Resource subject) throws RDFParseException {
-		return Models.getPropertyResource(metadata, subject, CSVW.TABLE_SCHEMA)
-				.orElseThrow(() -> new RDFParseException("Metadata file does not contain tableSchema for " + subject));
+	private Resource getTableSchema(Model metadata, Resource table) throws RDFParseException {
+		return Models.getPropertyResource(metadata, table, CSVW.TABLE_SCHEMA)
+				.orElseThrow(() -> new RDFParseException("Metadata file does not contain tableSchema for " + table));
 	}
 
 	/**
-	 * Get columns for a given tableschema
+	 * Get the (blank nodes of the) columns for a given tableschema
 	 *
 	 * @param metadata
-	 * @param subject
-	 * @return
+	 * @param tableSchema
+	 * @return list of blank nodes
 	 * @throws RDFParseException
 	 */
-	private List<Value> getColumns(Model metadata, Resource subject) throws RDFParseException {
-		Optional<Resource> head = Models.getPropertyResource(metadata, subject, CSVW.COLUMN);
+	private List<Value> getColumns(Model metadata, Resource tableSchema) throws RDFParseException {
+		Optional<Resource> head = Models.getPropertyResource(metadata, tableSchema, CSVW.COLUMN);
 		if (!head.isPresent()) {
-			throw new RDFParseException("Metadata file does not contain columns for " + subject);
+			throw new RDFParseException("Metadata file does not contain columns for " + tableSchema);
 		}
 		return RDFCollections.asValues(metadata, head.get(), new ArrayList<>());
 	}
@@ -205,31 +210,31 @@ public class CSVWParser extends AbstractRDFParser {
 	 * @param table
 	 * @return
 	 */
-	private Parser getCellParser(Model metadata, Resource subject) {
+	private Parser getCellParser(Model metadata, Resource column) {
 		Parser parser = new Parser();
 
-		Optional<Value> name = Models.getProperty(metadata, subject, CSVW.NAME);
+		Optional<Value> name = Models.getProperty(metadata, column, CSVW.NAME);
 		if (!name.isPresent()) {
-			throw new RDFParseException("Metadata file does not contain name for column " + subject);
+			throw new RDFParseException("Metadata file does not contain name for column " + column);
 		}
 		parser.setName(name.get().stringValue());
 
-		Optional<Value> defaultVal = Models.getProperty(metadata, subject, CSVW.DEFAULT);
+		Optional<Value> defaultVal = Models.getProperty(metadata, column, CSVW.DEFAULT);
 		if (defaultVal.isPresent()) {
 			parser.setDefaultValue(defaultVal.get().stringValue());
 		}
 
-		Optional<Value> dataType = Models.getProperty(metadata, subject, CSVW.DATATYPE);
-		parser.setDataType((IRI) dataType.orElse(XSD.STRING.getIri()));
+		// Optional<Value> dataType = Models.getProperty(metadata, column, CSVW.DATATYPE);
+		// parser.setDataType((IRI) dataType.orElse(XSD.STRING.getIri()));
 
-		Optional<Value> propertyURL = Models.getProperty(metadata, subject, CSVW.PROPERTY_URL);
+		Optional<Value> propertyURL = Models.getProperty(metadata, column, CSVW.PROPERTY_URL);
 		if (propertyURL.isPresent()) {
-			parser.setPropertyURL(propertyURL.get().toString());
+			parser.setPropertyURL(metadata.getNamespaces(), propertyURL.get().stringValue());
 		}
-		
-		Optional<Value> valueURL = Models.getProperty(metadata, subject, CSVW.VALUE_URL);
+
+		Optional<Value> valueURL = Models.getProperty(metadata, column, CSVW.VALUE_URL);
 		if (valueURL.isPresent()) {
-			parser.setValueURL(valueURL.get().toString());
+			parser.setValueURL(valueURL.get().stringValue());
 		}
 		return parser;
 	}
@@ -240,7 +245,7 @@ public class CSVWParser extends AbstractRDFParser {
 
 	/**
 	 * Get "about" URL template, to be used to create the subject of the triples
-	 * 
+	 *
 	 * @param metadata
 	 * @param subject
 	 * @return aboutURL or null
@@ -251,7 +256,7 @@ public class CSVWParser extends AbstractRDFParser {
 
 	/**
 	 * Get the index of the column name used to replace the placeholder value in the aboutURL
-	 * 
+	 *
 	 * @param aboutURL
 	 * @param cellParsers
 	 * @return 0-based index or -1
@@ -262,7 +267,7 @@ public class CSVWParser extends AbstractRDFParser {
 		}
 
 		String s;
-		for(int i=0; i < cellParsers.length; i++) {
+		for (int i = 0; i < cellParsers.length; i++) {
 			s = cellParsers[i].getName();
 			if (s != null && aboutURL.contains("{" + s + "}")) {
 				return i;
@@ -273,59 +278,59 @@ public class CSVWParser extends AbstractRDFParser {
 
 	/**
 	 * Parse a CSV file
-	 * 
-	 * @param csvFile URI of CSV file
+	 *
+	 * @param csvFile     URI of CSV file
 	 * @param cellParsers cell parsers
 	 * @param aboutURL
 	 * @param aboutIndex
 	 */
-	private void parseCSV(RDFHandler handler, URI csvFile, Parser[] cellParsers, String aboutURL, int aboutIndex) {
-		String placeholder = null;
-		if (aboutIndex > -1) {
-			placeholder = cellParsers[aboutIndex].getName();
-		}
-		CSVParser parser = new CSVParserBuilder().build();
+	private void parseCSV(Model metadata, RDFHandler handler, URI csvFile, Parser[] cellParsers, Resource table) {
+		String aboutURL = getAboutURL(metadata, table);
 
-		try(InputStream is = csvFile.toURL().openStream();
-			BufferedReader buf = new BufferedReader(new InputStreamReader(is));
-			CSVReader csv = new CSVReaderBuilder(buf).withSkipLines(1).withCSVParser(parser).build()) {
-			
+		// check for placeholder / column name that's being used to create subject IRI
+		int aboutIndex = getAboutIndex(aboutURL, cellParsers);
+		String placeholder = (aboutIndex > -1) ? cellParsers[aboutIndex].getName() : null;
+
+		LOGGER.info("Parsing {}", csvFile);
+		long line = 0;
+		try (InputStream is = csvFile.toURL().openStream();
+				BufferedReader reader = new BufferedReader(new InputStreamReader(is));
+				CSVReader csv = getCSVReader(metadata, reader)) {
+
 			String[] cells;
 			while ((cells = csv.readNext()) != null) {
-			
-				/* would it make much difference if processed in parallel ?
-				final String[] c = cells;
-				IntStream.range(0, cells.length)
-						.parallel()
-						.forEach(i -> cellParsers[i].parse(c[i]));
-				*/
 				Resource subject = getIRIorBnode(cellParsers, cells, aboutURL, aboutIndex, placeholder);
 				Value val;
 				Statement stmt;
-				for(int i = 0; i < cells.length; i++) {
-					if (i == aboutIndex) {
-						// already processed
+				for (int i = 0; i < cells.length; i++) {
+					if (i == aboutIndex) { // already processed to get subject
 						continue;
 					}
+					IRI predicate = cellParsers[i].getPropertyIRI();
 					val = cellParsers[i].parse(cells[i]);
-					cellParsers[i].getPropertyURL();
-					stmt = Statements.statement(subject, predicate, val, subject);
-					handler.handleStatement(stmt);
-				}	
+					handler.handleStatement(Statements.statement(subject, predicate, val, null));
+				}
+				line++;
 			}
-		} catch (IOException| CsvValidationException ex) {
-			throw new RDFParseException("Error parsing " + csvFile, ex);
+		} catch (IOException | CsvValidationException ex) {
+			throw new RDFParseException("Error parsing " + csvFile, ex, line, -1);
 		}
+	}
+
+	private CSVReader getCSVReader(Model metadata, Reader reader) {
+		CSVParser parser = new CSVParserBuilder().build();
+		return new CSVReaderBuilder(reader).withSkipLines(1).withCSVParser(parser).build();
 	}
 
 	/**
 	 * Get subject IRI or blank node
-	 * 
+	 *
 	 * @param cellParsers
 	 * @param aboutURL
-	 * @param aboutIndex 
+	 * @param aboutIndex
 	 */
-	private	Resource getIRIorBnode(Parser[] cellParsers, String[] cells, String aboutURL, int aboutIndex, String placeholder) {
+	private Resource getIRIorBnode(Parser[] cellParsers, String[] cells, String aboutURL, int aboutIndex,
+			String placeholder) {
 		if (aboutIndex > -1) {
 			Value val = cellParsers[aboutIndex].parse(cells[aboutIndex]);
 			if (val != null) {

@@ -8,16 +8,20 @@
  *
  * SPDX-License-Identifier: BSD-3-Clause
  *******************************************************************************/
-
 package org.eclipse.rdf4j.rio.csvw;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockserver.model.HttpRequest.request;
 import static org.mockserver.model.HttpResponse.response;
 
+import java.io.FileInputStream;
 import java.io.IOException;
-import java.net.URI;
 
+import org.eclipse.rdf4j.model.Model;
+import org.eclipse.rdf4j.model.impl.LinkedHashModel;
+import org.eclipse.rdf4j.rio.RDFFormat;
+import org.eclipse.rdf4j.rio.Rio;
+import org.eclipse.rdf4j.rio.helpers.BasicWriterSettings;
+import org.eclipse.rdf4j.rio.helpers.StatementCollector;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -29,8 +33,16 @@ import org.mockserver.junit.jupiter.MockServerExtension;
  * @author Bart.Hanssens
  */
 @ExtendWith(MockServerExtension.class)
-public class CSVWMetadataFinderTest extends AbstractTest {
-	private MockServerClient client;
+public abstract class AbstractTest {
+	protected MockServerClient client;
+
+	protected String getFile(String file) throws IOException {
+		return new String(CSVWMetadataFinderTest.class.getResourceAsStream("/" + file).readAllBytes());
+	}
+
+	protected String getBase() {
+		return "http://localhost:" + client.getPort() + "/";
+	}
 
 	@BeforeEach
 	public void init(MockServerClient client) throws IOException {
@@ -44,14 +56,5 @@ public class CSVWMetadataFinderTest extends AbstractTest {
 		client.when(
 				request().withMethod("GET").withPath("/downloads/painters.csvm"))
 				.respond(response().withBody(getFile("painters-metadata.json")));
-	}
-
-	@Test
-	public void testWellKnownLocation() throws IOException {
-		URI uri = URI.create(getBase() + "downloads/painters.csv");
-
-		String expected = getFile("painters-metadata.json");
-		String got = new String(CSVWMetadataFinder.findByWellKnown(uri).readAllBytes());
-		assertEquals(expected, got);
 	}
 }
