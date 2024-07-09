@@ -17,15 +17,10 @@ import java.io.InputStreamReader;
 import java.io.Reader;
 import java.net.URI;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
-import java.util.stream.Stream;
 
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Model;
@@ -45,7 +40,8 @@ import org.eclipse.rdf4j.rio.RDFHandler;
 import org.eclipse.rdf4j.rio.RDFHandlerException;
 import org.eclipse.rdf4j.rio.RDFParseException;
 import org.eclipse.rdf4j.rio.Rio;
-import org.eclipse.rdf4j.rio.csvw.parsers.Parser;
+import org.eclipse.rdf4j.rio.csvw.parsers.CellParserFactory;
+import org.eclipse.rdf4j.rio.csvw.parsers.CellParser;
 import org.eclipse.rdf4j.rio.helpers.AbstractRDFParser;
 import org.slf4j.LoggerFactory;
 
@@ -90,13 +86,15 @@ public class CSVWParser extends AbstractRDFParser {
 			if (csvFile == null) {
 				throw new RDFParseException("Could not find URL");
 			}
-			metadata.getNamespaces().add(new SimpleNamespace("", csvFile.toString() + "#"));
+			// add dummy namespace for resolving unspecified column names / predicates relative to CSV file
+			metadata.getNamespaces().add(new SimpleNamespace("_local", csvFile.toString() + "#"));
+
 			Resource tableSchema = getTableSchema(metadata, (Resource) table);
 			List<Value> columns = getColumns(metadata, tableSchema);
-			Parser[] cellParsers = columns.stream()
+			CellParser[] cellParsers = columns.stream()
 					.map(c -> getCellParser(metadata, (Resource) c))
 					.collect(Collectors.toList())
-					.toArray(new Parser[columns.size()]);
+					.toArray(new CellParser[columns.size()]);
 
 			parseCSV(metadata, rdfHandler, csvFile, cellParsers, (Resource) table);
 		}
@@ -205,13 +203,16 @@ public class CSVWParser extends AbstractRDFParser {
 	}
 
 	/**
+	 * Get parser for specific column
 	 *
 	 * @param metadata
-	 * @param table
+	 * @param column
 	 * @return
 	 */
-	private Parser getCellParser(Model metadata, Resource column) {
-		Parser parser = new Parser();
+	private CellParser getCellParser(Model metadata, Resource column) {
+		IRI datatype = getDatatypeIRI(metadata, column);
+
+		CellParser parser = CellParserFactory.create(datatype);
 
 		Optional<Value> name = Models.getProperty(metadata, column, CSVW.NAME);
 		if (!name.isPresent()) {
@@ -224,13 +225,9 @@ public class CSVWParser extends AbstractRDFParser {
 			parser.setDefaultValue(defaultVal.get().stringValue());
 		}
 
-		// Optional<Value> dataType = Models.getProperty(metadata, column, CSVW.DATATYPE);
-		// parser.setDataType((IRI) dataType.orElse(XSD.STRING.getIri()));
-
 		Optional<Value> propertyURL = Models.getProperty(metadata, column, CSVW.PROPERTY_URL);
-		if (propertyURL.isPresent()) {
-			parser.setPropertyURL(metadata.getNamespaces(), propertyURL.get().stringValue());
-		}
+		String s = propertyURL.isPresent() ? propertyURL.get().stringValue() : "_local:" + parser.getName();
+		parser.setPropertyURL(metadata.getNamespaces(), s);
 
 		Optional<Value> valueURL = Models.getProperty(metadata, column, CSVW.VALUE_URL);
 		if (valueURL.isPresent()) {
@@ -239,8 +236,30 @@ public class CSVWParser extends AbstractRDFParser {
 		return parser;
 	}
 
-	private IRI getDataType(Model metadata, Value col) {
-		return XSD.STRING.getIri();
+	/**
+	 * Get IRI of base or derived datatype
+	 *
+	 * @param metadata
+	 * @param column
+	 * @return
+	 */
+	private IRI getDatatypeIRI(Model metadata, Resource column) {
+		Optional<Value> val = Models.getProperty(metadata, column, CSVW.DATATYPE);
+		if (val.isPresent()) {
+			Value datatype = val.get();
+			// derived datatype
+			if (datatype.isBNode()) {
+				val = Models.getProperty(metadata, (Resource) datatype, CSVW.BASE);
+			}
+		}
+		if (!val.isPresent()) {
+			return XSD.STRING.getIri();
+		}
+		Value datatype = val.get();
+		if (datatype.isIRI()) {
+			return (IRI) datatype;
+		}
+		return XSD.valueOf(datatype.stringValue().toUpperCase()).getIri();
 	}
 
 	/**
@@ -261,7 +280,7 @@ public class CSVWParser extends AbstractRDFParser {
 	 * @param cellParsers
 	 * @return 0-based index or -1
 	 */
-	private int getAboutIndex(String aboutURL, Parser[] cellParsers) {
+	private int getAboutIndex(String aboutURL, CellParser[] cellParsers) {
 		if (aboutURL == null || aboutURL.isEmpty()) {
 			return -1;
 		}
@@ -284,7 +303,7 @@ public class CSVWParser extends AbstractRDFParser {
 	 * @param aboutURL
 	 * @param aboutIndex
 	 */
-	private void parseCSV(Model metadata, RDFHandler handler, URI csvFile, Parser[] cellParsers, Resource table) {
+	private void parseCSV(Model metadata, RDFHandler handler, URI csvFile, CellParser[] cellParsers, Resource table) {
 		String aboutURL = getAboutURL(metadata, table);
 
 		// check for placeholder / column name that's being used to create subject IRI
@@ -317,6 +336,13 @@ public class CSVWParser extends AbstractRDFParser {
 		}
 	}
 
+	/**
+	 * Get configured CSV file reader
+	 *
+	 * @param metadata
+	 * @param reader
+	 * @return
+	 */
 	private CSVReader getCSVReader(Model metadata, Reader reader) {
 		CSVParser parser = new CSVParserBuilder().build();
 		return new CSVReaderBuilder(reader).withSkipLines(1).withCSVParser(parser).build();
@@ -329,7 +355,7 @@ public class CSVWParser extends AbstractRDFParser {
 	 * @param aboutURL
 	 * @param aboutIndex
 	 */
-	private Resource getIRIorBnode(Parser[] cellParsers, String[] cells, String aboutURL, int aboutIndex,
+	private Resource getIRIorBnode(CellParser[] cellParsers, String[] cells, String aboutURL, int aboutIndex,
 			String placeholder) {
 		if (aboutIndex > -1) {
 			Value val = cellParsers[aboutIndex].parse(cells[aboutIndex]);
