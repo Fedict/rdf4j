@@ -10,6 +10,7 @@
  *******************************************************************************/
 package org.eclipse.rdf4j.rio.csvw.parsers;
 
+import java.time.format.DateTimeFormatter;
 import java.util.Set;
 
 import org.eclipse.rdf4j.model.IRI;
@@ -25,12 +26,12 @@ import org.eclipse.rdf4j.rio.RDFParseException;
  */
 public class CellParser {
 	private String name;
-	private IRI dataType;
-	private String defaultValue;
+	protected IRI dataType;
+	protected String defaultValue;
 	private boolean isRequired;
-	private String format;
 	private IRI propertyIRI;
 	private String valueUrl;
+	private String format;
 	private String separator;
 
 	/**
@@ -66,13 +67,6 @@ public class CellParser {
 	 */
 	public void setIsRequired(boolean isRequired) {
 		this.isRequired = isRequired;
-	}
-
-	/**
-	 * @param format the format to set
-	 */
-	public void setFormat(String format) {
-		this.format = format;
 	}
 
 	/**
@@ -130,6 +124,13 @@ public class CellParser {
 	}
 
 	/**
+	 * @param format
+	 */
+	public void setFormat(String format) {
+		this.format = format;
+	}
+
+	/**
 	 * Get the value from a cell
 	 *
 	 * @param cell
@@ -143,7 +144,8 @@ public class CellParser {
 		if (valueUrl != null && s != null) {
 			return Values.iri(valueUrl.replace("{" + name + "}", s));
 		}
-
+		System.err.println(s);
+		System.err.println(dataType);
 		return Values.literal(s, dataType);
 	}
 

@@ -57,6 +57,9 @@ public class CSVW {
 	/** csvw:dialect */
 	public static final IRI DIALECT;
 
+	/** csvw:format */
+	public static final IRI FORMAT;
+
 	/** csvw:header */
 	public static final IRI HEADER;
 
@@ -94,6 +97,7 @@ public class CSVW {
 		DATATYPE = Vocabularies.createIRI(NAMESPACE, "datatype");
 		DEFAULT = Vocabularies.createIRI(NAMESPACE, "default");
 		DIALECT = Vocabularies.createIRI(NAMESPACE, "dialect");
+		FORMAT = Vocabularies.createIRI(NAMESPACE, "format");
 		HEADER = Vocabularies.createIRI(NAMESPACE, "header");
 		LANG = Vocabularies.createIRI(NAMESPACE, "lang");
 		NAME = Vocabularies.createIRI(NAMESPACE, "name");
