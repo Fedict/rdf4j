@@ -10,7 +10,10 @@
  *******************************************************************************/
 package org.eclipse.rdf4j.rio.csvw.parsers;
 
+import java.util.Set;
+
 import org.eclipse.rdf4j.model.IRI;
+import org.eclipse.rdf4j.model.Namespace;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.util.Literals;
 import org.eclipse.rdf4j.model.util.Values;
@@ -26,7 +29,7 @@ public class Parser {
 	private String defaultValue;
 	private boolean isRequired;
 	private String format;
-	private String propertyUrl;
+	private IRI propertyIRI;
 	private String valueUrl;
 	private String separator;
 
@@ -73,17 +76,18 @@ public class Parser {
 	}
 
 	/**
-	 * @return the propertyUrl
+	 * @return the propertyUrl as IRI
 	 */
-	public String getPropertyURL() {
-		return propertyUrl;
+	public IRI getPropertyIRI() {
+		return propertyIRI;
 	}
 
 	/**
+	 * @param namespaces  set of namespaces
 	 * @param propertyUrl the propertyUrl to set
 	 */
-	public void setPropertyURL(String propertyUrl) {
-		this.propertyUrl = propertyUrl;
+	public void setPropertyURL(Set<Namespace> namespaces, String propertyUrl) {
+		this.propertyIRI = Values.iri(namespaces, propertyUrl);
 	}
 
 	/**

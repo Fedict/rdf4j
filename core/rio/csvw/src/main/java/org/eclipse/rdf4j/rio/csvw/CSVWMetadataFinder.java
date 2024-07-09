@@ -27,6 +27,7 @@ import org.slf4j.LoggerFactory;
  */
 public class CSVWMetadataFinder {
 	private static final Logger LOGGER = LoggerFactory.getLogger(CSVWMetadataFinder.class);
+
 	private static final String WELL_KNOWN = "/.well-known/csvm";
 	private static final String METADATA_JSON = "-metadata.json";
 	private static final String CSV = ".csv";
