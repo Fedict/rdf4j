@@ -11,6 +11,7 @@
 package org.eclipse.rdf4j.rio.csvw.parsers;
 
 import org.eclipse.rdf4j.model.IRI;
+import org.eclipse.rdf4j.model.base.CoreDatatype.XSD;
 
 /**
  *
@@ -19,11 +20,18 @@ import org.eclipse.rdf4j.model.IRI;
 public class CellParserFactory {
 	/**
 	 * Create a new CellParser based on datatype
+	 *
 	 * @param datatype
-	 * @return 
+	 * @return
 	 */
 	public static CellParser create(IRI datatype) {
-		CellParser p = new CellParser();
+		CellParser p;
+
+		if (datatype.equals(XSD.DATE.getIri())) {
+			p = new CellParserDate();
+		} else {
+			p = new CellParser();
+		}
 		p.setDataType(datatype);
 		return p;
 	}
