@@ -22,7 +22,10 @@
            "format": "d/M/yyyy"
         } },
       { "name": "maried",
-        "datatype": "boolean" },
+        "datatype": {
+            "base": "boolean",
+            "format": "Yes|No"
+        } },
       { "name": "languages",
         "separator": " " }
     ],

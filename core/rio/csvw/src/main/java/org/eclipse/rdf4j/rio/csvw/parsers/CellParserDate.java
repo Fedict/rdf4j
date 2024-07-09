@@ -37,12 +37,7 @@ public class CellParserDate extends CellParser {
 		formatter = DateTimeFormatter.ofPattern(format);
 	}
 
-	/**
-	 * Get the value from a cell
-	 *
-	 * @param cell
-	 * @return
-	 */
+	@Override
 	public Value parse(String cell) {
 		String s = cell;
 		if ((s == null || s.isEmpty()) && (defaultValue != null)) {
