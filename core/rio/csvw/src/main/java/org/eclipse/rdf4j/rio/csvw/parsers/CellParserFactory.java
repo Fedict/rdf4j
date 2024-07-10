@@ -27,12 +27,21 @@ public class CellParserFactory {
 	public static CellParser create(IRI datatype) {
 		CellParser p;
 
-		if (datatype.equals(XSD.DATE.getIri())) {
-			p = new CellParserDate();
-		} else if (datatype.equals(XSD.BOOLEAN.getIri())) {
-			p = new CellParserBoolean();
-		} else {
+		XSD xsdType = XSD.valueOf(datatype.toString());
+		if (xsdType == null) {
 			p = new CellParser();
+		} else {
+			switch(xsdType) {
+				case DATE: 
+				case DATETIME:
+					p = new CellParserDate();
+					break;
+				case BOOLEAN:
+					p = new CellParserBoolean();
+					break;
+				default:
+					p = new CellParser();
+			}
 		}
 		p.setDataType(datatype);
 		return p;

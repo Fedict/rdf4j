@@ -214,29 +214,22 @@ public class CSVWParser extends AbstractRDFParser {
 
 		CellParser parser = CellParserFactory.create(datatype);
 
-		Optional<Value> format = getFormat(metadata, column);
-		if (format.isPresent()) {
-			parser.setFormat(format.get().stringValue());
-		}
-		Optional<Value> name = Models.getProperty(metadata, column, CSVW.NAME);
-		if (!name.isPresent()) {
-			throw new RDFParseException("Metadata file does not contain name for column " + column);
-		}
-		parser.setName(name.get().stringValue());
+		getFormat(metadata, column).ifPresent(v -> parser.setFormat(v.stringValue()));
 
-		Optional<Value> defaultVal = Models.getProperty(metadata, column, CSVW.DEFAULT);
-		if (defaultVal.isPresent()) {
-			parser.setDefaultValue(defaultVal.get().stringValue());
-		}
+		Models.getProperty(metadata, column, CSVW.NAME)
+			.ifPresentOrElse(v -> parser.setName(v.stringValue()), 
+							() -> new RDFParseException("Metadata file does not contain name for column " + column));
+		
+		Models.getProperty(metadata, column, CSVW.DEFAULT).ifPresent(v -> parser.setDefaultValue(v.stringValue()));
+		Models.getProperty(metadata, column, CSVW.REQUIRED)
+				.ifPresent(v -> parser.setIsRequired(Boolean.parseBoolean(v.stringValue())));
+		Models.getProperty(metadata, column, CSVW.VALUE_URL).ifPresent(v -> parser.setValueURL(v.stringValue()));
 
+		// use a property from a vocabulary as predicate, or create a property relative to the namespace of the CSV
 		Optional<Value> propertyURL = Models.getProperty(metadata, column, CSVW.PROPERTY_URL);
 		String s = propertyURL.isPresent() ? propertyURL.get().stringValue() : "_local:" + parser.getName();
 		parser.setPropertyURL(metadata.getNamespaces(), s);
 
-		Optional<Value> valueURL = Models.getProperty(metadata, column, CSVW.VALUE_URL);
-		if (valueURL.isPresent()) {
-			parser.setValueURL(valueURL.get().stringValue());
-		}
 		return parser;
 	}
 
