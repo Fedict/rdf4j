@@ -28,6 +28,7 @@ public class CellParserDate extends CellParser {
 	@Override
 	public void setFormat(String format) {
 		super.setFormat(format);
+		System.err.println(format);
 		formatter = DateTimeFormatter.ofPattern(format);
 	}
 
