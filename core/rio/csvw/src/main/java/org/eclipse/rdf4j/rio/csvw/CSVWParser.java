@@ -234,7 +234,7 @@ public class CSVWParser extends AbstractRDFParser {
 		Models.getPropertyString(metadata, column, CSVW.GROUP_CHAR).ifPresent(v -> parser.setGroupChar(v));
 
 		// mostly for date formats
-		Models.getPropertyString(metadata, column, CSVW.FORMAT).ifPresent(v -> parser.setFormat(v));
+		getFormat(metadata, column).ifPresent(v -> parser.setFormat(v));
 
 		Models.getPropertyString(metadata, column, CSVW.VALUE_URL).ifPresent(v -> parser.setValueURL(v));
 
@@ -270,6 +270,24 @@ public class CSVWParser extends AbstractRDFParser {
 			return (IRI) datatype;
 		}
 		return XSD.valueOf(datatype.stringValue().toUpperCase()).getIri();
+	}
+
+	/**
+	 * Get format string
+	 *
+	 * @param metadata
+	 * @param column
+	 * @return
+	 */
+	private Optional<String> getFormat(Model metadata, Resource column) {
+		Optional<Value> val = Models.getProperty(metadata, column, CSVW.DATATYPE);
+		if (val.isPresent() && val.get().isBNode()) {
+			val = Models.getProperty(metadata, (Resource) val.get(), CSVW.FORMAT);
+			if (val.isPresent() && val.get().isLiteral()) {
+				return Optional.of(val.get().stringValue());
+			}
+		}
+		return Optional.empty();
 	}
 
 	/**
@@ -359,18 +377,20 @@ public class CSVWParser extends AbstractRDFParser {
 	private CSVReader getCSVReader(Model metadata, Resource table, Reader reader) {
 		CSVParserBuilder parserBuilder = new CSVParserBuilder();
 		CSVReaderBuilder builder = new CSVReaderBuilder(reader);
+		builder.withSkipLines(1);
 
-		Optional<Value> dialect = Models.getProperty(metadata, table, CSVW.DIALECT);
-		if (dialect.isPresent()) {
-			Models.getPropertyString(metadata, (Resource) dialect.get(), CSVW.DELIMITER)
+		Optional<Value> val = Models.getProperty(metadata, table, CSVW.DIALECT);
+		if (val.isPresent()) {
+			Resource dialect = (Resource) val.get();
+			Models.getPropertyString(metadata, dialect, CSVW.DELIMITER)
 					.ifPresent(v -> parserBuilder.withSeparator(v.charAt(0)));
-			Models.getPropertyString(metadata, (Resource) dialect.get(), CSVW.HEADER)
+			Models.getPropertyString(metadata, dialect, CSVW.HEADER)
 					.ifPresent(v -> builder.withSkipLines(v.equalsIgnoreCase("false") ? 0 : 1));
-			Models.getPropertyString(metadata, (Resource) dialect.get(), CSVW.QUOTE_CHAR)
+			Models.getPropertyString(metadata, dialect, CSVW.QUOTE_CHAR)
 					.ifPresent(v -> parserBuilder.withQuoteChar(v.charAt(0)));
 		}
 
-		return new CSVReaderBuilder(reader).withCSVParser(parserBuilder.build()).build();
+		return builder.withCSVParser(parserBuilder.build()).build();
 	}
 
 	/**
