@@ -10,22 +10,15 @@
  *******************************************************************************/
 package org.eclipse.rdf4j.rio.csvw;
 
-import static org.mockserver.model.HttpRequest.request;
-import static org.mockserver.model.HttpResponse.response;
-
 import java.io.FileInputStream;
 import java.io.IOException;
 
 import org.eclipse.rdf4j.model.Model;
 import org.eclipse.rdf4j.model.impl.LinkedHashModel;
-import org.eclipse.rdf4j.rio.RDFFormat;
-import org.eclipse.rdf4j.rio.Rio;
 import org.eclipse.rdf4j.rio.helpers.BasicWriterSettings;
 import org.eclipse.rdf4j.rio.helpers.StatementCollector;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockserver.client.MockServerClient;
 import org.mockserver.junit.jupiter.MockServerExtension;
 
 /**
@@ -43,6 +36,8 @@ public class CSVWParserTest extends AbstractTest {
 		parser.getParserConfig().set(BasicWriterSettings.BASE_DIRECTIVE, true);
 		parser.parse(new FileInputStream("src/test/resources/painters-metadata.json"), getBase() + "/downloads/");
 
-		System.err.println(model);
+		model.forEach(s -> {
+			System.err.println(s);
+		});
 	}
 }

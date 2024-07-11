@@ -21,22 +21,23 @@ import org.eclipse.rdf4j.model.util.Values;
  *
  * @author Bart Hanssens
  */
-public class CellParserBoolean extends CellParser {
-	private String valueTrue;
-	private String valueFalse;
-
-	@Override
-	public void setFormat(String format) {
-		String[] values = format.split("\\|");
-		valueTrue = values[0];
-		valueFalse = values[1];
-	}
-
+public class CellParserString extends CellParser {
 	@Override
 	public Value parse(String cell) {
-		String s = getValueOrDefault(cell);
-	
-		return Values.literal(valueTrue.equals(s) ? "true" : "false", dataType);
+		String s = cell;
+		if ((s == null || s.isEmpty()) && (defaultValue != null)) {
+			s = defaultValue;
+		}
+		if (valueUrl != null && s != null) {
+			return Values.iri(valueUrl.replace("{" + name + "}", s));
+		}
+		System.err.println(s);
+		System.err.println(dataType);
+
+		if (lang != null) {
+			return Values.literal(s, lang);
+		}
+		return Values.literal(s, dataType);
 	}
 
 }

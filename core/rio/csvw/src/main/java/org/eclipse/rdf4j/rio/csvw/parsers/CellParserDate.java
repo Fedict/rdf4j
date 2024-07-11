@@ -11,6 +11,7 @@
 package org.eclipse.rdf4j.rio.csvw.parsers;
 
 import java.time.format.DateTimeFormatter;
+
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.util.Values;
 
@@ -32,10 +33,8 @@ public class CellParserDate extends CellParser {
 
 	@Override
 	public Value parse(String cell) {
-		String s = cell;
-		if ((s == null || s.isEmpty()) && (defaultValue != null)) {
-			s = defaultValue;
-		}
+		String s = getValueOrDefault(cell);
+	
 		if (formatter != null) {
 			s = DateTimeFormatter.ISO_DATE.format(formatter.parse(s));
 		}

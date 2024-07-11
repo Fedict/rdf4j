@@ -10,10 +10,6 @@
  *******************************************************************************/
 package org.eclipse.rdf4j.rio.csvw.parsers;
 
-import java.util.Set;
-
-import org.eclipse.rdf4j.model.IRI;
-import org.eclipse.rdf4j.model.Namespace;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.util.Values;
 
@@ -21,22 +17,22 @@ import org.eclipse.rdf4j.model.util.Values;
  *
  * @author Bart Hanssens
  */
-public class CellParserBoolean extends CellParser {
-	private String valueTrue;
-	private String valueFalse;
-
-	@Override
-	public void setFormat(String format) {
-		String[] values = format.split("\\|");
-		valueTrue = values[0];
-		valueFalse = values[1];
-	}
+public class CellParserDouble extends CellParser {
 
 	@Override
 	public Value parse(String cell) {
 		String s = getValueOrDefault(cell);
-	
-		return Values.literal(valueTrue.equals(s) ? "true" : "false", dataType);
+
+		if (s != null && groupChar != null) {
+			s = s.replace(groupChar, "");
+		}
+
+		// always use a '.' in RDF, not the European-style ','
+		if (s != null && !decimalChar.equals(".")) {
+			s = s.replace(decimalChar, ".");
+		}
+
+		return Values.literal(s, dataType);
 	}
 
 }

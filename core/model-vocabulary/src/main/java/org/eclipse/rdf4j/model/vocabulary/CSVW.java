@@ -51,14 +51,23 @@ public class CSVW {
 	/** csvw:datatype */
 	public static final IRI DATATYPE;
 
+	/** csvw:decimalChar */
+	public static final IRI DECIMAL_CHAR;
+
 	/** csvw:default */
 	public static final IRI DEFAULT;
+
+	/** csvw:delimiter */
+	public static final IRI DELIMITER;
 
 	/** csvw:dialect */
 	public static final IRI DIALECT;
 
 	/** csvw:format */
 	public static final IRI FORMAT;
+
+	/** csvw:groupChar */
+	public static final IRI GROUP_CHAR;
 
 	/** csvw:header */
 	public static final IRI HEADER;
@@ -90,14 +99,20 @@ public class CSVW {
 	/** csvw:valueUrl */
 	public static final IRI VALUE_URL;
 
+	/** csvw:virtual */
+	public static final IRI VIRTUAL;
+
 	static {
 		ABOUT_URL = Vocabularies.createIRI(NAMESPACE, "aboutUrl");
 		BASE = Vocabularies.createIRI(NAMESPACE, "base");
 		COLUMN = Vocabularies.createIRI(NAMESPACE, "column");
 		DATATYPE = Vocabularies.createIRI(NAMESPACE, "datatype");
+		DECIMAL_CHAR = Vocabularies.createIRI(NAMESPACE, "decimalChar");
 		DEFAULT = Vocabularies.createIRI(NAMESPACE, "default");
+		DELIMITER = Vocabularies.createIRI(NAMESPACE, "delimiter");
 		DIALECT = Vocabularies.createIRI(NAMESPACE, "dialect");
 		FORMAT = Vocabularies.createIRI(NAMESPACE, "format");
+		GROUP_CHAR = Vocabularies.createIRI(NAMESPACE, "groupChar");
 		HEADER = Vocabularies.createIRI(NAMESPACE, "header");
 		LANG = Vocabularies.createIRI(NAMESPACE, "lang");
 		NAME = Vocabularies.createIRI(NAMESPACE, "name");
@@ -108,5 +123,6 @@ public class CSVW {
 		TITLE = Vocabularies.createIRI(NAMESPACE, "title");
 		URL = Vocabularies.createIRI(NAMESPACE, "url");
 		VALUE_URL = Vocabularies.createIRI(NAMESPACE, "valueUrl");
+		VIRTUAL = Vocabularies.createIRI(NAMESPACE, "virtual");
 	}
 }

@@ -214,20 +214,21 @@ public class CSVWParser extends AbstractRDFParser {
 
 		CellParser parser = CellParserFactory.create(datatype);
 
+		Models.getPropertyString(metadata, column, CSVW.LANG).ifPresent(v -> parser.setLang(v));
 		getFormat(metadata, column).ifPresent(v -> parser.setFormat(v.stringValue()));
 
-		Models.getProperty(metadata, column, CSVW.NAME)
-			.ifPresentOrElse(v -> parser.setName(v.stringValue()), 
-							() -> new RDFParseException("Metadata file does not contain name for column " + column));
-		
-		Models.getProperty(metadata, column, CSVW.DEFAULT).ifPresent(v -> parser.setDefaultValue(v.stringValue()));
-		Models.getProperty(metadata, column, CSVW.REQUIRED)
-				.ifPresent(v -> parser.setIsRequired(Boolean.parseBoolean(v.stringValue())));
-		Models.getProperty(metadata, column, CSVW.VALUE_URL).ifPresent(v -> parser.setValueURL(v.stringValue()));
+		Models.getPropertyString(metadata, column, CSVW.NAME)
+				.ifPresentOrElse(v -> parser.setName(v,
+						() -> new RDFParseException("Metadata file does not contain name for column " + column));
+
+		Models.getPropertyString(metadata, column, CSVW.DEFAULT).ifPresent(v -> parser.setDefaultValue(v);
+		Models.getPropertyString(metadata, column, CSVW.REQUIRED)
+				.ifPresent(v -> parser.setIsRequired(Boolean.parseBoolean(v));
+		Models.getPropertyString(metadata, column, CSVW.VALUE_URL).ifPresent(v -> parser.setValueURL(v));
 
 		// use a property from a vocabulary as predicate, or create a property relative to the namespace of the CSV
-		Optional<Value> propertyURL = Models.getProperty(metadata, column, CSVW.PROPERTY_URL);
-		String s = propertyURL.isPresent() ? propertyURL.get().stringValue() : "_local:" + parser.getName();
+		Optional<String> propertyURL = Models.getPropertyString(metadata, column, CSVW.PROPERTY_URL);
+		String s = propertyURL.isPresent() ? propertyURL.get() : "_local:" + parser.getName();
 		parser.setPropertyURL(metadata.getNamespaces(), s);
 
 		return parser;
@@ -260,7 +261,7 @@ public class CSVWParser extends AbstractRDFParser {
 	}
 
 	/**
-	 * Get IRI of base or derived datatype
+	 * Get name of the generic datatype or more specific  datatype
 	 *
 	 * @param metadata
 	 * @param column
@@ -272,7 +273,8 @@ public class CSVWParser extends AbstractRDFParser {
 			Value datatype = val.get();
 			// derived datatype
 			if (datatype.isBNode()) {
-				val = Models.getProperty(metadata, (Resource) datatype, CSVW.FORMAT);
+				Optional<Value> fmt = Models.getProperty(metadata, (Resource) datatype, CSVW.FORMAT);
+				val = Models.getProperty(metadata, (Resource) fmt.get(), CSVW.BASE);
 			}
 		}
 		return val;
@@ -327,10 +329,11 @@ public class CSVWParser extends AbstractRDFParser {
 		String placeholder = (aboutIndex > -1) ? cellParsers[aboutIndex].getName() : null;
 
 		LOGGER.info("Parsing {}", csvFile);
+	
 		long line = 0;
 		try (InputStream is = csvFile.toURL().openStream();
 				BufferedReader reader = new BufferedReader(new InputStreamReader(is));
-				CSVReader csv = getCSVReader(metadata, reader)) {
+				CSVReader csv = getCSVReader(metadata, table, reader)) {
 
 			String[] cells;
 			while ((cells = csv.readNext()) != null) {
@@ -359,8 +362,15 @@ public class CSVWParser extends AbstractRDFParser {
 	 * @param reader
 	 * @return
 	 */
-	private CSVReader getCSVReader(Model metadata, Reader reader) {
+	private CSVReader getCSVReader(Model metadata, Resource table, Reader reader) {
 		CSVParser parser = new CSVParserBuilder().build();
+		CSVReaderBuilder builder = new CSVReaderBuilder(reader);
+		
+		Optional<Value> dialect = Models.getProperty(metadata, table, CSVW.DIALECT);
+		if (dialect.isPresent()) {
+			Models.getPropertyString(metadata, (Resource) dialect, CSVW.DELIMITER);
+		}
+		
 		return new CSVReaderBuilder(reader).withSkipLines(1).withCSVParser(parser).build();
 	}
 
