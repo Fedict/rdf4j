@@ -27,20 +27,31 @@ public class CellParserFactory {
 	public static CellParser create(IRI datatype) {
 		CellParser p;
 
-		XSD xsdType = XSD.valueOf(datatype.toString());
+		XSD xsdType = XSD.valueOf(datatype.getLocalName().toUpperCase());
 		if (xsdType == null) {
-			p = new CellParser();
+			p = new CellParserString();
 		} else {
-			switch(xsdType) {
-				case DATE: 
-				case DATETIME:
-					p = new CellParserDate();
-					break;
+			switch (xsdType) {
 				case BOOLEAN:
 					p = new CellParserBoolean();
 					break;
+				case INTEGER:
+				case INT:
+				case SHORT:
+				case LONG:
+					p = new CellParserLong();
+					break;
+				case FLOAT:
+				case DOUBLE:
+					p = new CellParserDouble();
+					p.setDecimalChar(".");
+					break;
+				case DATE:
+				case DATETIME:
+					p = new CellParserDate();
+					break;
 				default:
-					p = new CellParser();
+					p = new CellParserString();
 			}
 		}
 		p.setDataType(datatype);

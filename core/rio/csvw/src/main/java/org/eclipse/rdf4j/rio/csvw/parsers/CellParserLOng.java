@@ -34,8 +34,10 @@ public class CellParserBoolean extends CellParser {
 
 	@Override
 	public Value parse(String cell) {
-		String s = getValueOrDefault(cell);
-	
+		String s = cell;
+		if ((s == null || s.isEmpty()) && (defaultValue != null)) {
+			s = defaultValue;
+		}
 		return Values.literal(valueTrue.equals(s) ? "true" : "false", dataType);
 	}
 

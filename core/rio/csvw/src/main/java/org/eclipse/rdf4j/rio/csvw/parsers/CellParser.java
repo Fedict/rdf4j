@@ -10,29 +10,29 @@
  *******************************************************************************/
 package org.eclipse.rdf4j.rio.csvw.parsers;
 
-import java.time.format.DateTimeFormatter;
 import java.util.Set;
 
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Namespace;
 import org.eclipse.rdf4j.model.Value;
-import org.eclipse.rdf4j.model.util.Literals;
 import org.eclipse.rdf4j.model.util.Values;
-import org.eclipse.rdf4j.rio.RDFParseException;
 
 /**
  *
  * @author Bart Hanssens
  */
-public class CellParser {
-	private String name;
+public abstract class CellParser {
+	protected String name;
 	protected IRI dataType;
+	protected String lang;
 	protected String defaultValue;
-	private boolean isRequired;
-	private IRI propertyIRI;
-	private String valueUrl;
-	private String format;
-	private String separator;
+	protected boolean isRequired;
+	protected IRI propertyIRI;
+	protected String valueUrl;
+	protected String format;
+	protected String decimalChar;
+	protected String groupChar;
+	protected String separator;
 
 	/**
 	 * @param name
@@ -53,6 +53,15 @@ public class CellParser {
 	 */
 	public void setDataType(IRI dataType) {
 		this.dataType = dataType;
+	}
+
+	/**
+	 * Set language code
+	 *
+	 * @param lang language code
+	 */
+	public void setLang(String lang) {
+		this.lang = lang;
 	}
 
 	/**
@@ -124,10 +133,46 @@ public class CellParser {
 	}
 
 	/**
+	 * @return the decimal character
+	 */
+	public String getDecimalChar() {
+		return decimalChar;
+	}
+
+	/**
+	 * @param decimalChar the decimal character to set
+	 */
+	public void setDecimalChar(String decimalChar) {
+		this.decimalChar = decimalChar;
+	}
+
+
+	/**
+	 * @return the group character
+	 */
+	public String getGroupChar() {
+		return groupChar;
+	}
+
+	/**
+	 * @param groupChar the group character to set
+	 */
+	public void setGroupChar(String groupChar) {
+		this.groupChar = groupChar;
+	}
+
+	/**
 	 * @param format
 	 */
 	public void setFormat(String format) {
 		this.format = format;
+	}
+
+	protected String getValueOrDefault(String s) {
+		if ((s == null || s.isEmpty()) && (defaultValue != null)) {
+			return defaultValue;
+		}
+		return s;
 	}
 
 	/**
@@ -136,17 +181,6 @@ public class CellParser {
 	 * @param cell
 	 * @return
 	 */
-	public Value parse(String cell) {
-		String s = cell;
-		if ((s == null || s.isEmpty()) && (defaultValue != null)) {
-			s = defaultValue;
-		}
-		if (valueUrl != null && s != null) {
-			return Values.iri(valueUrl.replace("{" + name + "}", s));
-		}
-		System.err.println(s);
-		System.err.println(dataType);
-		return Values.literal(s, dataType);
-	}
+	public abstract Value parse(String cell);
 
 }
