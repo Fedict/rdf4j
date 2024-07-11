@@ -32,26 +32,27 @@ public class CellParserFactory {
 			p = new CellParserString();
 		} else {
 			switch (xsdType) {
-				case BOOLEAN:
-					p = new CellParserBoolean();
-					break;
-				case INTEGER:
-				case INT:
-				case SHORT:
-				case LONG:
-					p = new CellParserLong();
-					break;
-				case FLOAT:
-				case DOUBLE:
-					p = new CellParserDouble();
-					p.setDecimalChar(".");
-					break;
-				case DATE:
-				case DATETIME:
-					p = new CellParserDate();
-					break;
-				default:
-					p = new CellParserString();
+			case BOOLEAN:
+				p = new CellParserBoolean();
+				break;
+			case INTEGER:
+			case INT:
+			case SHORT:
+			case LONG:
+				p = new CellParserInteger();
+				break;
+			case FLOAT:
+			case DOUBLE:
+				p = new CellParserDecimal();
+				p.setDecimalChar(".");
+				break;
+			case DATE:
+			case DATETIME:
+			case TIME:
+				p = new CellParserDate();
+				break;
+			default:
+				p = new CellParserString();
 			}
 		}
 		p.setDataType(datatype);

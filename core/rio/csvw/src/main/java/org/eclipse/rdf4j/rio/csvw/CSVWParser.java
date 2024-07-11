@@ -16,12 +16,15 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.net.URI;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import org.apache.commons.lang3.CharSet;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Model;
 import org.eclipse.rdf4j.model.Resource;
@@ -218,12 +221,12 @@ public class CSVWParser extends AbstractRDFParser {
 		getFormat(metadata, column).ifPresent(v -> parser.setFormat(v.stringValue()));
 
 		Models.getPropertyString(metadata, column, CSVW.NAME)
-				.ifPresentOrElse(v -> parser.setName(v,
+				.ifPresentOrElse(v -> parser.setName(v),
 						() -> new RDFParseException("Metadata file does not contain name for column " + column));
 
-		Models.getPropertyString(metadata, column, CSVW.DEFAULT).ifPresent(v -> parser.setDefaultValue(v);
+		Models.getPropertyString(metadata, column, CSVW.DEFAULT).ifPresent(v -> parser.setDefaultValue(v));
 		Models.getPropertyString(metadata, column, CSVW.REQUIRED)
-				.ifPresent(v -> parser.setIsRequired(Boolean.parseBoolean(v));
+				.ifPresent(v -> parser.setIsRequired(Boolean.parseBoolean(v)));
 		Models.getPropertyString(metadata, column, CSVW.VALUE_URL).ifPresent(v -> parser.setValueURL(v));
 
 		// use a property from a vocabulary as predicate, or create a property relative to the namespace of the CSV
@@ -261,7 +264,7 @@ public class CSVWParser extends AbstractRDFParser {
 	}
 
 	/**
-	 * Get name of the generic datatype or more specific  datatype
+	 * Get name of the generic datatype or more specific datatype
 	 *
 	 * @param metadata
 	 * @param column
@@ -329,10 +332,12 @@ public class CSVWParser extends AbstractRDFParser {
 		String placeholder = (aboutIndex > -1) ? cellParsers[aboutIndex].getName() : null;
 
 		LOGGER.info("Parsing {}", csvFile);
-	
+
+		Charset encoding = getEncoding(metadata, table);
+
 		long line = 0;
 		try (InputStream is = csvFile.toURL().openStream();
-				BufferedReader reader = new BufferedReader(new InputStreamReader(is));
+				BufferedReader reader = new BufferedReader(new InputStreamReader(is, encoding));
 				CSVReader csv = getCSVReader(metadata, table, reader)) {
 
 			String[] cells;
@@ -363,15 +368,38 @@ public class CSVWParser extends AbstractRDFParser {
 	 * @return
 	 */
 	private CSVReader getCSVReader(Model metadata, Resource table, Reader reader) {
-		CSVParser parser = new CSVParserBuilder().build();
+		CSVParserBuilder parserBuilder = new CSVParserBuilder();
 		CSVReaderBuilder builder = new CSVReaderBuilder(reader);
-		
+
 		Optional<Value> dialect = Models.getProperty(metadata, table, CSVW.DIALECT);
 		if (dialect.isPresent()) {
-			Models.getPropertyString(metadata, (Resource) dialect, CSVW.DELIMITER);
+			Models.getPropertyString(metadata, (Resource) dialect.get(), CSVW.DELIMITER)
+					.ifPresent(v -> parserBuilder.withSeparator(v.charAt(0)));
+			Models.getPropertyString(metadata, (Resource) dialect.get(), CSVW.HEADER)
+					.ifPresent(v -> builder.withSkipLines(v.equalsIgnoreCase("false") ? 1 : 0));
+			Models.getPropertyString(metadata, (Resource) dialect.get(), CSVW.QUOTE_CHAR)
+					.ifPresent(v -> parserBuilder.withQuoteChar(v.charAt(0)));
 		}
-		
-		return new CSVReaderBuilder(reader).withSkipLines(1).withCSVParser(parser).build();
+
+		return new CSVReaderBuilder(reader).withCSVParser(parserBuilder.build()).build();
+	}
+
+	/**
+	 * Get charset of the CSV, by default this should be UTF-8
+	 *
+	 * @param metadata
+	 * @param table
+	 * @return charset
+	 */
+	private Charset getEncoding(Model metadata, Resource table) {
+		Optional<Value> dialect = Models.getProperty(metadata, table, CSVW.DIALECT);
+		if (dialect.isPresent()) {
+			Optional<String> encoding = Models.getPropertyString(metadata, (Resource) dialect.get(), CSVW.ENCODING);
+			if (encoding.isPresent()) {
+				return Charset.forName(encoding.get());
+			}
+		}
+		return StandardCharsets.UTF_8;
 	}
 
 	/**

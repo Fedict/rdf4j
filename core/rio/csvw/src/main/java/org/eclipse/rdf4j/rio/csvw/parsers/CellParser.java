@@ -146,7 +146,6 @@ public abstract class CellParser {
 		this.decimalChar = decimalChar;
 	}
 
-
 	/**
 	 * @return the group character
 	 */

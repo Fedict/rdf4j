@@ -34,7 +34,7 @@ public class CellParserDate extends CellParser {
 	@Override
 	public Value parse(String cell) {
 		String s = getValueOrDefault(cell);
-	
+
 		if (formatter != null) {
 			s = DateTimeFormatter.ISO_DATE.format(formatter.parse(s));
 		}

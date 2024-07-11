@@ -17,7 +17,7 @@ import org.eclipse.rdf4j.model.util.Values;
  *
  * @author Bart Hanssens
  */
-public class CellParserDouble extends CellParser {
+public class CellParserInteger extends CellParser {
 
 	@Override
 	public Value parse(String cell) {
@@ -25,11 +25,6 @@ public class CellParserDouble extends CellParser {
 
 		if (s != null && groupChar != null) {
 			s = s.replace(groupChar, "");
-		}
-
-		// always use a '.' in RDF, not the European-style ','
-		if (s != null && !decimalChar.equals(".")) {
-			s = s.replace(decimalChar, ".");
 		}
 
 		return Values.literal(s, dataType);

@@ -63,6 +63,9 @@ public class CSVW {
 	/** csvw:dialect */
 	public static final IRI DIALECT;
 
+	/** csvw:encoding */
+	public static final IRI ENCODING;
+
 	/** csvw:format */
 	public static final IRI FORMAT;
 
@@ -80,6 +83,9 @@ public class CSVW {
 
 	/** csvw:propertyUrl */
 	public static final IRI PROPERTY_URL;
+
+	/** csvw:quoteChar */
+	public static final IRI QUOTE_CHAR;
 
 	/** csvw:required */
 	public static final IRI REQUIRED;
@@ -111,12 +117,14 @@ public class CSVW {
 		DEFAULT = Vocabularies.createIRI(NAMESPACE, "default");
 		DELIMITER = Vocabularies.createIRI(NAMESPACE, "delimiter");
 		DIALECT = Vocabularies.createIRI(NAMESPACE, "dialect");
+		ENCODING = Vocabularies.createIRI(NAMESPACE, "encoding");
 		FORMAT = Vocabularies.createIRI(NAMESPACE, "format");
 		GROUP_CHAR = Vocabularies.createIRI(NAMESPACE, "groupChar");
 		HEADER = Vocabularies.createIRI(NAMESPACE, "header");
 		LANG = Vocabularies.createIRI(NAMESPACE, "lang");
 		NAME = Vocabularies.createIRI(NAMESPACE, "name");
 		PROPERTY_URL = Vocabularies.createIRI(NAMESPACE, "propertyUrl");
+		QUOTE_CHAR = Vocabularies.createIRI(NAMESPACE, "quoteChar");
 		REQUIRED = Vocabularies.createIRI(NAMESPACE, "required");
 		TABLE_SCHEMA = Vocabularies.createIRI(NAMESPACE, "tableSchema");
 		TABLES = Vocabularies.createIRI(NAMESPACE, "tables");
