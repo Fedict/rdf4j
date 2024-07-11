@@ -10,10 +10,6 @@
  *******************************************************************************/
 package org.eclipse.rdf4j.rio.csvw.parsers;
 
-import java.util.Set;
-
-import org.eclipse.rdf4j.model.IRI;
-import org.eclipse.rdf4j.model.Namespace;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.util.Values;
 

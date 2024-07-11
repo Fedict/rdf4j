@@ -21,7 +21,7 @@
            "base": "date", 
            "format": "d/M/yyyy"
         } },
-      { "name": "maried",
+      { "name": "married",
         "datatype": {
             "base": "boolean",
             "format": "Yes|No"

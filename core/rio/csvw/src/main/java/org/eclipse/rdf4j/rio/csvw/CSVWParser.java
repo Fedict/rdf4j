@@ -55,7 +55,9 @@ import com.opencsv.CSVReaderBuilder;
 import com.opencsv.exceptions.CsvValidationException;
 
 /**
- * Basic (experimental) CSV on the Web Parser
+ * Basic (experimental) CSV on the Web parser.
+ *
+ * Currently only "minimal mode" is supported
  *
  * @author Bart Hanssens
  * @see <a href="https://w3c.github.io/csvw/primer/">CSV on the Web Primer</a>
@@ -107,9 +109,8 @@ public class CSVWParser extends AbstractRDFParser {
 	@Override
 	public void parse(Reader reader, String baseURI)
 			throws IOException, RDFParseException, RDFHandlerException {
-		Model metadata = parseMetadata(null, reader, baseURI);
 
-		clear();
+		Model metadata = parseMetadata(null, reader, baseURI);
 	}
 
 	/**
@@ -217,9 +218,6 @@ public class CSVWParser extends AbstractRDFParser {
 
 		CellParser parser = CellParserFactory.create(datatype);
 
-		Models.getPropertyString(metadata, column, CSVW.LANG).ifPresent(v -> parser.setLang(v));
-		getFormat(metadata, column).ifPresent(v -> parser.setFormat(v.stringValue()));
-
 		Models.getPropertyString(metadata, column, CSVW.NAME)
 				.ifPresentOrElse(v -> parser.setName(v),
 						() -> new RDFParseException("Metadata file does not contain name for column " + column));
@@ -227,6 +225,17 @@ public class CSVWParser extends AbstractRDFParser {
 		Models.getPropertyString(metadata, column, CSVW.DEFAULT).ifPresent(v -> parser.setDefaultValue(v));
 		Models.getPropertyString(metadata, column, CSVW.REQUIRED)
 				.ifPresent(v -> parser.setIsRequired(Boolean.parseBoolean(v)));
+
+		// only useful for strings
+		Models.getPropertyString(metadata, column, CSVW.LANG).ifPresent(v -> parser.setLang(v));
+
+		// only useful for numeric
+		Models.getPropertyString(metadata, column, CSVW.DECIMAL_CHAR).ifPresent(v -> parser.setDecimalChar(v));
+		Models.getPropertyString(metadata, column, CSVW.GROUP_CHAR).ifPresent(v -> parser.setGroupChar(v));
+
+		// mostly for date formats
+		Models.getPropertyString(metadata, column, CSVW.FORMAT).ifPresent(v -> parser.setFormat(v));
+
 		Models.getPropertyString(metadata, column, CSVW.VALUE_URL).ifPresent(v -> parser.setValueURL(v));
 
 		// use a property from a vocabulary as predicate, or create a property relative to the namespace of the CSV
@@ -238,7 +247,7 @@ public class CSVWParser extends AbstractRDFParser {
 	}
 
 	/**
-	 * Get IRI of base or derived datatype
+	 * Get name of base or derived datatype
 	 *
 	 * @param metadata
 	 * @param column
@@ -261,26 +270,6 @@ public class CSVWParser extends AbstractRDFParser {
 			return (IRI) datatype;
 		}
 		return XSD.valueOf(datatype.stringValue().toUpperCase()).getIri();
-	}
-
-	/**
-	 * Get name of the generic datatype or more specific datatype
-	 *
-	 * @param metadata
-	 * @param column
-	 * @return
-	 */
-	private Optional<Value> getFormat(Model metadata, Resource column) {
-		Optional<Value> val = Models.getProperty(metadata, column, CSVW.DATATYPE);
-		if (val.isPresent()) {
-			Value datatype = val.get();
-			// derived datatype
-			if (datatype.isBNode()) {
-				Optional<Value> fmt = Models.getProperty(metadata, (Resource) datatype, CSVW.FORMAT);
-				val = Models.getProperty(metadata, (Resource) fmt.get(), CSVW.BASE);
-			}
-		}
-		return val;
 	}
 
 	/**
@@ -376,7 +365,7 @@ public class CSVWParser extends AbstractRDFParser {
 			Models.getPropertyString(metadata, (Resource) dialect.get(), CSVW.DELIMITER)
 					.ifPresent(v -> parserBuilder.withSeparator(v.charAt(0)));
 			Models.getPropertyString(metadata, (Resource) dialect.get(), CSVW.HEADER)
-					.ifPresent(v -> builder.withSkipLines(v.equalsIgnoreCase("false") ? 1 : 0));
+					.ifPresent(v -> builder.withSkipLines(v.equalsIgnoreCase("false") ? 0 : 1));
 			Models.getPropertyString(metadata, (Resource) dialect.get(), CSVW.QUOTE_CHAR)
 					.ifPresent(v -> parserBuilder.withQuoteChar(v.charAt(0)));
 		}
