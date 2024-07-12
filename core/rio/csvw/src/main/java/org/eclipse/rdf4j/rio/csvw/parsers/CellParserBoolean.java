@@ -36,7 +36,7 @@ public class CellParserBoolean extends CellParser {
 	public Value parse(String cell) {
 		String s = getValueOrDefault(cell);
 
-		return Values.literal(valueTrue.equals(s) ? "true" : "false", dataType);
+		return Values.literal(valueTrue.equals(s) ? "true" : "false", getDataType());
 	}
 
 }

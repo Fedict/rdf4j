@@ -225,7 +225,7 @@ public class CSVWParser extends AbstractRDFParser {
 
 		Models.getPropertyString(metadata, column, CSVW.DEFAULT).ifPresent(v -> parser.setDefaultValue(v));
 		Models.getPropertyString(metadata, column, CSVW.REQUIRED)
-				.ifPresent(v -> parser.setIsRequired(Boolean.parseBoolean(v)));
+				.ifPresent(v -> parser.setRequired(Boolean.parseBoolean(v)));
 		Models.getPropertyString(metadata, column, CSVW.VIRTUAL)
 				.ifPresent(v -> parser.setVirtual(Boolean.parseBoolean(v)));
 
@@ -239,12 +239,15 @@ public class CSVWParser extends AbstractRDFParser {
 		// mostly for date formats
 		getFormat(metadata, column).ifPresent(v -> parser.setFormat(v));
 
-		Models.getPropertyString(metadata, column, CSVW.VALUE_URL).ifPresent(v -> parser.setValueURL(v));
+		Models.getPropertyString(metadata, column, CSVW.TRIM)
+				.ifPresent(v -> parser.setVirtual(Boolean.parseBoolean(v)));
+
+		Models.getPropertyString(metadata, column, CSVW.VALUE_URL).ifPresent(v -> parser.setValueUrl(v));
 
 		// use a property from a vocabulary as predicate, or create a property relative to the namespace of the CSV
 		Optional<String> propertyURL = Models.getPropertyString(metadata, column, CSVW.PROPERTY_URL);
 		String s = propertyURL.isPresent() ? propertyURL.get() : "_local:" + parser.getName();
-		parser.setPropertyURL(metadata.getNamespaces(), s);
+		parser.setPropertyIRI(metadata.getNamespaces(), s);
 
 		return parser;
 	}

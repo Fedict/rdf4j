@@ -40,7 +40,7 @@ public class CellParserDate extends CellParser {
 			s = DateTimeFormatter.ISO_DATE.format(formatter.parse(s));
 		}
 		System.err.println("date = " + s);
-		return Values.literal(s, dataType);
+		return Values.literal(s, getDataType());
 	}
 
 }

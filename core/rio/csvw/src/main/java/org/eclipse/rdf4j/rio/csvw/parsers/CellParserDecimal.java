@@ -23,16 +23,16 @@ public class CellParserDecimal extends CellParser {
 	public Value parse(String cell) {
 		String s = getValueOrDefault(cell);
 
-		if (s != null && groupChar != null) {
-			s = s.replace(groupChar, "");
+		if (s != null && getGroupChar() != null) {
+			s = s.replace(getGroupChar(), "");
 		}
 
 		// always use a '.' in RDF, not the European-style ','
-		if (s != null && !decimalChar.equals(".")) {
-			s = s.replace(decimalChar, ".");
+		if (s != null && !getDecimalChar().equals(".")) {
+			s = s.replace(getDecimalChar(), ".");
 		}
 
-		return Values.literal(s, dataType);
+		return Values.literal(s, getDataType());
 	}
 
 }

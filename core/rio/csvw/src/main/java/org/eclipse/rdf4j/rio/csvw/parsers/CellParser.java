@@ -22,66 +22,77 @@ import org.eclipse.rdf4j.model.util.Values;
  * @author Bart Hanssens
  */
 public abstract class CellParser {
-	protected String name;
-	protected IRI dataType;
-	protected String lang;
-	protected String defaultValue;
-	protected boolean isRequired;
-	protected boolean isVirtual;
-	protected IRI propertyIRI;
-	protected String valueUrl;
-	protected String format;
-	protected String decimalChar;
-	protected String groupChar;
-	protected String separator;
+	private String name;
+	private IRI dataType;
+	private String lang;
+	private String defaultValue;
+	private String nullValue;
+	private boolean required;
+	private boolean virtual = false;
+	private IRI propertyIRI;
+	private String valueUrl;
+	private String format;
+	private String decimalChar = ".";
+	private String groupChar;
+	private String separator;
+	private boolean trim = true;
 
-	/**
-	 * @param name
-	 */
-	public void setName(String name) {
-		this.name = name;
-	}
-
-	/**
-	 * @return name
-	 */
 	public String getName() {
 		return name;
 	}
 
-	/**
-	 * @param dataType
-	 */
+	public void setName(String name) {
+		this.name = name;
+	}
+
+	public IRI getDataType() {
+		return dataType;
+	}
+
 	public void setDataType(IRI dataType) {
 		this.dataType = dataType;
 	}
 
-	/**
-	 * Set language code
-	 *
-	 * @param lang language code
-	 */
+	public String getLang() {
+		return lang;
+	}
+
 	public void setLang(String lang) {
 		this.lang = lang;
 	}
 
-	/**
-	 * @param defaultValue the defaultValue to set
-	 */
+	public String getDefaultValue() {
+		return defaultValue;
+	}
+
 	public void setDefaultValue(String defaultValue) {
 		this.defaultValue = defaultValue;
 	}
 
-	/**
-	 * @param isRequired the isRequired to set
-	 */
-	public void setIsRequired(boolean isRequired) {
-		this.isRequired = isRequired;
+	public String getNullValue() {
+		return nullValue;
 	}
 
-	/**
-	 * @return the propertyUrl as IRI
-	 */
+	public void setNullValue(String nullValue) {
+		this.nullValue = nullValue;
+	}
+
+	public boolean isRequired() {
+		return required;
+	}
+
+	public void setRequired(boolean isRequired) {
+		this.required = isRequired;
+	}
+
+	public boolean isVirtual() {
+		return virtual;
+	}
+
+	public void setVirtual(boolean isVirtual) {
+		this.virtual = isVirtual;
+	}
+
 	public IRI getPropertyIRI() {
 		return propertyIRI;
 	}
@@ -92,7 +103,7 @@ public abstract class CellParser {
 	 * @param namespaces  set of namespaces
 	 * @param propertyUrl the propertyUrl to set
 	 */
-	public void setPropertyURL(Set<Namespace> namespaces, String propertyUrl) {
+	public void setPropertyIRI(Set<Namespace> namespaces, String propertyUrl) {
 		this.propertyIRI = Values.iri(namespaces, propertyUrl);
 	}
 
@@ -101,92 +112,76 @@ public abstract class CellParser {
 	 *
 	 * @param propertyUrl the propertyUrl to set
 	 */
-	public void setPropertyURL(String propertyUrl) {
+	public void setPropertyIRI(String propertyUrl) {
 		this.propertyIRI = Values.iri("", propertyUrl);
 	}
 
-	/**
-	 * @return the valueUrl
-	 */
-	public String getValueURL() {
+	public String getValueUrl() {
 		return valueUrl;
 	}
 
-	/**
-	 * @param valueUrl the valueUrl to set
-	 */
-	public void setValueURL(String valueUrl) {
+	public void setValueUrl(String valueUrl) {
 		this.valueUrl = valueUrl;
 	}
 
-	/**
-	 * @return the separator
-	 */
-	public String getSeparator() {
-		return separator;
+	public String getFormat() {
+		return format;
 	}
 
-	/**
-	 * @param separator the separator to set
-	 */
-	public void setSeparator(String separator) {
-		this.separator = separator;
-	}
-
-	/**
-	 * @return the decimal character
-	 */
-	public String getDecimalChar() {
-		return decimalChar;
-	}
-
-	/**
-	 * @param decimalChar the decimal character to set
-	 */
-	public void setDecimalChar(String decimalChar) {
-		this.decimalChar = decimalChar;
-	}
-
-	/**
-	 * @return the group character
-	 */
-	public String getGroupChar() {
-		return groupChar;
-	}
-
-	/**
-	 * @param groupChar the group character to set
-	 */
-	public void setGroupChar(String groupChar) {
-		this.groupChar = groupChar;
-	}
-
-	/**
-	 * @param format
-	 */
 	public void setFormat(String format) {
 		this.format = format;
 	}
 
+	public String getDecimalChar() {
+		return decimalChar;
+	}
+
+	public void setDecimalChar(String decimalChar) {
+		this.decimalChar = decimalChar;
+	}
+
+	public String getGroupChar() {
+		return groupChar;
+	}
+
+	public void setGroupChar(String groupChar) {
+		this.groupChar = groupChar;
+	}
+
+	public String getSeparator() {
+		return separator;
+	}
+
+	public void setSeparator(String separator) {
+		this.separator = separator;
+	}
+
+	public boolean isTrim() {
+		return trim;
+	}
+
+	public void setTrim(boolean trim) {
+		this.trim = trim;
+	}
+
+	/**
+	 * Get the (possibly trimmed) value or default value
+	 *
+	 * @param s
+	 * @return
+	 */
 	protected String getValueOrDefault(String s) {
 		if ((s == null || s.isEmpty()) && (defaultValue != null)) {
 			return defaultValue;
 		}
-		return s;
-	}
+		if (s == null) {
+			return null;
+		}
+		if (s.equals(nullValue)) {
+			return null;
+		}
 
-	/**
-	 * @return true if the column is virtual
-	 */
-	public boolean isVirtual() {
-		return this.isVirtual;
-	}
-
-	/**
-	 * @param isVirtual
-	 */
-	public void setVirtual(boolean isVirtual) {
-		this.isVirtual = isVirtual;
+		return trim ? s.trim() : s;
 	}
 
 	/**

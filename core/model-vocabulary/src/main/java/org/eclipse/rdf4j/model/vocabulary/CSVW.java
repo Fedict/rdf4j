@@ -84,6 +84,9 @@ public class CSVW {
 	/** csvw:name */
 	public static final IRI NAME;
 
+	/** csvw:null */
+	public static final IRI NULL;
+
 	/** csvw:propertyUrl */
 	public static final IRI PROPERTY_URL;
 
@@ -95,7 +98,7 @@ public class CSVW {
 
 	/** csvw:skipRows */
 	public static final IRI SKIP_ROWS;
-	
+
 	/** csvw:tableSchema */
 	public static final IRI TABLE_SCHEMA;
 
@@ -104,6 +107,9 @@ public class CSVW {
 
 	/** csvw:title */
 	public static final IRI TITLE;
+
+	/** csvw:trim */
+	public static final IRI TRIM;
 
 	/** csvw:url */
 	public static final IRI URL;
@@ -130,6 +136,7 @@ public class CSVW {
 		HEADER_ROW_COUNT = Vocabularies.createIRI(NAMESPACE, "headerRowCount");
 		LANG = Vocabularies.createIRI(NAMESPACE, "lang");
 		NAME = Vocabularies.createIRI(NAMESPACE, "name");
+		NULL = Vocabularies.createIRI(NAMESPACE, "null");
 		PROPERTY_URL = Vocabularies.createIRI(NAMESPACE, "propertyUrl");
 		QUOTE_CHAR = Vocabularies.createIRI(NAMESPACE, "quoteChar");
 		REQUIRED = Vocabularies.createIRI(NAMESPACE, "required");
@@ -137,6 +144,7 @@ public class CSVW {
 		TABLE_SCHEMA = Vocabularies.createIRI(NAMESPACE, "tableSchema");
 		TABLES = Vocabularies.createIRI(NAMESPACE, "tables");
 		TITLE = Vocabularies.createIRI(NAMESPACE, "title");
+		TRIM = Vocabularies.createIRI(NAMESPACE, "trim");
 		URL = Vocabularies.createIRI(NAMESPACE, "url");
 		VALUE_URL = Vocabularies.createIRI(NAMESPACE, "valueUrl");
 		VIRTUAL = Vocabularies.createIRI(NAMESPACE, "virtual");
