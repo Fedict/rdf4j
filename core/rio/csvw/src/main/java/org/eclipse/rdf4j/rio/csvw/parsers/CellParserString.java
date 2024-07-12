@@ -20,20 +20,13 @@ import org.eclipse.rdf4j.model.util.Values;
 public class CellParserString extends CellParser {
 	@Override
 	public Value parse(String cell) {
-		String s = cell;
-		if ((s == null || s.isEmpty()) && (defaultValue != null)) {
-			s = defaultValue;
-		}
-		if (valueUrl != null && s != null) {
-			return Values.iri(valueUrl.replace("{" + name + "}", s));
-		}
-		System.err.println(s);
-		System.err.println(dataType);
+		String s = getValueOrDefault(cell);
 
+		String lang = getLang();
 		if (lang != null) {
 			return Values.literal(s, lang);
 		}
-		return Values.literal(s, dataType);
+		return Values.literal(s, getDataType());
 	}
 
 }
