@@ -29,9 +29,24 @@ public class CSVWMetadataFinder {
 	private static final Logger LOGGER = LoggerFactory.getLogger(CSVWMetadataFinder.class);
 
 	private static final String WELL_KNOWN = "/.well-known/csvm";
-	private static final String METADATA_JSON = "-metadata.json";
+	private static final String METADATA_EXT = "-metadata.json";
+	private static final String METADATA_CSV = "csv-metadata.json";
 	private static final String CSV = ".csv";
 
+	/**
+	 * Open URI as input stream
+	 * 
+	 * @param uri
+	 * @return 
+	 */
+	private static InputStream openURI(URI uri) {
+		try (InputStream is = uri.toURL().openStream()) {
+			return new ByteArrayInputStream(is.readAllBytes());
+		} catch (IOException ioe) {
+			LOGGER.debug("Could not open {}", uri);
+			return null;
+		}
+	}
 	/**
 	 * Find by adding metadata.json as file extension
 	 *
@@ -43,13 +58,19 @@ public class CSVWMetadataFinder {
 		if (s.endsWith(CSV)) {
 			s = s.substring(0, s.length() - CSV.length());
 		}
-		URI metaURI = URI.create(s + METADATA_JSON);
-		try (InputStream meta = metaURI.toURL().openStream()) {
-			return new ByteArrayInputStream(meta.readAllBytes());
-		} catch (IOException ioe) {
-			LOGGER.debug("Could not open {}", metaURI);
-			return null;
-		}
+		URI metaURI = URI.create(s + METADATA_EXT);
+		return openURI(metaURI);
+	}
+	
+	/**
+	 * Find by trying to get the csv-metadata.json in the path
+	 *
+	 * @param csvFile
+	 * @return inputstream or null
+	 */
+	public static InputStream findInPath(URI csvFile) {
+		URI metaURI = csvFile.resolve(METADATA_CSV);
+		return openURI(metaURI);
 	}
 
 	/**
