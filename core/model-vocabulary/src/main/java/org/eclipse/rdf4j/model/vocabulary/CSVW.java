@@ -75,6 +75,9 @@ public class CSVW {
 	/** csvw:header */
 	public static final IRI HEADER;
 
+	/** csvw:headerRowCount */
+	public static final IRI HEADER_ROW_COUNT;
+
 	/** csvw:lang */
 	public static final IRI LANG;
 
@@ -90,6 +93,9 @@ public class CSVW {
 	/** csvw:required */
 	public static final IRI REQUIRED;
 
+	/** csvw:skipRows */
+	public static final IRI SKIP_ROWS;
+	
 	/** csvw:tableSchema */
 	public static final IRI TABLE_SCHEMA;
 
@@ -121,11 +127,13 @@ public class CSVW {
 		FORMAT = Vocabularies.createIRI(NAMESPACE, "format");
 		GROUP_CHAR = Vocabularies.createIRI(NAMESPACE, "groupChar");
 		HEADER = Vocabularies.createIRI(NAMESPACE, "header");
+		HEADER_ROW_COUNT = Vocabularies.createIRI(NAMESPACE, "headerRowCount");
 		LANG = Vocabularies.createIRI(NAMESPACE, "lang");
 		NAME = Vocabularies.createIRI(NAMESPACE, "name");
 		PROPERTY_URL = Vocabularies.createIRI(NAMESPACE, "propertyUrl");
 		QUOTE_CHAR = Vocabularies.createIRI(NAMESPACE, "quoteChar");
 		REQUIRED = Vocabularies.createIRI(NAMESPACE, "required");
+		SKIP_ROWS = Vocabularies.createIRI(NAMESPACE, "skipRows");
 		TABLE_SCHEMA = Vocabularies.createIRI(NAMESPACE, "tableSchema");
 		TABLES = Vocabularies.createIRI(NAMESPACE, "tables");
 		TITLE = Vocabularies.createIRI(NAMESPACE, "title");
