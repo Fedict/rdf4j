@@ -27,6 +27,7 @@ public abstract class CellParser {
 	protected String lang;
 	protected String defaultValue;
 	protected boolean isRequired;
+	protected boolean isVirtual;
 	protected IRI propertyIRI;
 	protected String valueUrl;
 	protected String format;
@@ -172,6 +173,20 @@ public abstract class CellParser {
 			return defaultValue;
 		}
 		return s;
+	}
+
+	/**
+	 * @return true if the column is virtual
+	 */
+	public boolean isVirtual() {
+		return this.isVirtual;
+	}
+
+	/**
+	 * @param isVirtual
+	 */
+	public void setVirtual(boolean isVirtual) {
+		this.isVirtual = isVirtual;
 	}
 
 	/**

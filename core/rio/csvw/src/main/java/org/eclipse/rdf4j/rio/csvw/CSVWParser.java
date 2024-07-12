@@ -60,8 +60,9 @@ import com.opencsv.exceptions.CsvValidationException;
  * Currently only "minimal mode" is supported
  *
  * @author Bart Hanssens
- * @see <a href="https://w3c.github.io/csvw/primer/">CSV on the Web Primer</a>
  *
+ * @see <a href="https://w3c.github.io/csvw/primer/">CSV on the Web Primer</a>
+ * @see <a href="https://w3c.github.io/csvw/metadata">Metadata Vocabulary for Tabular Data</a>
  * @since 5.1.0
  */
 public class CSVWParser extends AbstractRDFParser {
@@ -225,6 +226,8 @@ public class CSVWParser extends AbstractRDFParser {
 		Models.getPropertyString(metadata, column, CSVW.DEFAULT).ifPresent(v -> parser.setDefaultValue(v));
 		Models.getPropertyString(metadata, column, CSVW.REQUIRED)
 				.ifPresent(v -> parser.setIsRequired(Boolean.parseBoolean(v)));
+		Models.getPropertyString(metadata, column, CSVW.VIRTUAL)
+				.ifPresent(v -> parser.setVirtual(Boolean.parseBoolean(v)));
 
 		// only useful for strings
 		Models.getPropertyString(metadata, column, CSVW.LANG).ifPresent(v -> parser.setLang(v));
@@ -297,8 +300,10 @@ public class CSVWParser extends AbstractRDFParser {
 	 * @param subject
 	 * @return aboutURL or null
 	 */
-	private String getAboutURL(Model metadata, Resource subject) {
-		return Models.getPropertyString(metadata, subject, CSVW.ABOUT_URL).orElse(null);
+	private String getAboutURL(Model metadata, Resource table) {
+		return Models.getPropertyString(metadata, table, CSVW.ABOUT_URL)
+				.orElse(Models.getPropertyString(metadata, getTableSchema(metadata, table), CSVW.ABOUT_URL)
+						.orElse(null));
 	}
 
 	/**
@@ -336,7 +341,7 @@ public class CSVWParser extends AbstractRDFParser {
 
 		// check for placeholder / column name that's being used to create subject IRI
 		int aboutIndex = getAboutIndex(aboutURL, cellParsers);
-		String placeholder = (aboutIndex > -1) ? cellParsers[aboutIndex].getName() : null;
+		String placeholder = (aboutIndex > -1) ? "{" + cellParsers[aboutIndex].getName() + "}" : null;
 
 		LOGGER.info("Parsing {}", csvFile);
 
@@ -382,14 +387,19 @@ public class CSVWParser extends AbstractRDFParser {
 		Optional<Value> val = Models.getProperty(metadata, table, CSVW.DIALECT);
 		if (val.isPresent()) {
 			Resource dialect = (Resource) val.get();
+
+			// skip header (and possibly other) rows
+			String headerRows = Models.getPropertyString(metadata, dialect, CSVW.HEADER_ROW_COUNT).orElse("1");
+			String skipRows = Models.getPropertyString(metadata, dialect, CSVW.SKIP_ROWS).orElse("0");
+			int skip = Integer.valueOf(headerRows) + Integer.valueOf(skipRows);
+			Models.getPropertyString(metadata, dialect, CSVW.HEADER)
+					.ifPresent(v -> builder.withSkipLines(v.equalsIgnoreCase("false") ? 0 : skip));
+
 			Models.getPropertyString(metadata, dialect, CSVW.DELIMITER)
 					.ifPresent(v -> parserBuilder.withSeparator(v.charAt(0)));
-			Models.getPropertyString(metadata, dialect, CSVW.HEADER)
-					.ifPresent(v -> builder.withSkipLines(v.equalsIgnoreCase("false") ? 0 : 1));
 			Models.getPropertyString(metadata, dialect, CSVW.QUOTE_CHAR)
 					.ifPresent(v -> parserBuilder.withQuoteChar(v.charAt(0)));
 		}
-
 		return builder.withCSVParser(parserBuilder.build()).build();
 	}
 
@@ -423,7 +433,7 @@ public class CSVWParser extends AbstractRDFParser {
 		if (aboutIndex > -1) {
 			Value val = cellParsers[aboutIndex].parse(cells[aboutIndex]);
 			if (val != null) {
-				return Values.iri(aboutURL.replace(placeholder, val.toString()));
+				return Values.iri(aboutURL.replace(placeholder, val.stringValue()));
 			} else {
 				throw new RDFParseException("NULL value in aboutURL");
 			}

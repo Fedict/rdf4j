@@ -2,21 +2,23 @@
   "@context": "http://www.w3.org/ns/csvw",
   "url": "painters.csv",
   "tableSchema": {
+    "aboutUrl": "https://www.wikidata.org/wiki/{wikidata_id}",
     "columns": [
       { "name": "wikidata_id", 
-        "datatype": "string",
-        "valueUrl": "https://www.wikidata.org/wiki/{wikidata_id}"},
+        "datatype": "string"},
       { "name": "first_name",
         "propertyUrl": "schema:givenName"},
       { "name": "last_name",
         "propertyUrl": "schema:familyName"},
       { "name": "country_id",
+        "propertyUrl": "schema:nationality",
         "valueUrl": "https://www.wikidata.org/wiki/{country_id}"},
       { "name": "country_name_nl",
         "lang": "nl" },
       { "name": "country_name_en",
         "lang": "en" },
       { "name": "date_of_birth",
+        "propertyUrl": "schema:birthDate",
         "datatype": { 
            "base": "date", 
            "format": "d/M/yyyy"
@@ -27,7 +29,10 @@
             "format": "Yes|No"
         } },
       { "name": "languages",
-        "separator": " " }
+        "separator": " " },
+      { "virtual": true,
+        "propertyUrl": "rdf:type",
+        "valueUrl": "schema:Person" }
     ],
    "primaryKey": "wikidata_id"
   }
