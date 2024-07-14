@@ -35,9 +35,9 @@ public class CSVWMetadataFinder {
 
 	/**
 	 * Open URI as input stream
-	 * 
+	 *
 	 * @param uri
-	 * @return 
+	 * @return
 	 */
 	private static InputStream openURI(URI uri) {
 		try (InputStream is = uri.toURL().openStream()) {
@@ -47,6 +47,7 @@ public class CSVWMetadataFinder {
 			return null;
 		}
 	}
+
 	/**
 	 * Find by adding metadata.json as file extension
 	 *
@@ -61,7 +62,7 @@ public class CSVWMetadataFinder {
 		URI metaURI = URI.create(s + METADATA_EXT);
 		return openURI(metaURI);
 	}
-	
+
 	/**
 	 * Find by trying to get the csv-metadata.json in the path
 	 *
