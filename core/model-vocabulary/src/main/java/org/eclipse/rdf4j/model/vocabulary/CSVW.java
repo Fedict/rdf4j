@@ -37,6 +37,17 @@ public class CSVW {
 	public static final Namespace NS = Vocabularies.createNamespace(PREFIX, NAMESPACE);
 
 	// Classes
+	/** csvw:Row */
+	public static final IRI ROW;
+
+	/** csvw:Schema */
+	public static final IRI SCHEMA;
+
+	/** csvw:Table */
+	public static final IRI TABLE;
+
+	/** csvw:TableGroup */
+	public static final IRI TABLE_GROUP;
 
 	// Properties
 	/** csvw:aboutUrl */
@@ -59,6 +70,9 @@ public class CSVW {
 
 	/** csvw:delimiter */
 	public static final IRI DELIMITER;
+
+	/** csvw:describes */
+	public static final IRI DESCRIBES;
 
 	/** csvw:dialect */
 	public static final IRI DIALECT;
@@ -96,6 +110,12 @@ public class CSVW {
 	/** csvw:required */
 	public static final IRI REQUIRED;
 
+	/** csvw:rownum */
+	public static final IRI ROWNUM;
+
+	/** csvw:skipColumns */
+	public static final IRI SKIP_COLUMNS;
+
 	/** csvw:skipRows */
 	public static final IRI SKIP_ROWS;
 
@@ -121,6 +141,11 @@ public class CSVW {
 	public static final IRI VIRTUAL;
 
 	static {
+		ROW = Vocabularies.createIRI(NAMESPACE, "Row");
+		SCHEMA = Vocabularies.createIRI(NAMESPACE, "Schema");
+		TABLE = Vocabularies.createIRI(NAMESPACE, "Table");
+		TABLE_GROUP = Vocabularies.createIRI(NAMESPACE, "TableGroup");
+	
 		ABOUT_URL = Vocabularies.createIRI(NAMESPACE, "aboutUrl");
 		BASE = Vocabularies.createIRI(NAMESPACE, "base");
 		COLUMN = Vocabularies.createIRI(NAMESPACE, "column");
@@ -128,6 +153,7 @@ public class CSVW {
 		DECIMAL_CHAR = Vocabularies.createIRI(NAMESPACE, "decimalChar");
 		DEFAULT = Vocabularies.createIRI(NAMESPACE, "default");
 		DELIMITER = Vocabularies.createIRI(NAMESPACE, "delimiter");
+		DESCRIBES = Vocabularies.createIRI(NAMESPACE, "describes");
 		DIALECT = Vocabularies.createIRI(NAMESPACE, "dialect");
 		ENCODING = Vocabularies.createIRI(NAMESPACE, "encoding");
 		FORMAT = Vocabularies.createIRI(NAMESPACE, "format");
@@ -140,6 +166,8 @@ public class CSVW {
 		PROPERTY_URL = Vocabularies.createIRI(NAMESPACE, "propertyUrl");
 		QUOTE_CHAR = Vocabularies.createIRI(NAMESPACE, "quoteChar");
 		REQUIRED = Vocabularies.createIRI(NAMESPACE, "required");
+		ROWNUM = Vocabularies.createIRI(NAMESPACE, "rownum");
+		SKIP_COLUMNS = Vocabularies.createIRI(NAMESPACE, "skipColumns");
 		SKIP_ROWS = Vocabularies.createIRI(NAMESPACE, "skipRows");
 		TABLE_SCHEMA = Vocabularies.createIRI(NAMESPACE, "tableSchema");
 		TABLES = Vocabularies.createIRI(NAMESPACE, "tables");

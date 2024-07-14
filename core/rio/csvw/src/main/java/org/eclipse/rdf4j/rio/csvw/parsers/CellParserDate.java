@@ -28,7 +28,6 @@ public class CellParserDate extends CellParser {
 	@Override
 	public void setFormat(String format) {
 		super.setFormat(format);
-		System.err.println("format = " + format);
 		formatter = DateTimeFormatter.ofPattern(format);
 	}
 
@@ -39,7 +38,6 @@ public class CellParserDate extends CellParser {
 		if (formatter != null) {
 			s = DateTimeFormatter.ISO_DATE.format(formatter.parse(s));
 		}
-		System.err.println("date = " + s);
 		return Values.literal(s, getDataType());
 	}
 
