@@ -11,8 +11,7 @@
       { "name": "last_name",
         "propertyUrl": "schema:familyName"},
       { "name": "country_id",
-        "propertyUrl": "schema:nationality",
-        "valueUrl": "https://www.wikidata.org/wiki/{country_id}"},
+        "suppressOutput": "true" },
       { "name": "country_name_nl",
         "lang": "nl" },
       { "name": "country_name_en",
@@ -32,7 +31,14 @@
         "separator": " " },
       { "virtual": true,
         "propertyUrl": "rdf:type",
-        "valueUrl": "schema:Person" }
+        "valueUrl": "schema:Person" },
+      { "virtual": true,
+        "propertyUrl": "schema:nationality",
+        "valueUrl": "https://www.wikidata.org/wiki/{country_id}" },
+      { "virtual": true,
+        "aboutUrl": "https://www.wikidata.org/wiki/{country_id}",
+        "propertyUrl": "rdf:type",
+        "valueUrl": "schema:Country" }
     ],
    "primaryKey": "wikidata_id"
   }

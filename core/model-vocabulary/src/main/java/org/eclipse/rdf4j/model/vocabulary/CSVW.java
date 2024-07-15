@@ -122,6 +122,9 @@ public class CSVW {
 	/** csvw:skipRows */
 	public static final IRI SKIP_ROWS;
 
+	/** csvw:suppressOutput */
+	public static final IRI SUPPRESS_OUTPUT;
+
 	/** csvw:tableSchema */
 	public static final IRI TABLE_SCHEMA;
 
@@ -173,6 +176,7 @@ public class CSVW {
 		ROWNUM = Vocabularies.createIRI(NAMESPACE, "rownum");
 		SKIP_COLUMNS = Vocabularies.createIRI(NAMESPACE, "skipColumns");
 		SKIP_ROWS = Vocabularies.createIRI(NAMESPACE, "skipRows");
+		SUPPRESS_OUTPUT = Vocabularies.createIRI(NAMESPACE, "suppressOutput");
 		TABLE_SCHEMA = Vocabularies.createIRI(NAMESPACE, "tableSchema");
 		TABLES = Vocabularies.createIRI(NAMESPACE, "tables");
 		TITLE = Vocabularies.createIRI(NAMESPACE, "title");
