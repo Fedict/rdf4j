@@ -225,6 +225,15 @@ public abstract class CellParser {
 	}
 
 	/**
+	 * Get about placeholders
+	 * 
+	 * @return 
+	 */
+	public String[] getAboutPlaceholders() {
+		return aboutPlaceholders;
+	}
+
+	/**
 	 * Get propertyUrl as IRI
 	 *
 	 * @return
@@ -270,6 +279,15 @@ public abstract class CellParser {
 		this.valueUrl = valueUrl;
 		// check if this URL contains column placeholders
 		this.valuePlaceholders = getPlaceholders(valueUrl);
+	}
+
+	/**
+	 * Get value placeholders
+	 * 
+	 * @return 
+	 */
+	public String[] getValuePlaceholders() {
+		return valuePlaceholders;
 	}
 
 	/**
