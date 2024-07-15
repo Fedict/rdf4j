@@ -35,6 +35,17 @@ public class CSVWParserSettings {
 			"org.eclipse.rdf4j.rio.csvw.fail_on_invalid_lines", "Fail on CSVW invalid lines", Boolean.TRUE);
 
 	/**
+	 * Boolean setting for parser to determine whether 'minimal mode' is to be used. I.e. only produce triples from the
+	 * data cells, without adding table metadata .
+	 * <p>
+	 * Defaults to false.
+	 * <p>
+	 * Can be overridden by setting system property {@code org.eclipse.rdf4j.rio.csvw.minimal_mode}
+	 */
+	public static final BooleanRioSetting MINIMAL_MODE = new BooleanRioSetting(
+			"org.eclipse.rdf4j.rio.csvw.minimal_mode", "", Boolean.FALSE);
+
+	/**
 	 * Private constructor
 	 */
 	private CSVWParserSettings() {

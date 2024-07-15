@@ -110,6 +110,9 @@ public class CSVW {
 	/** csvw:required */
 	public static final IRI REQUIRED;
 
+	/** csvw:row */
+	public static final IRI HAS_ROW;
+
 	/** csvw:rownum */
 	public static final IRI ROWNUM;
 
@@ -145,7 +148,7 @@ public class CSVW {
 		SCHEMA = Vocabularies.createIRI(NAMESPACE, "Schema");
 		TABLE = Vocabularies.createIRI(NAMESPACE, "Table");
 		TABLE_GROUP = Vocabularies.createIRI(NAMESPACE, "TableGroup");
-	
+
 		ABOUT_URL = Vocabularies.createIRI(NAMESPACE, "aboutUrl");
 		BASE = Vocabularies.createIRI(NAMESPACE, "base");
 		COLUMN = Vocabularies.createIRI(NAMESPACE, "column");
@@ -166,6 +169,7 @@ public class CSVW {
 		PROPERTY_URL = Vocabularies.createIRI(NAMESPACE, "propertyUrl");
 		QUOTE_CHAR = Vocabularies.createIRI(NAMESPACE, "quoteChar");
 		REQUIRED = Vocabularies.createIRI(NAMESPACE, "required");
+		HAS_ROW = Vocabularies.createIRI(NAMESPACE, "row");
 		ROWNUM = Vocabularies.createIRI(NAMESPACE, "rownum");
 		SKIP_COLUMNS = Vocabularies.createIRI(NAMESPACE, "skipColumns");
 		SKIP_ROWS = Vocabularies.createIRI(NAMESPACE, "skipRows");

@@ -25,6 +25,7 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.CharSet;
+import org.eclipse.rdf4j.model.BNode;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Model;
 import org.eclipse.rdf4j.model.Resource;
@@ -37,6 +38,7 @@ import org.eclipse.rdf4j.model.util.RDFCollections;
 import org.eclipse.rdf4j.model.util.Statements;
 import org.eclipse.rdf4j.model.util.Values;
 import org.eclipse.rdf4j.model.vocabulary.CSVW;
+import org.eclipse.rdf4j.model.vocabulary.RDF;
 import org.eclipse.rdf4j.rio.ParserConfig;
 import org.eclipse.rdf4j.rio.RDFFormat;
 import org.eclipse.rdf4j.rio.RDFHandler;
@@ -79,12 +81,15 @@ public class CSVWParser extends AbstractRDFParser {
 
 		clear();
 
-		RDFHandler rdfHandler = getRDFHandler();
-
 		Model metadata = parseMetadata(in, null, baseURI);
 		if (metadata == null || metadata.isEmpty()) {
 			throw new RDFParseException("No metadata found");
 		}
+
+		RDFHandler rdfHandler = getRDFHandler();
+
+		boolean minimal = getParserConfig().get(CSVWParserSettings.MINIMAL_MODE);
+		Resource rootNode = minimal ? null : generateTablegroupNode(rdfHandler);
 
 		List<Value> tables = getTables(metadata);
 		for (Value table : tables) {
@@ -92,6 +97,7 @@ public class CSVWParser extends AbstractRDFParser {
 			if (csvFile == null) {
 				throw new RDFParseException("Could not find URL");
 			}
+			Resource tableNode = minimal ? null : generateTableNode(rdfHandler, rootNode);
 			// add dummy namespace for resolving unspecified column names / predicates relative to CSV file
 			metadata.getNamespaces().add(new SimpleNamespace("_local", csvFile.toString() + "#"));
 
@@ -102,7 +108,7 @@ public class CSVWParser extends AbstractRDFParser {
 					.collect(Collectors.toList())
 					.toArray(new CellParser[columns.size()]);
 
-			parseCSV(metadata, rdfHandler, csvFile, cellParsers, (Resource) table);
+			parseCSV(metadata, rdfHandler, csvFile, cellParsers, (Resource) table, tableNode);
 		}
 		clear();
 	}
@@ -138,25 +144,6 @@ public class CSVWParser extends AbstractRDFParser {
 	}
 
 	/**
-	 * Get (the blank nodes of) the table(s)
-	 *
-	 * @param metadata
-	 * @return
-	 */
-	private List<Value> getTables(Model metadata) throws RDFParseException {
-		Iterator<Statement> it = metadata.getStatements(null, CSVW.TABLES, null).iterator();
-		if (!it.hasNext()) {
-			// only one table, simplified structure
-			it = metadata.getStatements(null, CSVW.TABLE_SCHEMA, null).iterator();
-			if (!it.hasNext()) {
-				throw new RDFParseException("Metadata file has no tables and no tableSschema");
-			}
-			return List.of(it.next().getSubject());
-		}
-		return RDFCollections.asValues(metadata, (Resource) it.next().getObject(), new ArrayList<>());
-	}
-
-	/**
 	 * Get the location of the CSV file
 	 *
 	 * @param metadata
@@ -189,6 +176,25 @@ public class CSVWParser extends AbstractRDFParser {
 	private Resource getTableSchema(Model metadata, Resource table) throws RDFParseException {
 		return Models.getPropertyResource(metadata, table, CSVW.TABLE_SCHEMA)
 				.orElseThrow(() -> new RDFParseException("Metadata file does not contain tableSchema for " + table));
+	}
+
+	/**
+	 * Get (the blank nodes of) the table(s)
+	 *
+	 * @param metadata
+	 * @return
+	 */
+	private List<Value> getTables(Model metadata) throws RDFParseException {
+		Iterator<Statement> it = metadata.getStatements(null, CSVW.TABLES, null).iterator();
+		if (!it.hasNext()) {
+			// only one table, simplified structure
+			it = metadata.getStatements(null, CSVW.TABLE_SCHEMA, null).iterator();
+			if (!it.hasNext()) {
+				throw new RDFParseException("Metadata file has no tables and no tableSschema");
+			}
+			return List.of(it.next().getSubject());
+		}
+		return RDFCollections.asValues(metadata, (Resource) it.next().getObject(), new ArrayList<>());
 	}
 
 	/**
@@ -279,7 +285,7 @@ public class CSVWParser extends AbstractRDFParser {
 	}
 
 	/**
-	 * Get format string
+	 * Get format string, e.g date format
 	 *
 	 * @param metadata
 	 * @param column
@@ -332,6 +338,46 @@ public class CSVWParser extends AbstractRDFParser {
 	}
 
 	/**
+	 * Return root node for standard mode
+	 *
+	 * @param handler
+	 * @return
+	 */
+	private Resource generateTablegroupNode(RDFHandler handler) {
+		BNode node = Values.bnode();
+		handler.handleStatement(Statements.statement(node, RDF.TYPE, CSVW.TABLE_GROUP, null));
+		return node;
+	}
+
+	/**
+	 * Return root node for standard mode
+	 *
+	 * @param handler
+	 * @return
+	 */
+	private Resource generateTableNode(RDFHandler handler, Resource rootNode) {
+		BNode node = Values.bnode();
+		handler.handleStatement(Statements.statement(rootNode, CSVW.TABLES, node, null));
+		handler.handleStatement(Statements.statement(node, RDF.TYPE, CSVW.TABLE, null));
+		return node;
+	}
+
+	/**
+	 * Return root node for standard mode
+	 *
+	 * @param handler
+	 * @return
+	 */
+	private Resource generateRowNode(RDFHandler handler, Resource tableNode, Resource subject, long rownum) {
+		BNode node = Values.bnode();
+		handler.handleStatement(Statements.statement(tableNode, CSVW.HAS_ROW, node, null));
+		handler.handleStatement(Statements.statement(node, RDF.TYPE, CSVW.ROW, null));
+		handler.handleStatement(Statements.statement(node, CSVW.ROWNUM, Values.literal(rownum), null));
+		handler.handleStatement(Statements.statement(node, CSVW.DESCRIBES, subject, null));
+		return node;
+	}
+
+	/**
 	 * Parse a CSV file
 	 *
 	 * @param csvFile     URI of CSV file
@@ -339,7 +385,8 @@ public class CSVWParser extends AbstractRDFParser {
 	 * @param aboutURL
 	 * @param aboutIndex
 	 */
-	private void parseCSV(Model metadata, RDFHandler handler, URI csvFile, CellParser[] cellParsers, Resource table) {
+	private void parseCSV(Model metadata, RDFHandler handler, URI csvFile, CellParser[] cellParsers, Resource table,
+			Resource tableNode) {
 		String aboutURL = getAboutURL(metadata, table);
 
 		// check for placeholder / column name that's being used to create subject IRI
@@ -349,8 +396,9 @@ public class CSVWParser extends AbstractRDFParser {
 		LOGGER.info("Parsing {}", csvFile);
 
 		Charset encoding = getEncoding(metadata, table);
+		boolean minimal = getParserConfig().get(CSVWParserSettings.MINIMAL_MODE);
 
-		long line = 0;
+		long line = 1;
 		try (InputStream is = csvFile.toURL().openStream();
 				BufferedReader reader = new BufferedReader(new InputStreamReader(is, encoding));
 				CSVReader csv = getCSVReader(metadata, table, reader)) {
@@ -358,12 +406,15 @@ public class CSVWParser extends AbstractRDFParser {
 			String[] cells;
 			while ((cells = csv.readNext()) != null) {
 				Resource subject = getIRIorBnode(cellParsers, cells, aboutURL, aboutIndex, placeholder);
+				Resource rowNode = minimal ? null : generateRowNode(rdfHandler, tableNode, subject, line);
+
 				Value val;
 				Statement stmt;
 				for (int i = 0; i < cells.length; i++) {
 					if (i == aboutIndex) { // already processed to get subject
 						continue;
 					}
+
 					IRI predicate = cellParsers[i].getPropertyIRI();
 					val = cellParsers[i].parse(cells[i]);
 					handler.handleStatement(Statements.statement(subject, predicate, val, null));

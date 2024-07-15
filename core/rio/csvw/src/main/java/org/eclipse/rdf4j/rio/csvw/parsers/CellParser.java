@@ -71,8 +71,8 @@ public abstract class CellParser {
 
 	/**
 	 * Get default value
-	 * 
-	 * @return 
+	 *
+	 * @return
 	 */
 	public String getDefaultValue() {
 		return defaultValue;
@@ -80,8 +80,8 @@ public abstract class CellParser {
 
 	/**
 	 * Set default value
-	 * 
-	 * @param defaultValue 
+	 *
+	 * @param defaultValue
 	 */
 	public void setDefaultValue(String defaultValue) {
 		this.defaultValue = defaultValue;
@@ -89,8 +89,8 @@ public abstract class CellParser {
 
 	/**
 	 * Get NULL value
-	 * 
-	 * @return 
+	 *
+	 * @return
 	 */
 	public String getNullValue() {
 		return nullValue;
@@ -98,8 +98,8 @@ public abstract class CellParser {
 
 	/**
 	 * Set NULL value
-	 * 
-	 * @param nullValue 
+	 *
+	 * @param nullValue
 	 */
 	public void setNullValue(String nullValue) {
 		this.nullValue = nullValue;
@@ -115,8 +115,8 @@ public abstract class CellParser {
 
 	/**
 	 * IS virtual table ?
-	 * 
-	 * @return 
+	 *
+	 * @return
 	 */
 	public boolean isVirtual() {
 		return virtual;
@@ -124,8 +124,8 @@ public abstract class CellParser {
 
 	/**
 	 * Set virtual table
-	 * 
-	 * @param virtual 
+	 *
+	 * @param virtual
 	 */
 	public void setVirtual(boolean virtual) {
 		this.virtual = virtual;
@@ -137,9 +137,9 @@ public abstract class CellParser {
 
 	/**
 	 * Extract placeholders (if any)
-	 * 
+	 *
 	 * @param template URI template string
-	 * @return array of placeholders 
+	 * @return array of placeholders
 	 */
 	private String[] extractPlaceholders(String template) {
 		Matcher matcher = PLACEHOLDERS.matcher(template);
@@ -175,8 +175,8 @@ public abstract class CellParser {
 
 	/**
 	 * Get valueURL
-	 * 
-	 * @return 
+	 *
+	 * @return
 	 */
 	public String getValueUrl() {
 		return valueUrl;
@@ -184,8 +184,8 @@ public abstract class CellParser {
 
 	/**
 	 * Set valueUrl
-	 * 
-	 * @param valueUrl 
+	 *
+	 * @param valueUrl
 	 */
 	public void setValueUrl(String valueUrl) {
 		this.valueUrl = valueUrl;
@@ -194,8 +194,8 @@ public abstract class CellParser {
 
 	/**
 	 * Get format
-	 * 
-	 * @return 
+	 *
+	 * @return
 	 */
 	public String getFormat() {
 		return format;
@@ -203,8 +203,8 @@ public abstract class CellParser {
 
 	/**
 	 * Set format
-	 * 
-	 * @param format 
+	 *
+	 * @param format
 	 */
 	public void setFormat(String format) {
 		this.format = format;
@@ -212,8 +212,8 @@ public abstract class CellParser {
 
 	/**
 	 * Get decimal character
-	 * 
-	 * @return 
+	 *
+	 * @return
 	 */
 	public String getDecimalChar() {
 		return decimalChar;
@@ -221,8 +221,8 @@ public abstract class CellParser {
 
 	/**
 	 * Set decimal character
-	 * 
-	 * @param decimalChar 
+	 *
+	 * @param decimalChar
 	 */
 	public void setDecimalChar(String decimalChar) {
 		this.decimalChar = decimalChar;
@@ -230,8 +230,8 @@ public abstract class CellParser {
 
 	/**
 	 * Get group character
-	 * 
-	 * @return 
+	 *
+	 * @return
 	 */
 	public String getGroupChar() {
 		return groupChar;
@@ -239,8 +239,8 @@ public abstract class CellParser {
 
 	/**
 	 * Set group character
-	 * 
-	 * @param groupChar 
+	 *
+	 * @param groupChar
 	 */
 	public void setGroupChar(String groupChar) {
 		this.groupChar = groupChar;
@@ -248,8 +248,8 @@ public abstract class CellParser {
 
 	/**
 	 * Get separator character
-	 * 
-	 * @return 
+	 *
+	 * @return
 	 */
 	public String getSeparator() {
 		return separator;
@@ -257,8 +257,8 @@ public abstract class CellParser {
 
 	/**
 	 * Set separator character
-	 * 
-	 * @param separator 
+	 *
+	 * @param separator
 	 */
 	public void setSeparator(String separator) {
 		this.separator = separator;
@@ -266,8 +266,8 @@ public abstract class CellParser {
 
 	/**
 	 * Is trim enabled
-	 * 
-	 * @return 
+	 *
+	 * @return
 	 */
 	public boolean isTrim() {
 		return trim;
@@ -275,8 +275,8 @@ public abstract class CellParser {
 
 	/**
 	 * Set if value needs to be trimmed
-	 * 
-	 * @param trim 
+	 *
+	 * @param trim
 	 */
 	public void setTrim(boolean trim) {
 		this.trim = trim;

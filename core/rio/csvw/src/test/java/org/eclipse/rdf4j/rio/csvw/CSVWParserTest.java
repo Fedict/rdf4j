@@ -10,12 +10,19 @@
  *******************************************************************************/
 package org.eclipse.rdf4j.rio.csvw;
 
+import java.io.ByteArrayOutputStream;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 
 import org.eclipse.rdf4j.model.Model;
 import org.eclipse.rdf4j.model.impl.LinkedHashModel;
+import org.eclipse.rdf4j.rio.RDFFormat;
+import org.eclipse.rdf4j.rio.RDFWriter;
+import org.eclipse.rdf4j.rio.Rio;
 import org.eclipse.rdf4j.rio.helpers.BasicWriterSettings;
+import org.eclipse.rdf4j.rio.helpers.JSONLDMode;
+import org.eclipse.rdf4j.rio.helpers.JSONLDSettings;
 import org.eclipse.rdf4j.rio.helpers.StatementCollector;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -36,8 +43,12 @@ public class CSVWParserTest extends AbstractTest {
 		parser.getParserConfig().set(BasicWriterSettings.BASE_DIRECTIVE, true);
 		parser.parse(new FileInputStream("src/test/resources/painters-metadata.json"), getBase() + "/downloads/");
 
-		model.forEach(s -> {
-			System.err.println(s);
-		});
+		ByteArrayOutputStream os = new ByteArrayOutputStream();
+		RDFWriter writer = Rio.createWriter(RDFFormat.JSONLD, os);
+		writer.getWriterConfig().set(BasicWriterSettings.PRETTY_PRINT, true);
+		writer.getWriterConfig().set(JSONLDSettings.JSONLD_MODE, JSONLDMode.FLATTEN);
+		writer.getWriterConfig().set(JSONLDSettings.OPTIMIZE, true);
+		Rio.write(model, writer);
+		System.err.println(os.toString(StandardCharsets.UTF_8));
 	}
 }
