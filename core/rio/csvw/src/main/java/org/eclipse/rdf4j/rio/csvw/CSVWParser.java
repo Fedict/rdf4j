@@ -109,7 +109,7 @@ public class CSVWParser extends AbstractRDFParser {
 			Resource tableSchema = getTableSchema(metadata, (Resource) table);
 			List<Value> columns = getColumns(metadata, tableSchema);
 			CellParser[] cellParsers = columns.stream()
-					.map(c -> getCellParser(metadata, (Resource) c))
+					.map(c -> CSVWUtil.getCellParser(metadata, (Resource) c))
 					.collect(Collectors.toList())
 					.toArray(new CellParser[columns.size()]);
 
@@ -218,96 +218,6 @@ public class CSVWParser extends AbstractRDFParser {
 		return RDFCollections.asValues(metadata, head.get(), new ArrayList<>());
 	}
 
-	/**
-	 * Get parser for specific column
-	 *
-	 * @param metadata
-	 * @param column
-	 * @return
-	 */
-	private CellParser getCellParser(Model metadata, Resource column) {
-		IRI datatype = getDatatypeIRI(metadata, column);
-
-		CellParser parser = CellParserFactory.create(datatype);
-
-		Models.getPropertyString(metadata, column, CSVW.NAME)
-				.ifPresentOrElse(v -> parser.setName(v),
-						() -> new RDFParseException("Metadata file does not contain name for column " + column));
-
-		Models.getPropertyString(metadata, column, CSVW.DEFAULT).ifPresent(v -> parser.setDefaultValue(v));
-		Models.getPropertyString(metadata, column, CSVW.REQUIRED)
-				.ifPresent(v -> parser.setRequired(Boolean.parseBoolean(v)));
-		Models.getPropertyString(metadata, column, CSVW.VIRTUAL)
-				.ifPresent(v -> parser.setVirtual(Boolean.parseBoolean(v)));
-		Models.getPropertyString(metadata, column, CSVW.SUPPRESS_OUTPUT)
-				.ifPresent(v -> parser.setVirtual(Boolean.parseBoolean(v)));
-
-		// only useful for strings
-		Models.getPropertyString(metadata, column, CSVW.LANG).ifPresent(v -> parser.setLang(v));
-
-		// only useful for numeric
-		Models.getPropertyString(metadata, column, CSVW.DECIMAL_CHAR).ifPresent(v -> parser.setDecimalChar(v));
-		Models.getPropertyString(metadata, column, CSVW.GROUP_CHAR).ifPresent(v -> parser.setGroupChar(v));
-
-		// mostly for date formats
-		getFormat(metadata, column).ifPresent(v -> parser.setFormat(v));
-
-		Models.getPropertyString(metadata, column, CSVW.TRIM)
-				.ifPresent(v -> parser.setVirtual(Boolean.parseBoolean(v)));
-
-		Models.getPropertyString(metadata, column, CSVW.VALUE_URL).ifPresent(v -> parser.setValueUrl(v));
-
-		// use a property from a vocabulary as predicate, or create a property relative to the namespace of the CSV
-		Optional<String> propertyURL = Models.getPropertyString(metadata, column, CSVW.PROPERTY_URL);
-		String s = propertyURL.isPresent() ? propertyURL.get() : "_local:" + parser.getName();
-		parser.setPropertyIRI(metadata.getNamespaces(), s);
-
-		return parser;
-	}
-
-	/**
-	 * Get name of base or derived datatype
-	 *
-	 * @param metadata
-	 * @param column
-	 * @return
-	 */
-	private IRI getDatatypeIRI(Model metadata, Resource column) {
-		Optional<Value> val = Models.getProperty(metadata, column, CSVW.DATATYPE);
-		if (val.isPresent()) {
-			Value datatype = val.get();
-			// derived datatype
-			if (datatype.isBNode()) {
-				val = Models.getProperty(metadata, (Resource) datatype, CSVW.BASE);
-			}
-		}
-		if (!val.isPresent()) {
-			return XSD.STRING.getIri();
-		}
-		Value datatype = val.get();
-		if (datatype.isIRI()) {
-			return (IRI) datatype;
-		}
-		return XSD.valueOf(datatype.stringValue().toUpperCase()).getIri();
-	}
-
-	/**
-	 * Get format string, e.g date format
-	 *
-	 * @param metadata
-	 * @param column
-	 * @return
-	 */
-	private Optional<String> getFormat(Model metadata, Resource column) {
-		Optional<Value> val = Models.getProperty(metadata, column, CSVW.DATATYPE);
-		if (val.isPresent() && val.get().isBNode()) {
-			val = Models.getProperty(metadata, (Resource) val.get(), CSVW.FORMAT);
-			if (val.isPresent() && val.get().isLiteral()) {
-				return Optional.of(val.get().stringValue());
-			}
-		}
-		return Optional.empty();
-	}
 
 	/**
 	 * Get "about" URL template, to be used to create the subject of the triples
@@ -414,7 +324,7 @@ public class CSVWParser extends AbstractRDFParser {
 
 		String aboutURL = getAboutURL(metadata, table);
 
-		Charset encoding = getEncoding(metadata, table);
+		Charset encoding = CSVWUtil.getEncoding(metadata, table);
 		boolean minimal = getParserConfig().get(CSVWParserSettings.MINIMAL_MODE);
 
 		// check for placeholder / column name that's being used to create subject IRI
@@ -435,7 +345,7 @@ public class CSVWParser extends AbstractRDFParser {
 		long line = 1;
 		try (InputStream is = csvFile.toURL().openStream();
 				BufferedReader reader = new BufferedReader(new InputStreamReader(is, encoding));
-				CSVReader csv = getCSVReader(metadata, table, reader)) {
+				CSVReader csv = CSVWUtil.getCSVReader(metadata, table, reader)) {
 
 			Map<String, String> values = null;
 			String[] cells;
@@ -451,13 +361,15 @@ public class CSVWParser extends AbstractRDFParser {
 
 				// csv cells
 				for (int i = 0; i < cells.length; i++) {
+					if (doReplace) {
+						values.put("{_col}", Long.toString(i));
+					}
 					if (i == aboutIndex) { // already processed to get subject
 						if (doReplace) {
 							values.put(cellParsers[i].getNameEncoded(), cellParsers[i].parse(cells[i]).stringValue());
 						}
 						continue;
 					}
-
 					Value val = cellParsers[i].parse(cells[i]);
 					if (doReplace) {
 						values.put(cellParsers[i].getNameEncoded(), val.stringValue());
@@ -477,6 +389,9 @@ public class CSVWParser extends AbstractRDFParser {
 				}
 				// virtual columns, if any
 				for (int i = cells.length; i < cellParsers.length; i++) {
+					if (doReplace) {
+						values.put("{_col}", Long.toString(i));
+					}
 					handleStatement(handler, cellParsers[i], null, aboutSubject, values);
 				}
 				line++;
@@ -527,55 +442,6 @@ public class CSVWParser extends AbstractRDFParser {
 				(o != null) ? o : val,
 				null);
 		handler.handleStatement(stmt);
-	}
-
-	/**
-	 * Get configured CSV file reader
-	 *
-	 * @param metadata
-	 * @param reader
-	 * @return
-	 */
-	private CSVReader getCSVReader(Model metadata, Resource table, Reader reader) {
-		CSVParserBuilder parserBuilder = new CSVParserBuilder();
-		CSVReaderBuilder builder = new CSVReaderBuilder(reader);
-		builder.withSkipLines(1);
-
-		Optional<Value> val = Models.getProperty(metadata, table, CSVW.DIALECT);
-		if (val.isPresent()) {
-			Resource dialect = (Resource) val.get();
-
-			// skip header (and possibly other) rows
-			String headerRows = Models.getPropertyString(metadata, dialect, CSVW.HEADER_ROW_COUNT).orElse("1");
-			String skipRows = Models.getPropertyString(metadata, dialect, CSVW.SKIP_ROWS).orElse("0");
-			int skip = Integer.valueOf(headerRows) + Integer.valueOf(skipRows);
-			Models.getPropertyString(metadata, dialect, CSVW.HEADER)
-					.ifPresent(v -> builder.withSkipLines(v.equalsIgnoreCase("false") ? 0 : skip));
-
-			Models.getPropertyString(metadata, dialect, CSVW.DELIMITER)
-					.ifPresent(v -> parserBuilder.withSeparator(v.charAt(0)));
-			Models.getPropertyString(metadata, dialect, CSVW.QUOTE_CHAR)
-					.ifPresent(v -> parserBuilder.withQuoteChar(v.charAt(0)));
-		}
-		return builder.withCSVParser(parserBuilder.build()).build();
-	}
-
-	/**
-	 * Get charset of the CSV, by default this should be UTF-8
-	 *
-	 * @param metadata
-	 * @param table
-	 * @return charset
-	 */
-	private Charset getEncoding(Model metadata, Resource table) {
-		Optional<Value> dialect = Models.getProperty(metadata, table, CSVW.DIALECT);
-		if (dialect.isPresent()) {
-			Optional<String> encoding = Models.getPropertyString(metadata, (Resource) dialect.get(), CSVW.ENCODING);
-			if (encoding.isPresent()) {
-				return Charset.forName(encoding.get());
-			}
-		}
-		return StandardCharsets.UTF_8;
 	}
 
 	/**
