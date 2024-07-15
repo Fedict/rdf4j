@@ -218,7 +218,6 @@ public class CSVWParser extends AbstractRDFParser {
 		return RDFCollections.asValues(metadata, head.get(), new ArrayList<>());
 	}
 
-
 	/**
 	 * Get "about" URL template, to be used to create the subject of the triples
 	 *
@@ -392,7 +391,8 @@ public class CSVWParser extends AbstractRDFParser {
 					if (doReplace) {
 						values.put("{_col}", Long.toString(i));
 					}
-					handleStatement(handler, cellParsers[i], null, aboutSubject, values);
+					System.err.println("column: " + i);
+					handleStatement(handler, cellParsers[i], aboutSubject, values, needReplacement[i]);
 				}
 				line++;
 			}
@@ -415,10 +415,7 @@ public class CSVWParser extends AbstractRDFParser {
 		IRI predicate = cellParser.getPropertyIRI();
 		Resource o = cellParser.getValueUrl(cell);
 
-		Statement stmt = Statements.statement((s != null) ? s : aboutSubject,
-				predicate,
-				(o != null) ? o : val,
-				null);
+		Statement stmt = Statements.statement((s != null) ? s : aboutSubject, predicate, (o != null) ? o : val, null);
 		handler.handleStatement(stmt);
 	}
 
@@ -432,15 +429,32 @@ public class CSVWParser extends AbstractRDFParser {
 	 */
 	private void handleStatement(RDFHandler handler, CellParser cellParser, String cell, Resource aboutSubject,
 			Map<String, String> values) {
-		Resource s = cellParser.getAboutUrl(cell);
+		Resource s = cellParser.getAboutUrl(values);
 		IRI predicate = cellParser.getPropertyIRI();
-		Resource o = cellParser.getValueUrl(cell);
-		Value val = cellParser.parse(cell);
+		Value o = cellParser.getValueUrl(values, cell);
+		if (o == null) {
+			o = cellParser.parse(cell);
+		}
 
-		Statement stmt = Statements.statement((s != null) ? s : aboutSubject,
-				predicate,
-				(o != null) ? o : val,
-				null);
+		Statement stmt = Statements.statement((s != null) ? s : aboutSubject, predicate, o, null);
+		handler.handleStatement(stmt);
+	}
+
+	/**
+	 * Generate statement
+	 *
+	 * @param handler
+	 * @param cellParser
+	 * @param cells
+	 * @param aboutSubject
+	 */
+	private void handleStatement(RDFHandler handler, CellParser cellParser, Resource aboutSubject,
+			Map<String, String> values, boolean needsReplacement) {
+		Resource s = cellParser.getAboutUrl(values);
+		IRI predicate = cellParser.getPropertyIRI();
+		Resource o = (needsReplacement) ? cellParser.getValueUrl(values, null) : cellParser.getValueUrl(null);
+
+		Statement stmt = Statements.statement((s != null) ? s : aboutSubject, predicate, o, null);
 		handler.handleStatement(stmt);
 	}
 

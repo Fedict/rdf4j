@@ -16,6 +16,7 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.MatchResult;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -193,14 +194,19 @@ public abstract class CellParser {
 		Matcher matcher = PLACEHOLDERS.matcher(template);
 		String ownPlaceholder = getOwnPlaceholder(template);
 
-		if (matcher.find()) {
-			Set<String> placeholders = matcher.results()
-					.map(m -> m.group())
-					.filter(m -> !m.equals(ownPlaceholder))
-					.collect(Collectors.toSet());
-			return placeholders.toArray(new String[placeholders.size()]);
+		Set<String> placeholders = matcher.results()
+				.map(MatchResult::group)
+				.filter(m -> !m.equals(ownPlaceholder))
+				.collect(Collectors.toSet());
+		System.err.println("placeholders " + placeholders);
+		System.err.println("own placeholders " + ownPlaceholder);
+
+		if (placeholders.isEmpty()) {
+			System.err.println("no placeholder for " + template);
+			return null;
 		}
-		return null;
+		return placeholders.toArray(new String[placeholders.size()]);
+
 	}
 
 	/**
@@ -215,7 +221,7 @@ public abstract class CellParser {
 		}
 		String s = aboutUrl;
 		if (aboutPlaceholder != null && cell != null) {
-			s = aboutUrl.replace(encodedName, getValueOrDefault(cell));
+			s = aboutUrl.replace(aboutPlaceholder, getValueOrDefault(cell));
 		}
 		return Values.iri(s);
 	}
@@ -298,7 +304,8 @@ public abstract class CellParser {
 		}
 		String s = valueUrl;
 		if (valuePlaceholder != null && cell != null) {
-			s = valueUrl.replace(encodedName, getValueOrDefault(cell));
+			System.err.println("repace " + valuePlaceholder + " " + cell);
+			s = valueUrl.replace(valuePlaceholder, getValueOrDefault(cell));
 		}
 		return Values.iri(s);
 	}
@@ -315,7 +322,7 @@ public abstract class CellParser {
 			return null;
 		}
 		String s = valueUrl;
-		if (valuePlaceholder != null) {
+		if (valuePlaceholder != null && cell != null) {
 			s = valueUrl.replace(encodedName, getValueOrDefault(cell));
 		}
 		for (String val : valuePlaceholders) {
@@ -331,7 +338,9 @@ public abstract class CellParser {
 	 */
 	public void setValueUrl(String valueUrl) {
 		this.valueUrl = valueUrl;
+		System.err.println("valueurl " + valueUrl);
 		// check if this URL contains column placeholders
+		this.valuePlaceholder = getOwnPlaceholder(valueUrl);
 		this.valuePlaceholders = getPlaceholders(valueUrl);
 	}
 

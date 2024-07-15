@@ -10,13 +10,11 @@
  *******************************************************************************/
 package org.eclipse.rdf4j.rio.csvw;
 
-import com.opencsv.CSVParserBuilder;
-import com.opencsv.CSVReader;
-import com.opencsv.CSVReaderBuilder;
 import java.io.Reader;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.Optional;
+
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Model;
 import org.eclipse.rdf4j.model.Resource;
@@ -28,6 +26,9 @@ import org.eclipse.rdf4j.rio.RDFParseException;
 import org.eclipse.rdf4j.rio.csvw.parsers.CellParser;
 import org.eclipse.rdf4j.rio.csvw.parsers.CellParserFactory;
 
+import com.opencsv.CSVParserBuilder;
+import com.opencsv.CSVReader;
+import com.opencsv.CSVReaderBuilder;
 
 /**
  * Utility class, mostly about configuring the reader based on the JSON-LD metadata
@@ -112,7 +113,6 @@ public class CSVWUtil {
 		return CoreDatatype.XSD.valueOf(datatype.stringValue().toUpperCase()).getIri();
 	}
 
-	
 	/**
 	 * Get format string, e.g date format
 	 *
