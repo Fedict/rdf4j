@@ -24,7 +24,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-import org.apache.commons.lang3.CharSet;
 import org.eclipse.rdf4j.model.BNode;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Model;
@@ -48,6 +47,7 @@ import org.eclipse.rdf4j.rio.Rio;
 import org.eclipse.rdf4j.rio.csvw.parsers.CellParser;
 import org.eclipse.rdf4j.rio.csvw.parsers.CellParserFactory;
 import org.eclipse.rdf4j.rio.helpers.AbstractRDFParser;
+
 import org.slf4j.LoggerFactory;
 
 import com.opencsv.CSVParser;
@@ -57,14 +57,17 @@ import com.opencsv.CSVReaderBuilder;
 import com.opencsv.exceptions.CsvValidationException;
 
 /**
- * Basic (experimental) CSV on the Web parser.
- *
- * Currently only "minimal mode" is supported
+ * Experimental CSV on the Web parser.
  *
  * @author Bart Hanssens
  *
+ * Basically it consists of an existing CSV file and a metadata file (in JSON-LD) describing the columns.
+ * Parsers need to convert the data client-side.
+ * 
  * @see <a href="https://w3c.github.io/csvw/primer/">CSV on the Web Primer</a>
+ * @see <a href="https://w3c.github.io/csvw/syntax/">Model for Tabular Data and Metadata on the Web</a>
  * @see <a href="https://w3c.github.io/csvw/metadata">Metadata Vocabulary for Tabular Data</a>
+ * 
  * @since 5.1.0
  */
 public class CSVWParser extends AbstractRDFParser {
@@ -86,7 +89,7 @@ public class CSVWParser extends AbstractRDFParser {
 			throw new RDFParseException("No metadata found");
 		}
 
-		RDFHandler rdfHandler = getRDFHandler();
+		rdfHandler = getRDFHandler();
 
 		boolean minimal = getParserConfig().get(CSVWParserSettings.MINIMAL_MODE);
 		Resource rootNode = minimal ? null : generateTablegroupNode(rdfHandler);
