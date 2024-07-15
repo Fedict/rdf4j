@@ -34,6 +34,7 @@ public abstract class CellParser {
 	private String defaultValue;
 	private String nullValue;
 	private boolean required;
+	private String aboutUrl;
 	private IRI propertyIRI;
 	private String valueUrl;
 	private String format;
@@ -42,8 +43,11 @@ public abstract class CellParser {
 	private String separator;
 	private boolean trim = true;
 	private boolean virtual = false;
-	private String[] propPlaceholder;
-	private String[] valPlaceholder;
+	private boolean suppressed = false;
+
+	private String[] aboutPlaceholders;
+	private String[] propPlaceholders;
+	private String[] valPlaceholders;
 
 	public String getName() {
 		return name;
@@ -131,10 +135,6 @@ public abstract class CellParser {
 		this.virtual = virtual;
 	}
 
-	public IRI getPropertyIRI() {
-		return propertyIRI;
-	}
-
 	/**
 	 * Extract placeholders (if any)
 	 *
@@ -152,6 +152,34 @@ public abstract class CellParser {
 			return placeholders;
 		}
 		return null;
+	}
+
+	/**
+	 * Get aboutURL
+	 *
+	 * @return
+	 */
+	public String getAboutUrl() {
+		return aboutUrl;
+	}
+
+	/**
+	 * Set aboutUrl
+	 *
+	 * @param aboutUrl
+	 */
+	public void setAboutUrl(String aboutUrl) {
+		this.aboutUrl = aboutUrl;
+		this.aboutPlaceholders = extractPlaceholders(aboutUrl);
+	}
+
+	/**
+	 * Get propertyUrl as IRI
+	 *
+	 * @return
+	 */
+	public IRI getPropertyIRI() {
+		return propertyIRI;
 	}
 
 	/**
@@ -189,7 +217,7 @@ public abstract class CellParser {
 	 */
 	public void setValueUrl(String valueUrl) {
 		this.valueUrl = valueUrl;
-		this.valPlaceholder = extractPlaceholders(valueUrl);
+		this.valPlaceholders = extractPlaceholders(valueUrl);
 	}
 
 	/**
@@ -280,6 +308,24 @@ public abstract class CellParser {
 	 */
 	public void setTrim(boolean trim) {
 		this.trim = trim;
+	}
+
+	/**
+	 * Set if output needs to be suppressed
+	 *
+	 * @return
+	 */
+	public boolean isSuppressed() {
+		return suppressed;
+	}
+
+	/**
+	 * Set if output needs to be suppressed
+	 *
+	 * @param suppressed
+	 */
+	public void setSuppressed(boolean suppressed) {
+		this.suppressed = suppressed;
 	}
 
 	/**

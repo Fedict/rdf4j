@@ -234,6 +234,8 @@ public class CSVWParser extends AbstractRDFParser {
 				.ifPresent(v -> parser.setRequired(Boolean.parseBoolean(v)));
 		Models.getPropertyString(metadata, column, CSVW.VIRTUAL)
 				.ifPresent(v -> parser.setVirtual(Boolean.parseBoolean(v)));
+		Models.getPropertyString(metadata, column, CSVW.SUPPRESS_OUTPUT)
+				.ifPresent(v -> parser.setVirtual(Boolean.parseBoolean(v)));
 
 		// only useful for strings
 		Models.getPropertyString(metadata, column, CSVW.LANG).ifPresent(v -> parser.setLang(v));
@@ -417,7 +419,9 @@ public class CSVWParser extends AbstractRDFParser {
 
 					IRI predicate = cellParsers[i].getPropertyIRI();
 					val = cellParsers[i].parse(cells[i]);
-					handler.handleStatement(Statements.statement(subject, predicate, val, null));
+					if (!cellParsers[i].isSuppressed()) {
+						handler.handleStatement(Statements.statement(subject, predicate, val, null));
+					}
 				}
 				line++;
 			}
