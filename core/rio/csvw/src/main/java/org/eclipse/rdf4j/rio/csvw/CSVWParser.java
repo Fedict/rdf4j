@@ -343,7 +343,7 @@ public class CSVWParser extends AbstractRDFParser {
 	}
 
 	/**
-	 * Return root node for standard mode
+	 * Create tablegroup statement and return root node
 	 *
 	 * @param handler
 	 * @return
@@ -355,7 +355,7 @@ public class CSVWParser extends AbstractRDFParser {
 	}
 
 	/**
-	 * Return root node for standard mode
+	 * Create table statements and return table node
 	 *
 	 * @param handler
 	 * @return
@@ -368,7 +368,7 @@ public class CSVWParser extends AbstractRDFParser {
 	}
 
 	/**
-	 * Return root node for standard mode
+	 * Create row statements and return row node
 	 *
 	 * @param handler
 	 * @return
@@ -382,6 +382,22 @@ public class CSVWParser extends AbstractRDFParser {
 		return node;
 	}
 
+	/**
+	 * Check which cellparsers have placeholders that need to be replaced
+	 * 
+	 * @param cellParsers
+	 * @return 
+	 */
+	private boolean[] havePlaceholders(CellParser[] cellParsers) {
+		boolean[] placeholders = new boolean[cellParsers.length];
+		
+		for (int i = 0; i < cellParsers.length; i++) {
+			placeholders[i] &= (cellParsers[i].getAboutPlaceholders() != null);
+			placeholders[i] &= (cellParsers[i].getValuePlaceholders() != null);
+		}
+		return null;
+	}
+			
 	/**
 	 * Parse a CSV file
 	 *
@@ -397,6 +413,8 @@ public class CSVWParser extends AbstractRDFParser {
 		// check for placeholder / column name that's being used to create subject IRI
 		int aboutIndex = getAboutIndex(aboutURL, cellParsers);
 		String placeholder = (aboutIndex > -1) ? "{" + cellParsers[aboutIndex].getName() + "}" : null;
+
+		boolean[] placeholders = havePlaceholders(cellParsers);
 
 		LOGGER.info("Parsing {}", csvFile);
 
