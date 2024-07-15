@@ -10,7 +10,10 @@
  *******************************************************************************/
 package org.eclipse.rdf4j.rio.csvw.parsers;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -29,6 +32,7 @@ public abstract class CellParser {
 	private static final Pattern PLACEHOLDERS = Pattern.compile("(\\{#?_?[^\\}]+\\})");
 
 	private String name;
+	private String encodedName;
 	private IRI dataType;
 	private String lang;
 	private String defaultValue;
@@ -45,18 +49,45 @@ public abstract class CellParser {
 	private boolean virtual = false;
 	private boolean suppressed = false;
 
+	private String aboutPlaceholder;
 	private String[] aboutPlaceholders;
-	private String[] propPlaceholders;
-	private String[] valPlaceholders;
+	
+	private String valuePlaceholder;
+	private String[] valuePlaceholders;
 
+	/**
+	 * Get name of the column
+	 * 
+	 * @return 
+	 */
 	public String getName() {
 		return name;
 	}
 
-	public void setName(String name) {
-		this.name = name;
+	/**
+	 * Get URL encoded name
+	 * 
+	 * @return encoded name 
+	 */
+	public String getNameEncoded() {
+		return encodedName;
 	}
 
+	/**
+	 * Set name of the column
+	 * 
+	 * @param name 
+	 */
+	public void setName(String name) {
+		this.name = name;
+		this.encodedName = URLEncoder.encode(name, StandardCharsets.UTF_8);
+	}
+			
+	/**
+	 * Get datatype
+	 * 
+	 * @return 
+	 */
 	public IRI getDataType() {
 		return dataType;
 	}
@@ -135,21 +166,39 @@ public abstract class CellParser {
 		this.virtual = virtual;
 	}
 
+
 	/**
-	 * Extract placeholders (if any)
+	 * Extract placeholder name for the own column, if any
 	 *
 	 * @param template URI template string
-	 * @return array of placeholders
+	 * @return placeholder name or null
 	 */
-	private String[] extractPlaceholders(String template) {
-		Matcher matcher = PLACEHOLDERS.matcher(template);
-		if (matcher.find()) {
-			int matches = matcher.groupCount();
-			String[] placeholders = new String[matches];
-			for (int i = 0; i < matches; i++) {
-				placeholders[i] = matcher.group(i + 1);
+	private String getOwnPlaceholder(String template) {
+		if (encodedName != null) {
+			String placeholder = "{" + encodedName + "}";
+			if (template.contains(placeholder)) {
+				return placeholder;
 			}
-			return placeholders;
+		}
+		return null;
+	}
+
+	/**
+	 * Extract placeholder names for (values of) other columns, if any
+	 *
+	 * @param template URI template string
+	 * @return array of placeholder names
+	 */
+	private String[] getPlaceholders(String template) {
+		Matcher matcher = PLACEHOLDERS.matcher(template);
+		String ownPlaceholder = getOwnPlaceholder(template);
+		
+		if (matcher.find()) {
+			Set<String> placeholders = matcher.results()
+										.map(m -> m.group())
+										.filter(m -> !m.equals(ownPlaceholder))
+										.collect(Collectors.toSet());
+			return placeholders.toArray(new String[placeholders.size()]);
 		}
 		return null;
 	}
@@ -170,7 +219,9 @@ public abstract class CellParser {
 	 */
 	public void setAboutUrl(String aboutUrl) {
 		this.aboutUrl = aboutUrl;
-		this.aboutPlaceholders = extractPlaceholders(aboutUrl);
+		// check if this URL contains column placeholders
+		this.aboutPlaceholder = getOwnPlaceholder(aboutUrl);
+		this.aboutPlaceholders = getPlaceholders(aboutUrl);
 	}
 
 	/**
@@ -217,7 +268,8 @@ public abstract class CellParser {
 	 */
 	public void setValueUrl(String valueUrl) {
 		this.valueUrl = valueUrl;
-		this.valPlaceholders = extractPlaceholders(valueUrl);
+		// check if this URL contains column placeholders
+		this.valuePlaceholders = getPlaceholders(valueUrl);
 	}
 
 	/**
