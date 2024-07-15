@@ -14,6 +14,7 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -51,14 +52,14 @@ public abstract class CellParser {
 
 	private String aboutPlaceholder;
 	private String[] aboutPlaceholders;
-	
+
 	private String valuePlaceholder;
 	private String[] valuePlaceholders;
 
 	/**
 	 * Get name of the column
-	 * 
-	 * @return 
+	 *
+	 * @return
 	 */
 	public String getName() {
 		return name;
@@ -66,8 +67,8 @@ public abstract class CellParser {
 
 	/**
 	 * Get URL encoded name
-	 * 
-	 * @return encoded name 
+	 *
+	 * @return encoded name
 	 */
 	public String getNameEncoded() {
 		return encodedName;
@@ -75,18 +76,18 @@ public abstract class CellParser {
 
 	/**
 	 * Set name of the column
-	 * 
-	 * @param name 
+	 *
+	 * @param name
 	 */
 	public void setName(String name) {
 		this.name = name;
 		this.encodedName = URLEncoder.encode(name, StandardCharsets.UTF_8);
 	}
-			
+
 	/**
 	 * Get datatype
-	 * 
-	 * @return 
+	 *
+	 * @return
 	 */
 	public IRI getDataType() {
 		return dataType;
@@ -166,7 +167,6 @@ public abstract class CellParser {
 		this.virtual = virtual;
 	}
 
-
 	/**
 	 * Extract placeholder name for the own column, if any
 	 *
@@ -192,12 +192,12 @@ public abstract class CellParser {
 	private String[] getPlaceholders(String template) {
 		Matcher matcher = PLACEHOLDERS.matcher(template);
 		String ownPlaceholder = getOwnPlaceholder(template);
-		
+
 		if (matcher.find()) {
 			Set<String> placeholders = matcher.results()
-										.map(m -> m.group())
-										.filter(m -> !m.equals(ownPlaceholder))
-										.collect(Collectors.toSet());
+					.map(m -> m.group())
+					.filter(m -> !m.equals(ownPlaceholder))
+					.collect(Collectors.toSet());
 			return placeholders.toArray(new String[placeholders.size()]);
 		}
 		return null;
@@ -206,10 +206,35 @@ public abstract class CellParser {
 	/**
 	 * Get aboutURL
 	 *
+	 * @param cell
 	 * @return
 	 */
-	public String getAboutUrl() {
-		return aboutUrl;
+	public IRI getAboutUrl(String cell) {
+		if (aboutUrl == null) {
+			return null;
+		}
+		String s = aboutUrl;
+		if (aboutPlaceholder != null && cell != null) {
+			s = aboutUrl.replace(encodedName, getValueOrDefault(cell));
+		}
+		return Values.iri(s);
+	}
+
+	/**
+	 * Get aboutURL with placeholders replaced with values
+	 *
+	 * @param values
+	 * @return
+	 */
+	public IRI getAboutUrl(Map<String, String> values) {
+		if (aboutUrl == null) {
+			return null;
+		}
+		String s = aboutUrl;
+		for (String val : aboutPlaceholders) {
+			s = aboutUrl.replace(val, values.get(val));
+		}
+		return Values.iri(s);
 	}
 
 	/**
@@ -226,8 +251,8 @@ public abstract class CellParser {
 
 	/**
 	 * Get about placeholders
-	 * 
-	 * @return 
+	 *
+	 * @return
 	 */
 	public String[] getAboutPlaceholders() {
 		return aboutPlaceholders;
@@ -264,10 +289,39 @@ public abstract class CellParser {
 	/**
 	 * Get valueURL
 	 *
+	 * @param cell
 	 * @return
 	 */
-	public String getValueUrl() {
-		return valueUrl;
+	public IRI getValueUrl(String cell) {
+		if (valueUrl == null) {
+			return null;
+		}
+		String s = valueUrl;
+		if (valuePlaceholder != null && cell != null) {
+			s = valueUrl.replace(encodedName, getValueOrDefault(cell));
+		}
+		return Values.iri(s);
+	}
+
+	/**
+	 * Get valueURL with placeholders replaced with values
+	 *
+	 * @param values
+	 * @param cell
+	 * @return
+	 */
+	public IRI getValueUrl(Map<String, String> values, String cell) {
+		if (valueUrl == null) {
+			return null;
+		}
+		String s = valueUrl;
+		if (valuePlaceholder != null) {
+			s = valueUrl.replace(encodedName, getValueOrDefault(cell));
+		}
+		for (String val : valuePlaceholders) {
+			s = valueUrl.replace(val, values.get(val));
+		}
+		return Values.iri(s);
 	}
 
 	/**
@@ -283,8 +337,8 @@ public abstract class CellParser {
 
 	/**
 	 * Get value placeholders
-	 * 
-	 * @return 
+	 *
+	 * @return
 	 */
 	public String[] getValuePlaceholders() {
 		return valuePlaceholders;

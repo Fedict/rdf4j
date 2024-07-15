@@ -19,8 +19,11 @@ import java.net.URI;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -47,7 +50,6 @@ import org.eclipse.rdf4j.rio.Rio;
 import org.eclipse.rdf4j.rio.csvw.parsers.CellParser;
 import org.eclipse.rdf4j.rio.csvw.parsers.CellParserFactory;
 import org.eclipse.rdf4j.rio.helpers.AbstractRDFParser;
-
 import org.slf4j.LoggerFactory;
 
 import com.opencsv.CSVParser;
@@ -61,13 +63,13 @@ import com.opencsv.exceptions.CsvValidationException;
  *
  * @author Bart Hanssens
  *
- * Basically it consists of an existing CSV file and a metadata file (in JSON-LD) describing the columns.
- * Parsers need to convert the data client-side.
- * 
+ *         Basically it consists of an existing CSV file and a metadata file (in JSON-LD) describing the columns.
+ *         Parsers need to convert the data client-side.
+ *
  * @see <a href="https://w3c.github.io/csvw/primer/">CSV on the Web Primer</a>
  * @see <a href="https://w3c.github.io/csvw/syntax/">Model for Tabular Data and Metadata on the Web</a>
  * @see <a href="https://w3c.github.io/csvw/metadata">Metadata Vocabulary for Tabular Data</a>
- * 
+ *
  * @since 5.1.0
  */
 public class CSVWParser extends AbstractRDFParser {
@@ -384,20 +386,20 @@ public class CSVWParser extends AbstractRDFParser {
 
 	/**
 	 * Check which cellparsers have placeholders that need to be replaced
-	 * 
+	 *
 	 * @param cellParsers
-	 * @return 
+	 * @return
 	 */
-	private boolean[] havePlaceholders(CellParser[] cellParsers) {
+	private boolean[] needReplacement(CellParser[] cellParsers) {
 		boolean[] placeholders = new boolean[cellParsers.length];
-		
+
 		for (int i = 0; i < cellParsers.length; i++) {
 			placeholders[i] &= (cellParsers[i].getAboutPlaceholders() != null);
 			placeholders[i] &= (cellParsers[i].getValuePlaceholders() != null);
 		}
-		return null;
+		return placeholders;
 	}
-			
+
 	/**
 	 * Parse a CSV file
 	 *
@@ -408,47 +410,123 @@ public class CSVWParser extends AbstractRDFParser {
 	 */
 	private void parseCSV(Model metadata, RDFHandler handler, URI csvFile, CellParser[] cellParsers, Resource table,
 			Resource tableNode) {
-		String aboutURL = getAboutURL(metadata, table);
-
-		// check for placeholder / column name that's being used to create subject IRI
-		int aboutIndex = getAboutIndex(aboutURL, cellParsers);
-		String placeholder = (aboutIndex > -1) ? "{" + cellParsers[aboutIndex].getName() + "}" : null;
-
-		boolean[] placeholders = havePlaceholders(cellParsers);
-
 		LOGGER.info("Parsing {}", csvFile);
+
+		String aboutURL = getAboutURL(metadata, table);
 
 		Charset encoding = getEncoding(metadata, table);
 		boolean minimal = getParserConfig().get(CSVWParserSettings.MINIMAL_MODE);
+
+		// check for placeholder / column name that's being used to create subject IRI
+		int aboutIndex = getAboutIndex(aboutURL, cellParsers);
+		String placeholder = (aboutIndex > -1) ? "{" + cellParsers[aboutIndex].getNameEncoded() + "}" : null;
+
+		// check which columns need replacement in aboutURL/valueURL
+		boolean[] needReplacement = needReplacement(cellParsers);
+
+		boolean doReplace = false;
+		for (int i = 0; i < needReplacement.length; i++) {
+			if (needReplacement[i]) {
+				doReplace = true;
+				return;
+			}
+		}
 
 		long line = 1;
 		try (InputStream is = csvFile.toURL().openStream();
 				BufferedReader reader = new BufferedReader(new InputStreamReader(is, encoding));
 				CSVReader csv = getCSVReader(metadata, table, reader)) {
 
+			Map<String, String> values = null;
 			String[] cells;
-			while ((cells = csv.readNext()) != null) {
-				Resource subject = getIRIorBnode(cellParsers, cells, aboutURL, aboutIndex, placeholder);
-				Resource rowNode = minimal ? null : generateRowNode(rdfHandler, tableNode, subject, line);
 
-				Value val;
-				Statement stmt;
+			while ((cells = csv.readNext()) != null) {
+				Resource aboutSubject = getIRIorBnode(cellParsers, cells, aboutURL, aboutIndex, placeholder);
+				Resource rowNode = minimal ? null : generateRowNode(rdfHandler, tableNode, aboutSubject, line);
+
+				if (doReplace) {
+					values = new HashMap<>(cells.length + 4, 1.0f);
+					values.put("{_row}", Long.toString(line));
+				}
+
+				// csv cells
 				for (int i = 0; i < cells.length; i++) {
 					if (i == aboutIndex) { // already processed to get subject
+						if (doReplace) {
+							values.put(cellParsers[i].getNameEncoded(), cellParsers[i].parse(cells[i]).stringValue());
+						}
 						continue;
 					}
 
-					IRI predicate = cellParsers[i].getPropertyIRI();
-					val = cellParsers[i].parse(cells[i]);
-					if (!cellParsers[i].isSuppressed()) {
-						handler.handleStatement(Statements.statement(subject, predicate, val, null));
+					Value val = cellParsers[i].parse(cells[i]);
+					if (doReplace) {
+						values.put(cellParsers[i].getNameEncoded(), val.stringValue());
 					}
+					if (!cellParsers[i].isSuppressed() && !needReplacement[i]) {
+						handleStatement(handler, cellParsers[i], cells[i], aboutSubject, val);
+					}
+				}
+				// second pass, this time to retrieve replace placeholders in URLs with column values
+				for (int i = 0; i < cells.length; i++) {
+					if (i == aboutIndex || !needReplacement[i]) { // already processed to get subject
+						continue;
+					}
+					if (!cellParsers[i].isSuppressed()) {
+						handleStatement(handler, cellParsers[i], cells[i], aboutSubject, values);
+					}
+				}
+				// virtual columns, if any
+				for (int i = cells.length; i < cellParsers.length; i++) {
+					handleStatement(handler, cellParsers[i], null, aboutSubject, values);
 				}
 				line++;
 			}
 		} catch (IOException | CsvValidationException ex) {
 			throw new RDFParseException("Error parsing " + csvFile, ex, line, -1);
 		}
+	}
+
+	/**
+	 * Generate statement
+	 *
+	 * @param handler
+	 * @param cellParser
+	 * @param cells
+	 * @param aboutSubject
+	 */
+	private void handleStatement(RDFHandler handler, CellParser cellParser, String cell, Resource aboutSubject,
+			Value val) {
+		Resource s = cellParser.getAboutUrl(cell);
+		IRI predicate = cellParser.getPropertyIRI();
+		Resource o = cellParser.getValueUrl(cell);
+
+		Statement stmt = Statements.statement((s != null) ? s : aboutSubject,
+				predicate,
+				(o != null) ? o : val,
+				null);
+		handler.handleStatement(stmt);
+	}
+
+	/**
+	 * Generate statement
+	 *
+	 * @param handler
+	 * @param cellParser
+	 * @param cells
+	 * @param aboutSubject
+	 */
+	private void handleStatement(RDFHandler handler, CellParser cellParser, String cell, Resource aboutSubject,
+			Map<String, String> values) {
+		Resource s = cellParser.getAboutUrl(cell);
+		IRI predicate = cellParser.getPropertyIRI();
+		Resource o = cellParser.getValueUrl(cell);
+		Value val = cellParser.parse(cell);
+
+		Statement stmt = Statements.statement((s != null) ? s : aboutSubject,
+				predicate,
+				(o != null) ? o : val,
+				null);
+		handler.handleStatement(stmt);
 	}
 
 	/**
