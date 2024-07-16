@@ -20,6 +20,7 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.BitSet;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -303,8 +304,8 @@ public class CSVWParser extends AbstractRDFParser {
 		boolean[] placeholders = new boolean[cellParsers.length];
 
 		for (int i = 0; i < cellParsers.length; i++) {
-			placeholders[i] &= (cellParsers[i].getAboutPlaceholders() != null);
-			placeholders[i] &= (cellParsers[i].getValuePlaceholders() != null);
+			placeholders[i] = (cellParsers[i].getAboutPlaceholders().length > 0) ||
+					(cellParsers[i].getValuePlaceholders().length > 0);
 		}
 		return placeholders;
 	}
@@ -328,16 +329,15 @@ public class CSVWParser extends AbstractRDFParser {
 
 		// check for placeholder / column name that's being used to create subject IRI
 		int aboutIndex = getAboutIndex(aboutURL, cellParsers);
-		String placeholder = (aboutIndex > -1) ? "{" + cellParsers[aboutIndex].getNameEncoded() + "}" : null;
+		String placeholder = (aboutIndex > -1) ? cellParsers[aboutIndex].getNameEncoded() : null;
 
 		// check which columns need replacement in aboutURL/valueURL
 		boolean[] needReplacement = needReplacement(cellParsers);
-
 		boolean doReplace = false;
 		for (int i = 0; i < needReplacement.length; i++) {
 			if (needReplacement[i]) {
 				doReplace = true;
-				return;
+				break;
 			}
 		}
 
@@ -374,7 +374,7 @@ public class CSVWParser extends AbstractRDFParser {
 						values.put(cellParsers[i].getNameEncoded(), val.stringValue());
 					}
 					if (!cellParsers[i].isSuppressed() && !needReplacement[i]) {
-						handleStatement(handler, cellParsers[i], cells[i], aboutSubject, val);
+						handler.handleStatement(buildStatement(cellParsers[i], cells[i], aboutSubject, val));
 					}
 				}
 				// second pass, this time to retrieve replace placeholders in URLs with column values
@@ -383,7 +383,7 @@ public class CSVWParser extends AbstractRDFParser {
 						continue;
 					}
 					if (!cellParsers[i].isSuppressed()) {
-						handleStatement(handler, cellParsers[i], cells[i], aboutSubject, values);
+						handler.handleStatement(buildStatement(cellParsers[i], cells[i], aboutSubject, values));
 					}
 				}
 				// virtual columns, if any
@@ -391,8 +391,7 @@ public class CSVWParser extends AbstractRDFParser {
 					if (doReplace) {
 						values.put("{_col}", Long.toString(i));
 					}
-					System.err.println("column: " + i);
-					handleStatement(handler, cellParsers[i], aboutSubject, values, needReplacement[i]);
+					handler.handleStatement(buildStatement(cellParsers[i], null, aboutSubject, values));
 				}
 				line++;
 			}
@@ -409,14 +408,12 @@ public class CSVWParser extends AbstractRDFParser {
 	 * @param cells
 	 * @param aboutSubject
 	 */
-	private void handleStatement(RDFHandler handler, CellParser cellParser, String cell, Resource aboutSubject,
-			Value val) {
+	private Statement buildStatement(CellParser cellParser, String cell, Resource aboutSubject, Value val) {
 		Resource s = cellParser.getAboutUrl(cell);
 		IRI predicate = cellParser.getPropertyIRI();
 		Resource o = cellParser.getValueUrl(cell);
 
-		Statement stmt = Statements.statement((s != null) ? s : aboutSubject, predicate, (o != null) ? o : val, null);
-		handler.handleStatement(stmt);
+		return Statements.statement((s != null) ? s : aboutSubject, predicate, (o != null) ? o : val, null);
 	}
 
 	/**
@@ -427,35 +424,16 @@ public class CSVWParser extends AbstractRDFParser {
 	 * @param cells
 	 * @param aboutSubject
 	 */
-	private void handleStatement(RDFHandler handler, CellParser cellParser, String cell, Resource aboutSubject,
+	private Statement buildStatement(CellParser cellParser, String cell, Resource aboutSubject,
 			Map<String, String> values) {
 		Resource s = cellParser.getAboutUrl(values);
 		IRI predicate = cellParser.getPropertyIRI();
 		Value o = cellParser.getValueUrl(values, cell);
-		if (o == null) {
+		if (o == null && cell != null) {
 			o = cellParser.parse(cell);
 		}
 
-		Statement stmt = Statements.statement((s != null) ? s : aboutSubject, predicate, o, null);
-		handler.handleStatement(stmt);
-	}
-
-	/**
-	 * Generate statement
-	 *
-	 * @param handler
-	 * @param cellParser
-	 * @param cells
-	 * @param aboutSubject
-	 */
-	private void handleStatement(RDFHandler handler, CellParser cellParser, Resource aboutSubject,
-			Map<String, String> values, boolean needsReplacement) {
-		Resource s = cellParser.getAboutUrl(values);
-		IRI predicate = cellParser.getPropertyIRI();
-		Resource o = (needsReplacement) ? cellParser.getValueUrl(values, null) : cellParser.getValueUrl(null);
-
-		Statement stmt = Statements.statement((s != null) ? s : aboutSubject, predicate, o, null);
-		handler.handleStatement(stmt);
+		return Statements.statement((s != null) ? s : aboutSubject, predicate, o, null);
 	}
 
 	/**

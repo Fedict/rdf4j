@@ -12,8 +12,6 @@ package org.eclipse.rdf4j.rio.csvw.parsers;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
-import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.MatchResult;
@@ -52,10 +50,10 @@ public abstract class CellParser {
 	private boolean suppressed = false;
 
 	private String aboutPlaceholder;
-	private String[] aboutPlaceholders;
+	private String[] aboutPlaceholders = new String[0];
 
 	private String valuePlaceholder;
-	private String[] valuePlaceholders;
+	private String[] valuePlaceholders = new String[0];
 
 	/**
 	 * Get name of the column
@@ -82,7 +80,7 @@ public abstract class CellParser {
 	 */
 	public void setName(String name) {
 		this.name = name;
-		this.encodedName = URLEncoder.encode(name, StandardCharsets.UTF_8);
+		this.encodedName = "{" + URLEncoder.encode(name, StandardCharsets.UTF_8) + "}";
 	}
 
 	/**
@@ -198,15 +196,7 @@ public abstract class CellParser {
 				.map(MatchResult::group)
 				.filter(m -> !m.equals(ownPlaceholder))
 				.collect(Collectors.toSet());
-		System.err.println("placeholders " + placeholders);
-		System.err.println("own placeholders " + ownPlaceholder);
-
-		if (placeholders.isEmpty()) {
-			System.err.println("no placeholder for " + template);
-			return null;
-		}
-		return placeholders.toArray(new String[placeholders.size()]);
-
+		return placeholders.toArray(String[]::new);
 	}
 
 	/**
@@ -304,7 +294,6 @@ public abstract class CellParser {
 		}
 		String s = valueUrl;
 		if (valuePlaceholder != null && cell != null) {
-			System.err.println("repace " + valuePlaceholder + " " + cell);
 			s = valueUrl.replace(valuePlaceholder, getValueOrDefault(cell));
 		}
 		return Values.iri(s);
@@ -338,7 +327,6 @@ public abstract class CellParser {
 	 */
 	public void setValueUrl(String valueUrl) {
 		this.valueUrl = valueUrl;
-		System.err.println("valueurl " + valueUrl);
 		// check if this URL contains column placeholders
 		this.valuePlaceholder = getOwnPlaceholder(valueUrl);
 		this.valuePlaceholders = getPlaceholders(valueUrl);
