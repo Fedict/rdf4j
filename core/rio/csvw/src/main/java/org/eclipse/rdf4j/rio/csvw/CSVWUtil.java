@@ -168,6 +168,7 @@ public class CSVWUtil {
 		Models.getPropertyString(metadata, column, CSVW.TRIM)
 				.ifPresent(v -> parser.setVirtual(Boolean.parseBoolean(v)));
 
+		Models.getPropertyString(metadata, column, CSVW.ABOUT_URL).ifPresent(v -> parser.setAboutUrl(v));
 		Models.getPropertyString(metadata, column, CSVW.VALUE_URL).ifPresent(v -> parser.setValueUrl(v));
 
 		// use a property from a vocabulary as predicate, or create a property relative to the namespace of the CSV
