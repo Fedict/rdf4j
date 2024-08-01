@@ -24,11 +24,6 @@
 		</dependency>
 		<dependency>
 			<groupId>${project.groupId}</groupId>
-			<artifactId>rdf4j-rio-jsonld-legacy</artifactId>
-			<version>${project.version}</version>
-		</dependency>
-		<dependency>
-			<groupId>${project.groupId}</groupId>
 			<artifactId>rdf4j-rio-api</artifactId>
 			<version>${project.version}</version>
 			<exclusions>
@@ -48,10 +43,14 @@
 					<groupId>commons-codec</groupId>
 					<artifactId>commons-codec</artifactId>
 				</exclusion>
-				<exclusion>
-					<groupId>no.hasmac</groupId>
-					<artifactId>hasmac-json-ld</artifactId>
-				</exclusion>
+                                <exclusion>
+                                    <groupId>com.github.jsonld-java</groupId>
+                                    <artifactId>jsonld-java</artifactId>
+                                </exclusion>
+			 <exclusion>
+			  <groupId>org.eclipse.rdf4j</groupId>
+			  <artifactId>rdf4j-common-xml</artifactId>
+			 </exclusion>
 			</exclusions>
 		</dependency>
 		<dependency>
@@ -59,9 +58,37 @@
 			<artifactId>opencsv</artifactId>
 		</dependency>
 		<dependency>
+			<groupId>org.junit.jupiter</groupId>
+			<artifactId>junit-jupiter-params</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>${project.groupId}</groupId>
+			<artifactId>rdf4j-sail-api</artifactId>
+			<version>${project.version}</version>
+			<scope>test</scope>
+		</dependency>
+                <dependency>
+			<groupId>${project.groupId}</groupId>
+			<artifactId>rdf4j-repository-sail</artifactId>
+			<version>${project.version}</version>
+			<scope>test</scope>
+                </dependency>
+                <dependency>
+			<groupId>${project.groupId}</groupId>
+			<artifactId>rdf4j-sail-memory</artifactId>
+			<version>${project.version}</version>
+			<scope>test</scope>
+		</dependency>
+              <dependency>
+			<groupId>${project.groupId}</groupId>
+			<artifactId>rdf4j-rio-trig</artifactId>
+			<version>${project.version}</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
 			<groupId>org.mock-server</groupId>
 			<artifactId>mockserver-junit-jupiter-no-dependencies</artifactId>
-			<version>5.14.0</version>
 			<scope>test</scope>
 		</dependency>
 	</dependencies>
