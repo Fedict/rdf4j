@@ -19,18 +19,21 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
+import org.eclipse.rdf4j.model.IRI;
+import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.model.Model;
 import org.eclipse.rdf4j.model.Resource;
+import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.Value;
+import org.eclipse.rdf4j.model.impl.LinkedHashModel;
 import org.eclipse.rdf4j.model.util.Models;
 import org.eclipse.rdf4j.model.util.RDFCollections;
 import org.eclipse.rdf4j.model.util.Values;
+import org.eclipse.rdf4j.model.vocabulary.RDF;
 import org.eclipse.rdf4j.rio.RDFFormat;
 import org.eclipse.rdf4j.rio.Rio;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
 /**
@@ -39,20 +42,27 @@ import org.junit.jupiter.params.provider.MethodSource;
  */
 public class W3cComplianceTest {
 
-	public static Stream<Arguments> data() {
-		return getTestFiles().stream().sorted().map(Arguments::of);
-	}
-
 	@ParameterizedTest
-	@MethodSource("data")
+	@MethodSource("getTestFiles")
 	public void test(W3CTest testCase) throws IOException {
 		try {
-			runTest(testCase);
+			Model expected = testCase.getExpected();
+			System.err.println("parsing " + testCase.getJson().toString());
+			try (InputStream is = testCase.getJson().openStream()) {
+				Model result = Rio.parse(is, RDFFormat.CSVW, (Resource) null);
+				assertTrue(Models.isomorphic(result, expected), testCase.name);
+			}
 		} catch (AssertionError e) {
 			throw e;
 		}
 	}
 
+	/**
+	 * Get classpath location for a file
+	 *
+	 * @param file
+	 * @return
+	 */
 	private static URL getLocation(String file) {
 		return W3cComplianceTest.class.getClassLoader().getResource("w3c/" + file);
 	}
@@ -74,75 +84,80 @@ public class W3cComplianceTest {
 
 		String nsMF = "http://www.w3.org/2001/sw/DataAccess/tests/test-manifest#";
 		String csvtMF = "http://www.w3.org/2013/csvw/tests/vocab#";
+
 		URL url = getLocation("manifest-rdf.ttl");
 
 		if (url != null) {
 			Model model;
 			try {
-				model = Rio.parse(url.openStream(), RDFFormat.TRIG, (Resource) null);
+				model = Rio.parse(url.openStream(), getLocation("").toString(), RDFFormat.TURTLE, (Resource) null);
 			} catch (IOException e) {
 				throw new RuntimeException(e);
 			}
-			Value empty = Values.literal("");
+			Statement manifest = model.getStatements(null, RDF.TYPE, Values.iri(nsMF, "Manifest")).iterator().next();
+			Statement header = model.getStatements(manifest.getSubject(), Values.iri(nsMF, "entries"), null)
+					.iterator()
+					.next();
 
-			List<Value> entries = RDFCollections.asValues(model, Values.iri(nsMF, "entries"), new ArrayList<>(),
-					(Resource) null);
+			List<Value> entries = RDFCollections.asValues(model, (Resource) header.getObject(), new ArrayList<>());
 			tests = entries.stream()
 					.map(t -> (Resource) t)
 					.map(t -> new W3CTest(
 							t.stringValue(),
-							Models.getProperty(model, t, Values.iri(nsMF, "name"), (Resource) null)
-									.orElse(empty)
-									.stringValue(),
-							Models.getProperty(model, t, Values.iri(csvtMF, "action"), (Resource) null)
-									.orElse(empty)
-									.stringValue(),
-							Models.getProperty(model, t, Values.iri(nsMF, "implicit"), (Resource) null)
-									.orElse(empty)
-									.stringValue(),
-							Models.getProperty(model, t, Values.iri(nsMF, "result"), (Resource) null)
-									.orElse(empty)
-									.stringValue())
+							Models.getPropertyLiteral(model, t, Values.iri(nsMF, "name"), (Resource) null).orElse(null),
+							Models.getPropertyIRI(model, t, Values.iri(csvtMF, "implicit"), (Resource) null)
+									.orElse(null),
+							Models.getPropertyIRI(model, t, Values.iri(nsMF, "action"), (Resource) null).orElse(null),
+							Models.getPropertyIRI(model, t, Values.iri(nsMF, "result"), (Resource) null).orElse(null))
 					)
 					.collect(Collectors.toList());
 		}
 		return tests;
 	}
 
-	// Test Manifest
+	/* Test Object */
 	static class W3CTest {
 		String id;
 		String name;
-		String csv;
-		String json;
-		String result;
+		IRI csv;
+		IRI json;
+		IRI result;
 
+		/**
+		 * Get expected triples as model
+		 *
+		 * @return
+		 * @throws IOException
+		 */
 		public Model getExpected() throws IOException {
-			URL location = getLocation(result);
-			try (InputStream is = location.openStream()) {
-				return Rio.parse(is, RDFFormat.TURTLE, (Resource) null);
+			if (result == null) {
+				return new LinkedHashModel();
+			}
+			URL url = new URL(result.toString());
+			try (InputStream is = url.openStream()) {
+				return Rio.parse(is, url.toString(), RDFFormat.TURTLE, (Resource) null);
 			}
 		}
 
+		/**
+		 * Get URL of JSON metadata file
+		 *
+		 * @return
+		 * @throws IOException
+		 */
 		public URL getJson() throws IOException {
-			return getLocation(json);
+			if (json == null) {
+				return null;
+			}
+			return new URL(json.toString());
 		}
 
-		public W3CTest(String id, String name, String csv, String json, String result) {
+		public W3CTest(String id, Literal name, IRI csv, IRI json, IRI result) {
 			this.id = id;
-			this.name = name;
+			this.name = name.stringValue();
 			this.csv = csv;
 			this.json = json;
 			this.result = result;
-		}
-	}
-
-	private void runTest(W3CTest test) throws IOException {
-		Model expected = test.getExpected();
-
-		try (InputStream is = test.getJson().openStream()) {
-			Model result = Rio.parse(is, RDFFormat.CSVW, (Resource) null);
-			assertTrue(Models.isomorphic(result, expected), test.name);
 		}
 	}
 }
