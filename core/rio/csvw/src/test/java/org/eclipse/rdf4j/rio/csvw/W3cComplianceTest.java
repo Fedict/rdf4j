@@ -12,6 +12,7 @@
 package org.eclipse.rdf4j.rio.csvw;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -45,6 +46,10 @@ public class W3cComplianceTest {
 	@ParameterizedTest
 	@MethodSource("getTestFiles")
 	public void test(W3CTest testCase) throws IOException {
+		if (!testCase.positive) {
+			System.err.println("test should fail");
+			return;
+		}
 		try {
 			Model expected = testCase.getExpected();
 			System.err.println("parsing " + testCase.getJson().toString());
@@ -52,8 +57,9 @@ public class W3cComplianceTest {
 				Model result = Rio.parse(is, RDFFormat.CSVW, (Resource) null);
 				assertTrue(Models.isomorphic(result, expected), testCase.name);
 			}
+			System.err.println("done");
 		} catch (AssertionError e) {
-			throw e;
+			fail();
 		}
 	}
 
@@ -108,7 +114,10 @@ public class W3cComplianceTest {
 							Models.getPropertyIRI(model, t, Values.iri(csvtMF, "implicit"), (Resource) null)
 									.orElse(null),
 							Models.getPropertyIRI(model, t, Values.iri(nsMF, "action"), (Resource) null).orElse(null),
-							Models.getPropertyIRI(model, t, Values.iri(nsMF, "result"), (Resource) null).orElse(null))
+							Models.getPropertyIRI(model, t, Values.iri(nsMF, "result"), (Resource) null).orElse(null),
+							!Models.getPropertyIRI(model, t, RDF.TYPE, (Resource) null)
+									.orElse(null)
+									.equals(Values.iri(csvtMF, "NegativeRdfTest")))
 					)
 					.collect(Collectors.toList());
 		}
@@ -122,6 +131,7 @@ public class W3cComplianceTest {
 		IRI csv;
 		IRI json;
 		IRI result;
+		boolean positive;
 
 		/**
 		 * Get expected triples as model
@@ -152,12 +162,13 @@ public class W3cComplianceTest {
 			return new URL(json.toString());
 		}
 
-		public W3CTest(String id, Literal name, IRI csv, IRI json, IRI result) {
+		public W3CTest(String id, Literal name, IRI csv, IRI json, IRI result, boolean positive) {
 			this.id = id;
 			this.name = name.stringValue();
 			this.csv = csv;
 			this.json = json;
 			this.result = result;
+			this.positive = positive;
 		}
 	}
 }

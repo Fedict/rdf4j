@@ -11,7 +11,11 @@
 package org.eclipse.rdf4j.rio.csvw;
 
 import org.eclipse.rdf4j.rio.RioSetting;
+import org.eclipse.rdf4j.rio.csvw.metadata.CSVWMetadataFinder;
+import org.eclipse.rdf4j.rio.csvw.metadata.CSVWMetadataProvider;
 import org.eclipse.rdf4j.rio.helpers.BooleanRioSetting;
+import org.eclipse.rdf4j.rio.helpers.ClassRioSetting;
+import org.eclipse.rdf4j.rio.helpers.StringRioSetting;
 
 /**
  * ParserSettings for the CSV on the Web parser features.
@@ -25,16 +29,6 @@ import org.eclipse.rdf4j.rio.helpers.BooleanRioSetting;
 public class CSVWParserSettings {
 
 	/**
-	 * Boolean setting for parser to determine whether syntactically invalid lines in CSVW generate a parse error.
-	 * <p>
-	 * Defaults to true.
-	 * <p>
-	 * Can be overridden by setting system property {@code org.eclipse.rdf4j.rio.ntriples.fail_on_invalid_lines}
-	 */
-	public static final BooleanRioSetting FAIL_ON_INVALID_LINES = new BooleanRioSetting(
-			"org.eclipse.rdf4j.rio.csvw.fail_on_invalid_lines", "Fail on CSVW invalid lines", Boolean.TRUE);
-
-	/**
 	 * Boolean setting for parser to determine whether 'minimal mode' is to be used. I.e. only produce triples from the
 	 * data cells, without adding table metadata .
 	 * <p>
@@ -43,7 +37,60 @@ public class CSVWParserSettings {
 	 * Can be overridden by setting system property {@code org.eclipse.rdf4j.rio.csvw.minimal_mode}
 	 */
 	public static final BooleanRioSetting MINIMAL_MODE = new BooleanRioSetting(
-			"org.eclipse.rdf4j.rio.csvw.minimal_mode", "", Boolean.FALSE);
+			"org.eclipse.rdf4j.rio.csvw.minimal_mode", "CSVWeb minimal mode", Boolean.FALSE);
+
+	
+	/**
+	 * String setting for parser to provide location of a JSON metadata file.
+	 * 
+	 * This implies that the parser's InputStream or Reader parameter points to a CSV file, 
+	 * not to a JSON-LD metadata file
+	 * <p>
+	 * Defaults to true.
+	 * <p>
+	 * Can be overridden by setting system property {@code org.eclipse.rdf4j.rio.csvw.metadata_json_file}
+	 */
+	public static final BooleanRioSetting METADATA_INPUT_MODE = new BooleanRioSetting(
+			"org.eclipse.rdf4j.rio.csvw.metadata_uri", "Location of JSON metadata file", true);
+
+
+	/**
+	 * String setting for parser to provide location of a JSON metadata file.
+	 * 
+	 * This implies that the parser's InputStream or Reader parameter points to a CSV file, 
+	 * not to a JSON-LD metadata file
+	 * <p>
+	 * Defaults to null.
+	 * <p>
+	 * Can be overridden by setting system property {@code org.eclipse.rdf4j.rio.csvw.metadata_json_file}
+	 */
+	public static final StringRioSetting METADATA_URI = new StringRioSetting(
+			"org.eclipse.rdf4j.rio.csvw.metadata_uri", "Location of JSON metadata file", null);
+
+	/**
+	 * Class setting for parser to provide a metadata provider
+	 * 
+	 * This implies that the parser's InputStream or Reader parameter points to a CSV file, 
+	 * not to a JSON-LD metadata file
+	 * <p>
+	 * Defaults to CSVWMetadataFinder.
+	 * <p>
+	 * Can be overridden by setting system property {@code org.eclipse.rdf4j.rio.csvw.metadata_finder}
+	 */
+	public static final ClassRioSetting<? extends CSVWMetadataProvider> METADATA_FINDER = new ClassRioSetting<>(
+			"org.eclipse.rdf4j.rio.csvw.metadata_finder", "Metadata provider class", new CSVWMetadataFinder());
+
+	/**
+	 * String setting for parser to provide location of the CSV data file.
+	 * 
+	 * <p>
+	 * Defaults to empty.
+	 * <p>
+	 * Can be overridden by setting system property {@code org.eclipse.rdf4j.rio.csvw.metadata_json_file}
+	 */
+	public static final StringRioSetting DATA_URL = new StringRioSetting(
+			"org.eclipse.rdf4j.rio.csvw.data_url", "Location (URL) of the CSV data", "");
+
 
 	/**
 	 * Private constructor

@@ -17,15 +17,13 @@ import java.io.InputStreamReader;
 import java.io.Reader;
 import java.net.URI;
 import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.BitSet;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.eclipse.rdf4j.model.BNode;
@@ -34,7 +32,6 @@ import org.eclipse.rdf4j.model.Model;
 import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.Value;
-import org.eclipse.rdf4j.model.base.CoreDatatype.XSD;
 import org.eclipse.rdf4j.model.impl.SimpleNamespace;
 import org.eclipse.rdf4j.model.util.Models;
 import org.eclipse.rdf4j.model.util.RDFCollections;
@@ -49,15 +46,15 @@ import org.eclipse.rdf4j.rio.RDFHandlerException;
 import org.eclipse.rdf4j.rio.RDFParseException;
 import org.eclipse.rdf4j.rio.Rio;
 import org.eclipse.rdf4j.rio.csvw.parsers.CellParser;
-import org.eclipse.rdf4j.rio.csvw.parsers.CellParserFactory;
 import org.eclipse.rdf4j.rio.helpers.AbstractRDFParser;
+import org.eclipse.rdf4j.rio.helpers.JSONLDSettings;
 import org.slf4j.LoggerFactory;
 
-import com.opencsv.CSVParser;
-import com.opencsv.CSVParserBuilder;
 import com.opencsv.CSVReader;
-import com.opencsv.CSVReaderBuilder;
 import com.opencsv.exceptions.CsvValidationException;
+import org.eclipse.rdf4j.model.impl.LinkedHashModel;
+import org.eclipse.rdf4j.rio.csvw.metadata.CSVWMetadataProvider;
+import org.slf4j.Logger;
 
 /**
  * Experimental CSV on the Web parser.
@@ -74,7 +71,11 @@ import com.opencsv.exceptions.CsvValidationException;
  * @since 5.1.0
  */
 public class CSVWParser extends AbstractRDFParser {
-	private static final org.slf4j.Logger LOGGER = LoggerFactory.getLogger(CSVWParser.class);
+	private static final Logger LOGGER = LoggerFactory.getLogger(CSVWParser.class);
+
+	private static final ParserConfig METADATA_CFG = 
+			new ParserConfig().set(JSONLDSettings.WHITELIST, Set.of("http://www.w3.org/ns/csvw"));
+
 
 	@Override
 	public RDFFormat getRDFFormat() {
@@ -86,11 +87,8 @@ public class CSVWParser extends AbstractRDFParser {
 			throws IOException, RDFParseException, RDFHandlerException {
 
 		clear();
-
-		Model metadata = parseMetadata(in, null, baseURI);
-		if (metadata == null || metadata.isEmpty()) {
-			throw new RDFParseException("No metadata found");
-		}
+	
+		Model metadata = getMetadataAsModel(in);
 
 		rdfHandler = getRDFHandler();
 
@@ -122,31 +120,31 @@ public class CSVWParser extends AbstractRDFParser {
 	@Override
 	public void parse(Reader reader, String baseURI)
 			throws IOException, RDFParseException, RDFHandlerException {
-
-		Model metadata = parseMetadata(null, reader, baseURI);
+		throw new IOException("not implemented yet");
+//		Model metadata = parseMetadata(null, reader, baseURI);
 	}
 
-	/**
-	 * Parse JSON-LD metadata
-	 *
-	 * @param in
-	 * @param reader
-	 * @param baseURI
-	 * @return
-	 * @throws IOException
-	 */
-	private Model parseMetadata(InputStream in, Reader reader, String baseURI) throws IOException {
-		Model metadata = null;
-		ParserConfig cfg = new ParserConfig();
+	
+	private Model getMetadataAsModel(InputStream in) throws IOException {
+		Model m = null;
+		InputStream metadata = null;
 
-		if (in != null) {
-			metadata = Rio.parse(in, null, RDFFormat.JSONLD, cfg);
+		if (getParserConfig().get(CSVWParserSettings.METADATA_INPUT_MODE)) {
+			metadata = in;
+		} else {
+			CSVWMetadataProvider provider = getParserConfig().get(CSVWParserSettings.METADATA_FINDER);
+			if (provider != null) {
+				metadata = provider.getMetadata();
+			}
 		}
-
-//		if (reader != null) {
-//			return Rio.parse(reader, baseURI, RDFFormat.JSONLD, cfg);
-//		}
-		return metadata;
+		if (metadata != null) {
+			m = Rio.parse(metadata, null, RDFFormat.JSONLD, METADATA_CFG);
+		}
+		if (m == null) {
+			LOGGER.warn("No metadata found");
+			m = new LinkedHashModel();
+		}
+		return m;
 	}
 
 	/**

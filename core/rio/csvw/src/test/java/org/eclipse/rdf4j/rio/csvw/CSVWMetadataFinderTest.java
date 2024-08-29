@@ -11,6 +11,7 @@
 
 package org.eclipse.rdf4j.rio.csvw;
 
+import org.eclipse.rdf4j.rio.csvw.metadata.CSVWMetadataFinder;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockserver.model.HttpRequest.request;
 import static org.mockserver.model.HttpResponse.response;
