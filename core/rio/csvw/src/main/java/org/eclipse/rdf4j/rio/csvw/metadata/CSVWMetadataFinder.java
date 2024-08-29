@@ -8,7 +8,7 @@
  *
  * SPDX-License-Identifier: BSD-3-Clause
  *******************************************************************************/
-package org.eclipse.rdf4j.rio.csvw;
+package org.eclipse.rdf4j.rio.csvw.metadata;
 
 import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
@@ -16,6 +16,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,7 +26,7 @@ import org.slf4j.LoggerFactory;
  *
  * @author Bart Hanssens
  */
-public class CSVWMetadataFinder {
+public class CSVWMetadataFinder implements CSVWMetadataProvider {
 	private static final Logger LOGGER = LoggerFactory.getLogger(CSVWMetadataFinder.class);
 
 	private static final String WELL_KNOWN = "/.well-known/csvm";
@@ -33,54 +34,45 @@ public class CSVWMetadataFinder {
 	private static final String METADATA_CSV = "csv-metadata.json";
 	private static final String CSV = ".csv";
 
-	/**
-	 * Open URI as input stream
-	 *
-	 * @param uri
-	 * @return
-	 */
-	private static InputStream openURI(URI uri) {
-		try (InputStream is = uri.toURL().openStream()) {
-			return new ByteArrayInputStream(is.readAllBytes());
-		} catch (IOException ioe) {
-			LOGGER.debug("Could not open {}", uri);
-			return null;
-		}
+	private ByteArrayInputStream buffer;
+
+
+	@Override
+	public InputStream getMetadata() {
+		return buffer;
 	}
+
 
 	/**
 	 * Find by adding metadata.json as file extension
 	 *
 	 * @param csvFile
-	 * @return inputstream or null
 	 */
-	public static InputStream findByExtension(URI csvFile) {
+	public void findByExtension(URI csvFile) {
 		String s = csvFile.toString();
 		if (s.endsWith(CSV)) {
 			s = s.substring(0, s.length() - CSV.length());
 		}
 		URI metaURI = URI.create(s + METADATA_EXT);
-		return openURI(metaURI);
+		buffer = openURI(metaURI);
 	}
 
 	/**
 	 * Find by trying to get the csv-metadata.json in the path
 	 *
 	 * @param csvFile
-	 * @return inputstream or null
 	 */
-	public static InputStream findInPath(URI csvFile) {
+	public void findInPath(URI csvFile) {
 		URI metaURI = csvFile.resolve(METADATA_CSV);
-		return openURI(metaURI);
+		buffer = openURI(metaURI);
 	}
 
 	/**
 	 * Try reading the well-known location
 	 *
 	 * @param csvFile
-	 * @return URI or null
 	 */
-	public static InputStream findByWellKnown(URI csvFile) {
+	public void findByWellKnown(URI csvFile) {
 		URI wellKnown = csvFile.resolve(WELL_KNOWN);
 
 		try (InputStream is = wellKnown.toURL().openStream();
@@ -104,7 +96,7 @@ public class CSVWMetadataFinder {
 					metaURI = URI.create(s);
 				}
 				try (InputStream meta = metaURI.toURL().openStream()) {
-					return new ByteArrayInputStream(meta.readAllBytes());
+					buffer = new ByteArrayInputStream(meta.readAllBytes());
 				} catch (IOException ioe) {
 					LOGGER.debug("Could not open {}", metaURI);
 				}
@@ -113,6 +105,36 @@ public class CSVWMetadataFinder {
 		} catch (IOException ioe) {
 			LOGGER.info("Could not open {}", wellKnown);
 		}
-		return null;
+	}
+
+	/**
+	 * Try different ways to obtain CSVW metadata file
+	 * 
+	 * @param csvFile 
+	 */
+	public void find(URI csvFile) {
+		buffer = null;
+		findByExtension(csvFile);
+		if (buffer == null) {
+			findInPath(csvFile);
+		}
+		if (buffer == null) {
+			findByWellKnown(csvFile);
+		}
+	}
+
+	/**
+	 * Open URI as input stream
+	 *
+	 * @param uri
+	 * @return
+	 */
+	private ByteArrayInputStream openURI(URI uri) {
+		try (InputStream is = uri.toURL().openStream()) {
+			return new ByteArrayInputStream(is.readAllBytes());
+		} catch (IOException ioe) {
+			LOGGER.debug("Could not open {}", uri);
+			return null;
+		}
 	}
 }
