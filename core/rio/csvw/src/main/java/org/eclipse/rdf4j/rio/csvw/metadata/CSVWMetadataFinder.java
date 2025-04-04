@@ -16,7 +16,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.URI;
-import java.nio.charset.StandardCharsets;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,20 +33,48 @@ public class CSVWMetadataFinder implements CSVWMetadataProvider {
 	private static final String METADATA_CSV = "csv-metadata.json";
 	private static final String CSV = ".csv";
 
+	private URI csvLocation;
 	private ByteArrayInputStream buffer;
+
+	/**
+	 * 
+	 * @return 
+	 */
+	public URI getCsvLocation() {
+		return csvLocation;
+	}
+	
+	/**
+	 * 
+	 * @param location 
+	 */
+	public void setCsvLocation(URI location) {
+		this.csvLocation = location;
+	}
 
 	@Override
 	public InputStream getMetadata() {
+		if (csvLocation == null) {
+			LOGGER.error("Location of CSV file not known, metadata location cannot be determined");
+			return null;
+		}
+		buffer = null;
+
+		findByExtension();
+		if (buffer == null) {
+			findInPath();
+		}
+		if (buffer == null) {
+			findByWellKnown();
+		}
 		return buffer;
 	}
-
+	
 	/**
 	 * Find by adding metadata.json as file extension
-	 *
-	 * @param csvFile
 	 */
-	public void findByExtension(URI csvFile) {
-		String s = csvFile.toString();
+	public void findByExtension() {
+		String s = csvLocation.toString();
 		if (s.endsWith(CSV)) {
 			s = s.substring(0, s.length() - CSV.length());
 		}
@@ -57,21 +84,17 @@ public class CSVWMetadataFinder implements CSVWMetadataProvider {
 
 	/**
 	 * Find by trying to get the csv-metadata.json in the path
-	 *
-	 * @param csvFile
 	 */
-	public void findInPath(URI csvFile) {
-		URI metaURI = csvFile.resolve(METADATA_CSV);
+	public void findInPath() {
+		URI metaURI = csvLocation.resolve(METADATA_CSV);
 		buffer = openURI(metaURI);
 	}
 
 	/**
 	 * Try reading the well-known location
-	 *
-	 * @param csvFile
 	 */
-	public void findByWellKnown(URI csvFile) {
-		URI wellKnown = csvFile.resolve(WELL_KNOWN);
+	public void findByWellKnown() {
+		URI wellKnown = csvLocation.resolve(WELL_KNOWN);
 
 		try (InputStream is = wellKnown.toURL().openStream();
 				BufferedReader r = new BufferedReader(new InputStreamReader(is))) {
@@ -79,19 +102,19 @@ public class CSVWMetadataFinder implements CSVWMetadataProvider {
 			String line = r.readLine();
 
 			while (line != null) {
-				String s = line.replaceFirst("\\{\\+?url\\}", csvFile.toString());
+				String s = line.replaceFirst("\\{\\+?url\\}", csvLocation.toString());
 				if (s.isBlank()) {
 					continue;
 				}
 				switch (line.charAt(0)) {
-				case '?':
-					metaURI = URI.create(line + s);
-					break;
-				case '/':
-					metaURI = csvFile.resolve(s);
-					break;
-				default:
-					metaURI = URI.create(s);
+					case '?':
+						metaURI = URI.create(line + s);
+						break;
+					case '/':
+						metaURI = csvLocation.resolve(s);
+						break;
+					default:
+						metaURI = URI.create(s);
 				}
 				try (InputStream meta = metaURI.toURL().openStream()) {
 					buffer = new ByteArrayInputStream(meta.readAllBytes());
@@ -102,22 +125,6 @@ public class CSVWMetadataFinder implements CSVWMetadataProvider {
 			}
 		} catch (IOException ioe) {
 			LOGGER.info("Could not open {}", wellKnown);
-		}
-	}
-
-	/**
-	 * Try different ways to obtain CSVW metadata file
-	 *
-	 * @param csvFile
-	 */
-	public void find(URI csvFile) {
-		buffer = null;
-		findByExtension(csvFile);
-		if (buffer == null) {
-			findInPath(csvFile);
-		}
-		if (buffer == null) {
-			findByWellKnown(csvFile);
 		}
 	}
 

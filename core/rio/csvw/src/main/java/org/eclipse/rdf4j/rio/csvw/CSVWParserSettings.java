@@ -73,10 +73,10 @@ public class CSVWParserSettings {
 	 * <p>
 	 * Defaults to CSVWMetadataFinder.
 	 * <p>
-	 * Can be overridden by setting system property {@code org.eclipse.rdf4j.rio.csvw.metadata_finder}
+	 * Can be overridden by setting system property {@code org.eclipse.rdf4j.rio.csvw.metadata_provider}
 	 */
-	public static final ClassRioSetting<? extends CSVWMetadataProvider> METADATA_FINDER = new ClassRioSetting<>(
-			"org.eclipse.rdf4j.rio.csvw.metadata_finder", "Metadata provider class", new CSVWMetadataFinder());
+	public static final ClassRioSetting<? extends CSVWMetadataProvider> METADATA_PROVIDER = new ClassRioSetting<>(
+			"org.eclipse.rdf4j.rio.csvw.metadata_provider", "Metadata provider", new CSVWMetadataFinder());
 
 	/**
 	 * String setting for parser to provide location of the CSV data file.

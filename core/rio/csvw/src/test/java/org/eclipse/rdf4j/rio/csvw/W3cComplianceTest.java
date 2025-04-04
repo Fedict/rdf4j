@@ -33,12 +33,13 @@ import org.eclipse.rdf4j.model.util.RDFCollections;
 import org.eclipse.rdf4j.model.util.Values;
 import org.eclipse.rdf4j.model.vocabulary.RDF;
 import org.eclipse.rdf4j.rio.RDFFormat;
+import org.eclipse.rdf4j.rio.RDFParser;
 import org.eclipse.rdf4j.rio.Rio;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
 /**
- * Based upon the SHACL W3C Compliance Test
+ * Largely based upon the SHACL W3C Compliance Test (courtesy of Håvard M.Ottestad)
  *
  */
 public class W3cComplianceTest {
@@ -52,12 +53,14 @@ public class W3cComplianceTest {
 		}
 		try {
 			Model expected = testCase.getExpected();
-			if (testCase.getJson() != null) {
-				try (InputStream is = testCase.getJson().openStream()) {
+			if (testCase.getJsonMetadata() != null) {
+				try (InputStream is = testCase.getJsonMetadata().openStream()) {
 					Model result = Rio.parse(is, RDFFormat.CSVW, (Resource) null);
 					assertTrue(Models.isomorphic(result, expected), testCase.name);
 				}
 			} else {
+				RDFParser parser = Rio.createParser(RDFFormat.CSVW);
+				parser.getParserConfig().set(CSVWParserSettings.METADATA_FINDER, parser)
 				try (InputStream is = testCase.getCSV().openStream()) {
 					Model result = Rio.parse(is, RDFFormat.CSVW, (Resource) null);
 					assertTrue(Models.isomorphic(result, expected), testCase.name);
@@ -174,7 +177,7 @@ public class W3cComplianceTest {
 		 * @return
 		 * @throws IOException
 		 */
-		public URL getJson() throws IOException {
+		public URL getJsonMetadata() throws IOException {
 			if (json == null) {
 				return null;
 			}

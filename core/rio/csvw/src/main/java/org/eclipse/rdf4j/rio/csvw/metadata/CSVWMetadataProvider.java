@@ -10,16 +10,7 @@
  *******************************************************************************/
 package org.eclipse.rdf4j.rio.csvw.metadata;
 
-import java.io.BufferedReader;
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.net.URI;
-import java.nio.charset.StandardCharsets;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Find metadata info for a given CSV file, using various methods
