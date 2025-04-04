@@ -37,16 +37,16 @@ public class CSVWMetadataFinder implements CSVWMetadataProvider {
 	private ByteArrayInputStream buffer;
 
 	/**
-	 * 
-	 * @return 
+	 *
+	 * @return
 	 */
 	public URI getCsvLocation() {
 		return csvLocation;
 	}
-	
+
 	/**
-	 * 
-	 * @param location 
+	 *
+	 * @param location
 	 */
 	public void setCsvLocation(URI location) {
 		this.csvLocation = location;
@@ -69,7 +69,7 @@ public class CSVWMetadataFinder implements CSVWMetadataProvider {
 		}
 		return buffer;
 	}
-	
+
 	/**
 	 * Find by adding metadata.json as file extension
 	 */
@@ -107,14 +107,14 @@ public class CSVWMetadataFinder implements CSVWMetadataProvider {
 					continue;
 				}
 				switch (line.charAt(0)) {
-					case '?':
-						metaURI = URI.create(line + s);
-						break;
-					case '/':
-						metaURI = csvLocation.resolve(s);
-						break;
-					default:
-						metaURI = URI.create(s);
+				case '?':
+					metaURI = URI.create(line + s);
+					break;
+				case '/':
+					metaURI = csvLocation.resolve(s);
+					break;
+				default:
+					metaURI = URI.create(s);
 				}
 				try (InputStream meta = metaURI.toURL().openStream()) {
 					buffer = new ByteArrayInputStream(meta.readAllBytes());

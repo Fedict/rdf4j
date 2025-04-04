@@ -57,6 +57,7 @@ import org.slf4j.LoggerFactory;
 
 import com.opencsv.CSVReader;
 import com.opencsv.exceptions.CsvValidationException;
+import org.eclipse.rdf4j.rio.csvw.metadata.CSVWMetadataNone;
 
 /**
  * Experimental CSV on the Web parser.
@@ -140,8 +141,8 @@ public class CSVWParser extends AbstractRDFParser {
 			metadata = in;
 		} else {
 			// input is CSV, so try to find associated metadata
-			CSVWMetadataProvider provider = getParserConfig().get(CSVWParserSettings.METADATA_FINDER);
-			if (provider != null) {
+			CSVWMetadataProvider provider = getParserConfig().get(CSVWParserSettings.METADATA_PROVIDER);
+			if ((provider != null) && !(provider instanceof CSVWMetadataNone)) {
 				metadata = provider.getMetadata();
 			}
 		}

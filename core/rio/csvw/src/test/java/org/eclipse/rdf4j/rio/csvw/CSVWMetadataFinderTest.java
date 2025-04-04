@@ -51,7 +51,7 @@ public class CSVWMetadataFinderTest extends AbstractTest {
 
 		String expected = getFile("painters-metadata.json");
 		CSVWMetadataFinder finder = new CSVWMetadataFinder();
-		finder.findByWellKnown(uri);
+		finder.setCsvLocation(uri);
 		String got = new String(finder.getMetadata().readAllBytes());
 		assertEquals(expected, got);
 	}

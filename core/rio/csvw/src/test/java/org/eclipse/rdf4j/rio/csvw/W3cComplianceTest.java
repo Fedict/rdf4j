@@ -32,9 +32,12 @@ import org.eclipse.rdf4j.model.util.Models;
 import org.eclipse.rdf4j.model.util.RDFCollections;
 import org.eclipse.rdf4j.model.util.Values;
 import org.eclipse.rdf4j.model.vocabulary.RDF;
+import org.eclipse.rdf4j.rio.ParserConfig;
 import org.eclipse.rdf4j.rio.RDFFormat;
 import org.eclipse.rdf4j.rio.RDFParser;
 import org.eclipse.rdf4j.rio.Rio;
+import org.eclipse.rdf4j.rio.csvw.metadata.CSVWMetadataNone;
+import org.eclipse.rdf4j.rio.csvw.metadata.CSVWMetadataProvider;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
@@ -59,10 +62,11 @@ public class W3cComplianceTest {
 					assertTrue(Models.isomorphic(result, expected), testCase.name);
 				}
 			} else {
-				RDFParser parser = Rio.createParser(RDFFormat.CSVW);
-				parser.getParserConfig().set(CSVWParserSettings.METADATA_FINDER, parser)
+				ParserConfig cfg = new ParserConfig();
+				cfg.set(CSVWParserSettings.METADATA_INPUT_MODE, false);
+				cfg.set(CSVWParserSettings.METADATA_PROVIDER, new CSVWMetadataNone());
 				try (InputStream is = testCase.getCSV().openStream()) {
-					Model result = Rio.parse(is, RDFFormat.CSVW, (Resource) null);
+					Model result = Rio.parse(is, RDFFormat.CSVW, cfg, (Resource) null);
 					assertTrue(Models.isomorphic(result, expected), testCase.name);
 				}
 			}
