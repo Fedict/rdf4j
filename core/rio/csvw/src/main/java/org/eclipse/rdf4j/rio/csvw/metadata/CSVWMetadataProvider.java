@@ -30,8 +30,8 @@ public interface CSVWMetadataProvider {
 
 	/**
 	 * Get metadata as string
-	 * 
-	 * @return 
+	 *
+	 * @return
 	 */
 	public InputStream getMetadata();
 }

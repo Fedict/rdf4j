@@ -39,26 +39,24 @@ public class CSVWParserSettings {
 	public static final BooleanRioSetting MINIMAL_MODE = new BooleanRioSetting(
 			"org.eclipse.rdf4j.rio.csvw.minimal_mode", "CSVWeb minimal mode", Boolean.FALSE);
 
-	
 	/**
-	 * String setting for parser to provide location of a JSON metadata file.
-	 * 
-	 * This implies that the parser's InputStream or Reader parameter points to a CSV file, 
-	 * not to a JSON-LD metadata file
+	 * Boolean setting for parser to select JSON metadata file as input instead of CSV data file
+	 *
+	 * This implies that the parser's InputStream or Reader parameter points to a JSON-LD metadata file, not to a CSV
+	 * data file
 	 * <p>
 	 * Defaults to true.
 	 * <p>
-	 * Can be overridden by setting system property {@code org.eclipse.rdf4j.rio.csvw.metadata_json_file}
+	 * Can be overridden by setting system property {@code org.eclipse.rdf4j.rio.csvw.metadata_input_mode}
 	 */
 	public static final BooleanRioSetting METADATA_INPUT_MODE = new BooleanRioSetting(
-			"org.eclipse.rdf4j.rio.csvw.metadata_uri", "Location of JSON metadata file", true);
-
+			"org.eclipse.rdf4j.rio.csvw.metadata_input_mode", "Input is JSON metadata instead of CDV data", true);
 
 	/**
 	 * String setting for parser to provide location of a JSON metadata file.
-	 * 
-	 * This implies that the parser's InputStream or Reader parameter points to a CSV file, 
-	 * not to a JSON-LD metadata file
+	 *
+	 * This implies that the parser's InputStream or Reader parameter points to a CSV file, not to a JSON-LD metadata
+	 * file
 	 * <p>
 	 * Defaults to null.
 	 * <p>
@@ -69,9 +67,9 @@ public class CSVWParserSettings {
 
 	/**
 	 * Class setting for parser to provide a metadata provider
-	 * 
-	 * This implies that the parser's InputStream or Reader parameter points to a CSV file, 
-	 * not to a JSON-LD metadata file
+	 *
+	 * This implies that the parser's InputStream or Reader parameter points to a CSV file, not to a JSON-LD metadata
+	 * file
 	 * <p>
 	 * Defaults to CSVWMetadataFinder.
 	 * <p>
@@ -82,7 +80,7 @@ public class CSVWParserSettings {
 
 	/**
 	 * String setting for parser to provide location of the CSV data file.
-	 * 
+	 *
 	 * <p>
 	 * Defaults to empty.
 	 * <p>
@@ -90,7 +88,6 @@ public class CSVWParserSettings {
 	 */
 	public static final StringRioSetting DATA_URL = new StringRioSetting(
 			"org.eclipse.rdf4j.rio.csvw.data_url", "Location (URL) of the CSV data", "");
-
 
 	/**
 	 * Private constructor

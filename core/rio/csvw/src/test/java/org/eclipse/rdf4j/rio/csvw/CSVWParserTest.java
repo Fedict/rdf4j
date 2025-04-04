@@ -49,6 +49,5 @@ public class CSVWParserTest extends AbstractTest {
 		writer.getWriterConfig().set(JSONLDSettings.JSONLD_MODE, JSONLDMode.FLATTEN);
 		writer.getWriterConfig().set(JSONLDSettings.OPTIMIZE, true);
 		Rio.write(model, writer);
-		System.err.println(os.toString(StandardCharsets.UTF_8));
 	}
 }

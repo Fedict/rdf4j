@@ -36,12 +36,10 @@ public class CSVWMetadataFinder implements CSVWMetadataProvider {
 
 	private ByteArrayInputStream buffer;
 
-
 	@Override
 	public InputStream getMetadata() {
 		return buffer;
 	}
-
 
 	/**
 	 * Find by adding metadata.json as file extension
@@ -109,8 +107,8 @@ public class CSVWMetadataFinder implements CSVWMetadataProvider {
 
 	/**
 	 * Try different ways to obtain CSVW metadata file
-	 * 
-	 * @param csvFile 
+	 *
+	 * @param csvFile
 	 */
 	public void find(URI csvFile) {
 		buffer = null;

@@ -11,12 +11,14 @@
 package org.eclipse.rdf4j.rio.csvw;
 
 import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.net.URI;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -32,6 +34,7 @@ import org.eclipse.rdf4j.model.Model;
 import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.Value;
+import org.eclipse.rdf4j.model.impl.LinkedHashModel;
 import org.eclipse.rdf4j.model.impl.SimpleNamespace;
 import org.eclipse.rdf4j.model.util.Models;
 import org.eclipse.rdf4j.model.util.RDFCollections;
@@ -45,16 +48,15 @@ import org.eclipse.rdf4j.rio.RDFHandler;
 import org.eclipse.rdf4j.rio.RDFHandlerException;
 import org.eclipse.rdf4j.rio.RDFParseException;
 import org.eclipse.rdf4j.rio.Rio;
+import org.eclipse.rdf4j.rio.csvw.metadata.CSVWMetadataProvider;
 import org.eclipse.rdf4j.rio.csvw.parsers.CellParser;
 import org.eclipse.rdf4j.rio.helpers.AbstractRDFParser;
 import org.eclipse.rdf4j.rio.helpers.JSONLDSettings;
+import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.opencsv.CSVReader;
 import com.opencsv.exceptions.CsvValidationException;
-import org.eclipse.rdf4j.model.impl.LinkedHashModel;
-import org.eclipse.rdf4j.rio.csvw.metadata.CSVWMetadataProvider;
-import org.slf4j.Logger;
 
 /**
  * Experimental CSV on the Web parser.
@@ -73,9 +75,8 @@ import org.slf4j.Logger;
 public class CSVWParser extends AbstractRDFParser {
 	private static final Logger LOGGER = LoggerFactory.getLogger(CSVWParser.class);
 
-	private static final ParserConfig METADATA_CFG = 
-			new ParserConfig().set(JSONLDSettings.WHITELIST, Set.of("http://www.w3.org/ns/csvw"));
-
+	private static final ParserConfig METADATA_CFG = new ParserConfig().set(JSONLDSettings.WHITELIST,
+			Set.of("http://www.w3.org/ns/csvw", "https://www.w3.org/ns/csvw", "https://www.w3.org/ns/csvw.jsonld"));
 
 	@Override
 	public RDFFormat getRDFFormat() {
@@ -87,7 +88,7 @@ public class CSVWParser extends AbstractRDFParser {
 			throws IOException, RDFParseException, RDFHandlerException {
 
 		clear();
-	
+
 		Model metadata = getMetadataAsModel(in);
 
 		rdfHandler = getRDFHandler();
@@ -124,7 +125,13 @@ public class CSVWParser extends AbstractRDFParser {
 //		Model metadata = parseMetadata(null, reader, baseURI);
 	}
 
-	
+	/**
+	 * Get the JSON-LD metadata as an RDF model
+	 *
+	 * @param in
+	 * @return
+	 * @throws IOException
+	 */
 	private Model getMetadataAsModel(InputStream in) throws IOException {
 		Model m = null;
 		InputStream metadata = null;
@@ -132,13 +139,22 @@ public class CSVWParser extends AbstractRDFParser {
 		if (getParserConfig().get(CSVWParserSettings.METADATA_INPUT_MODE)) {
 			metadata = in;
 		} else {
+			// input is CSV, so try to find associated metadata
 			CSVWMetadataProvider provider = getParserConfig().get(CSVWParserSettings.METADATA_FINDER);
 			if (provider != null) {
 				metadata = provider.getMetadata();
 			}
 		}
 		if (metadata != null) {
-			m = Rio.parse(metadata, null, RDFFormat.JSONLD, METADATA_CFG);
+			byte[] bytes = metadata.readAllBytes();
+			String str = new String(bytes, StandardCharsets.UTF_8);
+			/*
+			 * if (!str.contains("@context")) { str = "{\"@context\": \"https://www.w3.org/ns/csvw.jsonld\"," +
+			 * str.substring(1); } System.err.println("METADATA JSON: " + str);
+			 */
+			try (InputStream s = new ByteArrayInputStream(str.getBytes(StandardCharsets.UTF_8))) {
+				m = Rio.parse(s, null, RDFFormat.JSONLD, METADATA_CFG);
+			}
 		}
 		if (m == null) {
 			LOGGER.warn("No metadata found");

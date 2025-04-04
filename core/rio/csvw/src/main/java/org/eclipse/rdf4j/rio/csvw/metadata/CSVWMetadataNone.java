@@ -13,8 +13,8 @@ package org.eclipse.rdf4j.rio.csvw.metadata;
 import java.io.InputStream;
 
 /**
- * Empty metadata provider.
- * Mostly for testing purposes, since not providing metadata will result in relative subject/property URIs
+ * Empty metadata provider. Mostly for testing purposes, since not providing metadata will result in relative
+ * subject/property URIs
  *
  * @author Bart Hanssens
  */

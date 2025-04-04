@@ -11,7 +11,6 @@
 
 package org.eclipse.rdf4j.rio.csvw;
 
-import org.eclipse.rdf4j.rio.csvw.metadata.CSVWMetadataFinder;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockserver.model.HttpRequest.request;
 import static org.mockserver.model.HttpResponse.response;
@@ -19,6 +18,7 @@ import static org.mockserver.model.HttpResponse.response;
 import java.io.IOException;
 import java.net.URI;
 
+import org.eclipse.rdf4j.rio.csvw.metadata.CSVWMetadataFinder;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -50,7 +50,9 @@ public class CSVWMetadataFinderTest extends AbstractTest {
 		URI uri = URI.create(getBase() + "downloads/painters.csv");
 
 		String expected = getFile("painters-metadata.json");
-		String got = new String(CSVWMetadataFinder.findByWellKnown(uri).readAllBytes());
+		CSVWMetadataFinder finder = new CSVWMetadataFinder();
+		finder.findByWellKnown(uri);
+		String got = new String(finder.getMetadata().readAllBytes());
 		assertEquals(expected, got);
 	}
 }

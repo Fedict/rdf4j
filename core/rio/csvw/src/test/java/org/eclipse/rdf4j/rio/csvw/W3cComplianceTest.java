@@ -52,12 +52,18 @@ public class W3cComplianceTest {
 		}
 		try {
 			Model expected = testCase.getExpected();
-			System.err.println("parsing " + testCase.getJson().toString());
-			try (InputStream is = testCase.getJson().openStream()) {
-				Model result = Rio.parse(is, RDFFormat.CSVW, (Resource) null);
-				assertTrue(Models.isomorphic(result, expected), testCase.name);
+			if (testCase.getJson() != null) {
+				try (InputStream is = testCase.getJson().openStream()) {
+					Model result = Rio.parse(is, RDFFormat.CSVW, (Resource) null);
+					assertTrue(Models.isomorphic(result, expected), testCase.name);
+				}
+			} else {
+				try (InputStream is = testCase.getCSV().openStream()) {
+					Model result = Rio.parse(is, RDFFormat.CSVW, (Resource) null);
+					assertTrue(Models.isomorphic(result, expected), testCase.name);
+				}
 			}
-			System.err.println("done");
+
 		} catch (AssertionError e) {
 			fail();
 		}
@@ -111,9 +117,9 @@ public class W3cComplianceTest {
 					.map(t -> new W3CTest(
 							t.stringValue(),
 							Models.getPropertyLiteral(model, t, Values.iri(nsMF, "name"), (Resource) null).orElse(null),
+							Models.getPropertyIRI(model, t, Values.iri(nsMF, "action"), (Resource) null).orElse(null),
 							Models.getPropertyIRI(model, t, Values.iri(csvtMF, "implicit"), (Resource) null)
 									.orElse(null),
-							Models.getPropertyIRI(model, t, Values.iri(nsMF, "action"), (Resource) null).orElse(null),
 							Models.getPropertyIRI(model, t, Values.iri(nsMF, "result"), (Resource) null).orElse(null),
 							!Models.getPropertyIRI(model, t, RDF.TYPE, (Resource) null)
 									.orElse(null)
@@ -132,6 +138,19 @@ public class W3cComplianceTest {
 		IRI json;
 		IRI result;
 		boolean positive;
+
+		/**
+		 * Get URL of CSV data file
+		 *
+		 * @return
+		 * @throws IOException
+		 */
+		public URL getCSV() throws IOException {
+			if (csv == null) {
+				return null;
+			}
+			return new URL(csv.toString());
+		}
 
 		/**
 		 * Get expected triples as model
