@@ -25,35 +25,41 @@ public class CellParserFactory {
 	 * @return
 	 */
 	public static CellParser create(IRI datatype) {
+		if (datatype == null) {
+			return null;
+		}
+
 		CellParser p;
 
-		XSD xsdType = XSD.valueOf(datatype.getLocalName().toUpperCase());
-		if (xsdType == null) {
+		XSD xsdType;
+		try {
+			xsdType = XSD.valueOf(datatype.getLocalName().toUpperCase());
+		} catch (IllegalArgumentException ioe) {
+			xsdType = XSD.STRING;
+		}
+
+		switch (xsdType) {
+		case BOOLEAN:
+			p = new CellParserBoolean();
+			break;
+		case INTEGER:
+		case INT:
+		case SHORT:
+		case LONG:
+			p = new CellParserInteger();
+			break;
+		case FLOAT:
+		case DOUBLE:
+			p = new CellParserDecimal();
+			p.setDecimalChar(".");
+			break;
+		case DATE:
+		case DATETIME:
+		case TIME:
+			p = new CellParserDate();
+			break;
+		default:
 			p = new CellParserString();
-		} else {
-			switch (xsdType) {
-			case BOOLEAN:
-				p = new CellParserBoolean();
-				break;
-			case INTEGER:
-			case INT:
-			case SHORT:
-			case LONG:
-				p = new CellParserInteger();
-				break;
-			case FLOAT:
-			case DOUBLE:
-				p = new CellParserDecimal();
-				p.setDecimalChar(".");
-				break;
-			case DATE:
-			case DATETIME:
-			case TIME:
-				p = new CellParserDate();
-				break;
-			default:
-				p = new CellParserString();
-			}
 		}
 		p.setDataType(datatype);
 		return p;

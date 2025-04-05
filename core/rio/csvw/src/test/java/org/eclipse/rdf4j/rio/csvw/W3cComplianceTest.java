@@ -54,19 +54,22 @@ public class W3cComplianceTest {
 			System.err.println("test should fail");
 			return;
 		}
+
 		try {
 			Model expected = testCase.getExpected();
 			if (testCase.getJsonMetadata() != null) {
 				try (InputStream is = testCase.getJsonMetadata().openStream()) {
-					Model result = Rio.parse(is, RDFFormat.CSVW, (Resource) null);
+					Model result = Rio.parse(is, "http://www.w3.org/2013/csvw/tests/", RDFFormat.CSVW, (Resource) null);
 					assertTrue(Models.isomorphic(result, expected), testCase.name);
 				}
 			} else {
 				ParserConfig cfg = new ParserConfig();
 				cfg.set(CSVWParserSettings.METADATA_INPUT_MODE, false);
 				cfg.set(CSVWParserSettings.METADATA_PROVIDER, new CSVWMetadataNone());
+
 				try (InputStream is = testCase.getCSV().openStream()) {
-					Model result = Rio.parse(is, RDFFormat.CSVW, cfg, (Resource) null);
+					Model result = Rio.parse(is, "http://www.w3.org/2013/csvw/tests/", RDFFormat.CSVW, cfg,
+							(Resource) null);
 					assertTrue(Models.isomorphic(result, expected), testCase.name);
 				}
 			}

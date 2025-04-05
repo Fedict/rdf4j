@@ -48,7 +48,7 @@ public class CSVWUtil {
 	protected static CSVReader getCSVReader(Model metadata, Resource table, Reader reader) {
 		CSVParserBuilder parserBuilder = new CSVParserBuilder();
 		CSVReaderBuilder builder = new CSVReaderBuilder(reader);
-		builder.withSkipLines(1);
+		builder.withSkipLines(0);
 
 		Optional<Value> val = Models.getProperty(metadata, table, CSVW.DIALECT);
 		if (val.isPresent()) {
