@@ -186,6 +186,9 @@ public class CSVWParser extends AbstractRDFParser {
 	 * @param baseURI
 	 */
 	private URI getURL(Model metadata, Resource table, String baseURI) {
+		if (metadata == null || table == null) {
+			return null;
+		}
 		Optional<String> val = Models.getPropertyString(metadata, table, CSVW.URL);
 		if (val.isPresent()) {
 			String s = val.get();
@@ -346,7 +349,6 @@ public class CSVWParser extends AbstractRDFParser {
 	 * @param handler
 	 * @param baseURI
 	 * @param csvFile
-	 * @param table
 	 * @param tableNode
 	 */
 	private void parseCSV(Model metadata, RDFHandler handler, String baseURI, URI csvFile, Resource tableNode) {
@@ -398,8 +400,7 @@ public class CSVWParser extends AbstractRDFParser {
 	 * @param tableNode
 	 */
 	private void parseCSV(Model metadata, RDFHandler handler, String baseURI, URI csvFile, CellParser[] cellParsers,
-			Resource table,
-			Resource tableNode) {
+			Resource table, Resource tableNode) {
 		LOGGER.info("Parsing {}", csvFile);
 
 		String aboutURL = getAboutURL(metadata, table);
