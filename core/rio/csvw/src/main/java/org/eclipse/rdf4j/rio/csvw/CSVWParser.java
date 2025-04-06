@@ -34,6 +34,7 @@ import org.eclipse.rdf4j.model.Model;
 import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.Value;
+import org.eclipse.rdf4j.model.base.CoreDatatype.XSD;
 import org.eclipse.rdf4j.model.impl.LinkedHashModel;
 import org.eclipse.rdf4j.model.impl.SimpleNamespace;
 import org.eclipse.rdf4j.model.util.Models;
@@ -51,6 +52,7 @@ import org.eclipse.rdf4j.rio.Rio;
 import org.eclipse.rdf4j.rio.csvw.metadata.CSVWMetadataNone;
 import org.eclipse.rdf4j.rio.csvw.metadata.CSVWMetadataProvider;
 import org.eclipse.rdf4j.rio.csvw.parsers.CellParser;
+import org.eclipse.rdf4j.rio.csvw.parsers.CellParserFactory;
 import org.eclipse.rdf4j.rio.helpers.AbstractRDFParser;
 import org.eclipse.rdf4j.rio.helpers.JSONLDSettings;
 import org.slf4j.Logger;
@@ -58,8 +60,6 @@ import org.slf4j.LoggerFactory;
 
 import com.opencsv.CSVReader;
 import com.opencsv.exceptions.CsvValidationException;
-import org.eclipse.rdf4j.model.base.CoreDatatype.XSD;
-import org.eclipse.rdf4j.rio.csvw.parsers.CellParserFactory;
 
 /**
  * Experimental CSV on the Web parser.
@@ -117,7 +117,7 @@ public class CSVWParser extends AbstractRDFParser {
 						.collect(Collectors.toList())
 						.toArray(new CellParser[columns.size()]);
 
-				parseCSV(metadata, rdfHandler, csvFile, cellParsers, (Resource) table, tableNode);
+				parseCSV(metadata, rdfHandler, baseURI, csvFile, cellParsers, (Resource) table, tableNode);
 			}
 		} else {
 			URI csvFile = getURL(metadata, null, baseURI);
@@ -127,8 +127,8 @@ public class CSVWParser extends AbstractRDFParser {
 			Resource tableNode = minimal ? null : generateTableNode(rdfHandler, rootNode);
 			// add dummy namespace for resolving unspecified column names / predicates relative to CSV file
 			metadata.getNamespaces().add(new SimpleNamespace("_local", csvFile.toString() + "#"));
-			
-			parseCSV(metadata, rdfHandler, csvFile, tableNode);
+
+			parseCSV(metadata, rdfHandler, baseURI, csvFile, tableNode);
 		}
 		clear();
 	}
@@ -341,14 +341,15 @@ public class CSVWParser extends AbstractRDFParser {
 
 	/**
 	 * Parse a CSV file without metadata
-	 * 
+	 *
 	 * @param metadata
 	 * @param handler
+	 * @param baseURI
 	 * @param csvFile
 	 * @param table
-	 * @param tableNode 
+	 * @param tableNode
 	 */
-	private void parseCSV(Model metadata, RDFHandler handler, URI csvFile, Resource table, Resource tableNode) {
+	private void parseCSV(Model metadata, RDFHandler handler, String baseURI, URI csvFile, Resource tableNode) {
 		LOGGER.info("Parsing {}", csvFile);
 
 		Charset encoding = StandardCharsets.UTF_8;
@@ -357,13 +358,12 @@ public class CSVWParser extends AbstractRDFParser {
 		long line = 1;
 		try (InputStream is = csvFile.toURL().openStream();
 				BufferedReader reader = new BufferedReader(new InputStreamReader(is, encoding));
-				CSVReader csv = CSVWUtil.getCSVReader(metadata, table, reader)) {
+				CSVReader csv = CSVWUtil.getCSVReader(metadata, null, reader)) {
 
-			Map<String, String> values = null;
 			String[] cells;
 
 			// assume first line is header
-			String header[] = csv.readNext();
+			String[] header = csv.readNext();
 			CellParser[] cellParsers = new CellParser[header.length];
 			for (int i = 0; i < header.length; i++) {
 				cellParsers[i] = CellParserFactory.create(XSD.STRING.getIri());
@@ -371,15 +371,13 @@ public class CSVWParser extends AbstractRDFParser {
 			}
 
 			while ((cells = csv.readNext()) != null) {
-				Resource aboutSubject = getIRIorBnode(cellParsers, cells, aboutURL, aboutIndex, placeholder);
+				Resource aboutSubject = Values.iri(baseURI + "#row=" + line);
 				Resource rowNode = minimal ? null : generateRowNode(rdfHandler, tableNode, aboutSubject, line);
 
 				// csv cells
 				for (int i = 0; i < cells.length; i++) {
 					Value val = cellParsers[i].parse(cells[i]);
-					if (!cellParsers[i].isSuppressed()) {
-						handler.handleStatement(buildStatement(cellParsers[i], cells[i], aboutSubject, val));
-					}
+					handler.handleStatement(buildStatement(cellParsers[i], cells[i], aboutSubject, val));
 				}
 				line++;
 			}
@@ -388,18 +386,19 @@ public class CSVWParser extends AbstractRDFParser {
 		}
 	}
 
-
 	/**
 	 * Parse a CSV file
-	 * 
+	 *
 	 * @param metadata
 	 * @param handler
+	 * @param baseURI
 	 * @param csvFile
 	 * @param cellParsers
 	 * @param table
-	 * @param tableNode 
+	 * @param tableNode
 	 */
-	private void parseCSV(Model metadata, RDFHandler handler, URI csvFile, CellParser[] cellParsers, Resource table,
+	private void parseCSV(Model metadata, RDFHandler handler, String baseURI, URI csvFile, CellParser[] cellParsers,
+			Resource table,
 			Resource tableNode) {
 		LOGGER.info("Parsing {}", csvFile);
 

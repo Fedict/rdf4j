@@ -50,21 +50,23 @@ public class CSVWUtil {
 		CSVReaderBuilder builder = new CSVReaderBuilder(reader);
 		builder.withSkipLines(0);
 
-		Optional<Value> val = Models.getProperty(metadata, table, CSVW.DIALECT);
-		if (val.isPresent()) {
-			Resource dialect = (Resource) val.get();
+		if (metadata != null && table != null) {
+			Optional<Value> val = Models.getProperty(metadata, table, CSVW.DIALECT);
+			if (val.isPresent()) {
+				Resource dialect = (Resource) val.get();
 
-			// skip header (and possibly other) rows
-			String headerRows = Models.getPropertyString(metadata, dialect, CSVW.HEADER_ROW_COUNT).orElse("1");
-			String skipRows = Models.getPropertyString(metadata, dialect, CSVW.SKIP_ROWS).orElse("0");
-			int skip = Integer.valueOf(headerRows) + Integer.valueOf(skipRows);
-			Models.getPropertyString(metadata, dialect, CSVW.HEADER)
-					.ifPresent(v -> builder.withSkipLines(v.equalsIgnoreCase("false") ? 0 : skip));
+				// skip header (and possibly other) rows
+				String headerRows = Models.getPropertyString(metadata, dialect, CSVW.HEADER_ROW_COUNT).orElse("1");
+				String skipRows = Models.getPropertyString(metadata, dialect, CSVW.SKIP_ROWS).orElse("0");
+				int skip = Integer.valueOf(headerRows) + Integer.valueOf(skipRows);
+				Models.getPropertyString(metadata, dialect, CSVW.HEADER)
+						.ifPresent(v -> builder.withSkipLines(v.equalsIgnoreCase("false") ? 0 : skip));
 
-			Models.getPropertyString(metadata, dialect, CSVW.DELIMITER)
-					.ifPresent(v -> parserBuilder.withSeparator(v.charAt(0)));
-			Models.getPropertyString(metadata, dialect, CSVW.QUOTE_CHAR)
-					.ifPresent(v -> parserBuilder.withQuoteChar(v.charAt(0)));
+				Models.getPropertyString(metadata, dialect, CSVW.DELIMITER)
+						.ifPresent(v -> parserBuilder.withSeparator(v.charAt(0)));
+				Models.getPropertyString(metadata, dialect, CSVW.QUOTE_CHAR)
+						.ifPresent(v -> parserBuilder.withQuoteChar(v.charAt(0)));
+			}
 		}
 		return builder.withCSVParser(parserBuilder.build()).build();
 	}

@@ -10,7 +10,6 @@
  *******************************************************************************/
 package org.eclipse.rdf4j.rio.csvw;
 
-import org.eclipse.rdf4j.rio.RioSetting;
 import org.eclipse.rdf4j.rio.csvw.metadata.CSVWMetadataFinder;
 import org.eclipse.rdf4j.rio.csvw.metadata.CSVWMetadataProvider;
 import org.eclipse.rdf4j.rio.helpers.BooleanRioSetting;
