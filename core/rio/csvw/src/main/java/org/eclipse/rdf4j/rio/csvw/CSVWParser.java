@@ -45,7 +45,6 @@ import org.eclipse.rdf4j.model.util.Statements;
 import org.eclipse.rdf4j.model.util.Values;
 import org.eclipse.rdf4j.model.vocabulary.CSVW;
 import org.eclipse.rdf4j.model.vocabulary.RDF;
-import org.eclipse.rdf4j.model.vocabulary.XMLSchema;
 import org.eclipse.rdf4j.rio.ParserConfig;
 import org.eclipse.rdf4j.rio.RDFFormat;
 import org.eclipse.rdf4j.rio.RDFHandler;
@@ -394,7 +393,7 @@ public class CSVWParser extends AbstractRDFParser {
 			for (int i = 0; i < header.length; i++) {
 				cellParsers[i] = CellParserFactory.create(XSD.STRING.getIri());
 				cellParsers[i].setName(header[i]);
-				cellParsers[i].setPropertyIRI(csvFile + "#" + URLEncoder.encode(header[i], StandardCharsets.UTF_8));
+				cellParsers[i].setPropertyIRI(csvFile + "#" + CSVWUtil.encode(header[i]));
 			}
 
 			while ((cells = csv.readNext()) != null) {
@@ -405,7 +404,10 @@ public class CSVWParser extends AbstractRDFParser {
 				// csv cells
 				for (int i = 0; i < cells.length; i++) {
 					Value val = cellParsers[i].parse(cells[i]);
-					handler.handleStatement(Statements.statement(rowNode, cellParsers[i].getPropertyIRI(), val, null));
+					if (val != null) {
+						handler.handleStatement(
+								Statements.statement(rowNode, cellParsers[i].getPropertyIRI(), val, null));
+					}
 				}
 				line++;
 			}
@@ -473,10 +475,10 @@ public class CSVWParser extends AbstractRDFParser {
 						continue;
 					}
 					Value val = cellParsers[i].parse(cells[i]);
-					if (doReplace) {
+					if (val != null && doReplace) {
 						values.put(cellParsers[i].getNameEncoded(), val.stringValue());
 					}
-					if (!cellParsers[i].isSuppressed() && !needReplacement[i]) {
+					if (!cellParsers[i].isSuppressed() && !needReplacement[i] && val != null) {
 						handler.handleStatement(buildStatement(cellParsers[i], cells[i], aboutSubject, val));
 					}
 				}

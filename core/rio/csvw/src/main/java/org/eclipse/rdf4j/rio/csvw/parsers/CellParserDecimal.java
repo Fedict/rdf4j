@@ -22,13 +22,15 @@ public class CellParserDecimal extends CellParser {
 	@Override
 	public Value parse(String cell) {
 		String s = getValueOrDefault(cell);
-
-		if (s != null && getGroupChar() != null) {
+		if (s == null || s.isEmpty()) {
+			return null;
+		}
+		if (getGroupChar() != null) {
 			s = s.replace(getGroupChar(), "");
 		}
 
 		// always use a '.' in RDF, not the European-style ','
-		if (s != null && !getDecimalChar().equals(".")) {
+		if (!getDecimalChar().equals(".")) {
 			s = s.replace(getDecimalChar(), ".");
 		}
 

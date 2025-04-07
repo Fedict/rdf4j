@@ -11,10 +11,12 @@
 package org.eclipse.rdf4j.rio.csvw;
 
 import java.io.Reader;
+import java.net.URLEncoder;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 
+import org.apache.http.client.utils.URIBuilder;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Model;
 import org.eclipse.rdf4j.model.Resource;
@@ -36,6 +38,19 @@ import com.opencsv.CSVReaderBuilder;
  * @author Bart Hanssens
  */
 public class CSVWUtil {
+
+	/**
+	 * Return URL encoded string
+	 *
+	 * @param s
+	 * @return
+	 */
+	public static String encode(String s) {
+		if (s == null || s.isEmpty()) {
+			return s;
+		}
+		return URLEncoder.encode(s.replace(" ", "%20"), StandardCharsets.UTF_8).replace("%2520", "%20");
+	}
 
 	/**
 	 * Get configured CSV file reader

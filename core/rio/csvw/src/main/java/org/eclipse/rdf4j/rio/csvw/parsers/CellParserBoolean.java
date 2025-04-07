@@ -10,10 +10,6 @@
  *******************************************************************************/
 package org.eclipse.rdf4j.rio.csvw.parsers;
 
-import java.util.Set;
-
-import org.eclipse.rdf4j.model.IRI;
-import org.eclipse.rdf4j.model.Namespace;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.util.Values;
 
@@ -35,7 +31,9 @@ public class CellParserBoolean extends CellParser {
 	@Override
 	public Value parse(String cell) {
 		String s = getValueOrDefault(cell);
-
+		if (s == null || s.isEmpty()) {
+			return null;
+		}
 		return Values.literal(valueTrue.equals(s) ? "true" : "false", getDataType());
 	}
 

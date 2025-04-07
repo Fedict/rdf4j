@@ -53,20 +53,24 @@ import org.junit.jupiter.params.provider.MethodSource;
 public class W3cComplianceTest {
 
 	private void compareResults(W3CTest testCase, ParserConfig cfg, String baseURI, InputStream is) throws IOException {
+		WriterConfig ttlcfg = new WriterConfig();
+		ttlcfg.set(BasicWriterSettings.INLINE_BLANK_NODES, true);
+		ttlcfg.set(BasicWriterSettings.PRETTY_PRINT, true);
+
 		Model expected = testCase.getExpected();
 		Model result = Rio.parse(is, baseURI, RDFFormat.CSVW, cfg, (Resource) null);
 		if (testCase.positive) {
-			WriterConfig ttlcfg = new WriterConfig();
-			ttlcfg.set(BasicWriterSettings.INLINE_BLANK_NODES, true);
-			ttlcfg.set(BasicWriterSettings.PRETTY_PRINT, true);
-			StringWriter w = new StringWriter();
-			w.write("\nResult\n");
-			Rio.write(result, w, RDFFormat.TURTLE, ttlcfg);
-			w.write("\nExpected\n");
-			Rio.write(expected, w, RDFFormat.TURTLE, ttlcfg);
-			System.out.println(w.toString());
-
-			assertTrue(Models.isomorphic(result, expected), testCase.name);
+			try {
+				assertTrue(Models.isomorphic(result, expected), testCase.name);
+			} catch (Error e) {
+				StringWriter w = new StringWriter();
+				w.write("\nResult\n");
+				Rio.write(result, w, RDFFormat.TURTLE, ttlcfg);
+				w.write("\nExpected\n");
+				Rio.write(expected, w, RDFFormat.TURTLE, ttlcfg);
+				System.out.println(w.toString());
+				throw (e);
+			}
 		} else {
 			assertFalse(Models.isomorphic(result, expected), testCase.name);
 		}
@@ -75,6 +79,7 @@ public class W3cComplianceTest {
 	@ParameterizedTest
 	@MethodSource("getTestFiles")
 	public void test(W3CTest testCase) throws IOException {
+		int i = 1;
 
 		try {
 			ParserConfig cfg = new ParserConfig();
@@ -93,6 +98,7 @@ public class W3cComplianceTest {
 				int pos = csv.getPath().lastIndexOf("/") + 1;
 				String fname = csv.getPath().substring(pos);
 
+				System.err.println("Test " + i + " : " + fname);
 				try (InputStream is = testCase.getCSV().openStream()) {
 					compareResults(testCase, cfg, "http://www.w3.org/2013/csvw/tests/" + fname, is);
 				}

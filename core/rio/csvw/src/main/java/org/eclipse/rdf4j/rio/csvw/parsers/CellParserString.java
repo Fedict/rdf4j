@@ -21,7 +21,9 @@ public class CellParserString extends CellParser {
 	@Override
 	public Value parse(String cell) {
 		String s = getValueOrDefault(cell);
-
+		if (s == null || s.isEmpty()) {
+			return null;
+		}
 		String lang = getLang();
 		if (lang != null) {
 			return Values.literal(s, lang);

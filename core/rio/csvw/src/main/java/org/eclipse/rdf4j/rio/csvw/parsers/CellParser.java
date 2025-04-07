@@ -10,8 +10,6 @@
  *******************************************************************************/
 package org.eclipse.rdf4j.rio.csvw.parsers;
 
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.MatchResult;
@@ -23,6 +21,7 @@ import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Namespace;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.util.Values;
+import org.eclipse.rdf4j.rio.csvw.CSVWUtil;
 
 /**
  *
@@ -80,7 +79,7 @@ public abstract class CellParser {
 	 */
 	public void setName(String name) {
 		this.name = name;
-		this.encodedName = "{" + URLEncoder.encode(name, StandardCharsets.UTF_8) + "}";
+		this.encodedName = "{" + CSVWUtil.encode(name) + "}";
 	}
 
 	/**

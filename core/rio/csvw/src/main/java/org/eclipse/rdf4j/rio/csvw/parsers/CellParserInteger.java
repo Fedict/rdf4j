@@ -22,8 +22,10 @@ public class CellParserInteger extends CellParser {
 	@Override
 	public Value parse(String cell) {
 		String s = getValueOrDefault(cell);
-
-		if (s != null && getGroupChar() != null) {
+		if (s == null || s.isEmpty()) {
+			return null;
+		}
+		if (getGroupChar() != null) {
 			s = s.replace(getGroupChar(), "");
 		}
 		return Values.literal(s, getDataType());
