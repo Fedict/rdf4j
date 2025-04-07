@@ -42,6 +42,7 @@ import org.eclipse.rdf4j.rio.WriterConfig;
 import org.eclipse.rdf4j.rio.csvw.metadata.CSVWMetadataNone;
 import org.eclipse.rdf4j.rio.csvw.metadata.CSVWMetadataProvider;
 import org.eclipse.rdf4j.rio.helpers.BasicWriterSettings;
+import org.eclipse.rdf4j.rio.turtle.TurtleWriterSettings;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
@@ -56,7 +57,8 @@ public class W3cComplianceTest {
 		Model result = Rio.parse(is, baseURI, RDFFormat.CSVW, cfg, (Resource) null);
 		if (testCase.positive) {
 			WriterConfig ttlcfg = new WriterConfig();
-			cfg.set(BasicWriterSettings.PRETTY_PRINT, true);
+			ttlcfg.set(BasicWriterSettings.INLINE_BLANK_NODES, true);
+			ttlcfg.set(BasicWriterSettings.PRETTY_PRINT, true);
 			StringWriter w = new StringWriter();
 			w.write("\nResult\n");
 			Rio.write(result, w, RDFFormat.TURTLE, ttlcfg);

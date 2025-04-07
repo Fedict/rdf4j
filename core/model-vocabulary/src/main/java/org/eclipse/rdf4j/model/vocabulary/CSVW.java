@@ -128,8 +128,8 @@ public class CSVW {
 	/** csvw:tableSchema */
 	public static final IRI TABLE_SCHEMA;
 
-	/** csvw:tables */
-	public static final IRI TABLES;
+	/** csvw:table */
+	public static final IRI HAS_TABLE;
 
 	/** csvw:title */
 	public static final IRI TITLE;
@@ -173,12 +173,12 @@ public class CSVW {
 		QUOTE_CHAR = Vocabularies.createIRI(NAMESPACE, "quoteChar");
 		REQUIRED = Vocabularies.createIRI(NAMESPACE, "required");
 		HAS_ROW = Vocabularies.createIRI(NAMESPACE, "row");
+		HAS_TABLE = Vocabularies.createIRI(NAMESPACE, "table");
 		ROWNUM = Vocabularies.createIRI(NAMESPACE, "rownum");
 		SKIP_COLUMNS = Vocabularies.createIRI(NAMESPACE, "skipColumns");
 		SKIP_ROWS = Vocabularies.createIRI(NAMESPACE, "skipRows");
 		SUPPRESS_OUTPUT = Vocabularies.createIRI(NAMESPACE, "suppressOutput");
 		TABLE_SCHEMA = Vocabularies.createIRI(NAMESPACE, "tableSchema");
-		TABLES = Vocabularies.createIRI(NAMESPACE, "tables");
 		TITLE = Vocabularies.createIRI(NAMESPACE, "title");
 		TRIM = Vocabularies.createIRI(NAMESPACE, "trim");
 		URL = Vocabularies.createIRI(NAMESPACE, "url");
