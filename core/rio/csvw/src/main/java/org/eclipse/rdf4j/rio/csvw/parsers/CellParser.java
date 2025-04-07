@@ -279,7 +279,7 @@ public abstract class CellParser {
 	 * @param propertyUrl the propertyUrl to set
 	 */
 	public void setPropertyIRI(String propertyUrl) {
-		this.propertyIRI = Values.iri("", propertyUrl);
+		this.propertyIRI = Values.iri(propertyUrl);
 	}
 
 	/**

@@ -11,11 +11,13 @@
 
 package org.eclipse.rdf4j.rio.csvw;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.StringWriter;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
@@ -36,8 +38,10 @@ import org.eclipse.rdf4j.rio.ParserConfig;
 import org.eclipse.rdf4j.rio.RDFFormat;
 import org.eclipse.rdf4j.rio.RDFParser;
 import org.eclipse.rdf4j.rio.Rio;
+import org.eclipse.rdf4j.rio.WriterConfig;
 import org.eclipse.rdf4j.rio.csvw.metadata.CSVWMetadataNone;
 import org.eclipse.rdf4j.rio.csvw.metadata.CSVWMetadataProvider;
+import org.eclipse.rdf4j.rio.helpers.BasicWriterSettings;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
@@ -47,33 +51,50 @@ import org.junit.jupiter.params.provider.MethodSource;
  */
 public class W3cComplianceTest {
 
+	private void compareResults(W3CTest testCase, ParserConfig cfg, String baseURI, InputStream is) throws IOException {
+		Model expected = testCase.getExpected();
+		Model result = Rio.parse(is, baseURI, RDFFormat.CSVW, cfg, (Resource) null);
+		if (testCase.positive) {
+			WriterConfig ttlcfg = new WriterConfig();
+			cfg.set(BasicWriterSettings.PRETTY_PRINT, true);
+			StringWriter w = new StringWriter();
+			w.write("\nResult\n");
+			Rio.write(result, w, RDFFormat.TURTLE, ttlcfg);
+			w.write("\nExpected\n");
+			Rio.write(expected, w, RDFFormat.TURTLE, ttlcfg);
+			System.out.println(w.toString());
+
+			assertTrue(Models.isomorphic(result, expected), testCase.name);
+		} else {
+			assertFalse(Models.isomorphic(result, expected), testCase.name);
+		}
+	}
+
 	@ParameterizedTest
 	@MethodSource("getTestFiles")
 	public void test(W3CTest testCase) throws IOException {
-		if (!testCase.positive) {
-			System.err.println("test should fail");
-			return;
-		}
 
 		try {
-			Model expected = testCase.getExpected();
+			ParserConfig cfg = new ParserConfig();
+
 			if (testCase.getJsonMetadata() != null) {
 				try (InputStream is = testCase.getJsonMetadata().openStream()) {
-					Model result = Rio.parse(is, "http://www.w3.org/2013/csvw/tests/", RDFFormat.CSVW, (Resource) null);
-					assertTrue(Models.isomorphic(result, expected), testCase.name);
+					compareResults(testCase, cfg, "http://www.w3.org/2013/csvw/tests/", is);
 				}
 			} else {
-				ParserConfig cfg = new ParserConfig();
+				// basic tests without metadata file
 				cfg.set(CSVWParserSettings.METADATA_INPUT_MODE, false);
 				cfg.set(CSVWParserSettings.METADATA_PROVIDER, new CSVWMetadataNone());
+				cfg.set(CSVWParserSettings.DATA_URL, testCase.getCSV().toString());
+
+				URL csv = testCase.getCSV();
+				int pos = csv.getPath().lastIndexOf("/") + 1;
+				String fname = csv.getPath().substring(pos);
 
 				try (InputStream is = testCase.getCSV().openStream()) {
-					Model result = Rio.parse(is, "http://www.w3.org/2013/csvw/tests/", RDFFormat.CSVW, cfg,
-							(Resource) null);
-					assertTrue(Models.isomorphic(result, expected), testCase.name);
+					compareResults(testCase, cfg, "http://www.w3.org/2013/csvw/tests/" + fname, is);
 				}
 			}
-
 		} catch (AssertionError e) {
 			fail();
 		}

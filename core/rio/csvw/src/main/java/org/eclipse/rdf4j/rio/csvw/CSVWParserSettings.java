@@ -61,8 +61,8 @@ public class CSVWParserSettings {
 	 * <p>
 	 * Can be overridden by setting system property {@code org.eclipse.rdf4j.rio.csvw.metadata_json_file}
 	 */
-	public static final StringRioSetting METADATA_URI = new StringRioSetting(
-			"org.eclipse.rdf4j.rio.csvw.metadata_uri", "Location of JSON metadata file", null);
+	public static final StringRioSetting METADATA_URL = new StringRioSetting(
+			"org.eclipse.rdf4j.rio.csvw.metadata_url", "Location of JSON metadata file", null);
 
 	/**
 	 * Class setting for parser to provide a metadata provider
