@@ -16,7 +16,6 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 
-import org.apache.http.client.utils.URIBuilder;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Model;
 import org.eclipse.rdf4j.model.Resource;
@@ -63,9 +62,10 @@ public class CSVWUtil {
 	protected static CSVReader getCSVReader(Model metadata, Resource table, Reader reader) {
 		CSVParserBuilder parserBuilder = new CSVParserBuilder();
 		CSVReaderBuilder builder = new CSVReaderBuilder(reader);
-		builder.withSkipLines(0);
+		builder.withSkipLines(0); // set to zero to allow CSVW without metadata to read the header
 
 		if (metadata != null && table != null) {
+			builder.withSkipLines(1); // first line is assumed to be the header
 			Optional<Value> val = Models.getProperty(metadata, table, CSVW.DIALECT);
 			if (val.isPresent()) {
 				Resource dialect = (Resource) val.get();
@@ -153,6 +153,7 @@ public class CSVWUtil {
 	 *
 	 * @param metadata
 	 * @param column
+	 * @param csvFile
 	 * @return
 	 */
 	protected static CellParser getCellParser(Model metadata, Resource column) {
@@ -190,7 +191,7 @@ public class CSVWUtil {
 
 		// use a property from a vocabulary as predicate, or create a property relative to the namespace of the CSV
 		Optional<String> propertyURL = Models.getPropertyString(metadata, column, CSVW.PROPERTY_URL);
-		String s = propertyURL.isPresent() ? propertyURL.get() : "_local:" + parser.getName();
+		String s = propertyURL.isPresent() ? propertyURL.get() : ":" + parser.getName();
 		parser.setPropertyIRI(metadata.getNamespaces(), s);
 
 		return parser;

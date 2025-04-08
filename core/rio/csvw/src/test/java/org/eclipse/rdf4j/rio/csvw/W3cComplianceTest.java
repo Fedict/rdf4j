@@ -36,13 +36,10 @@ import org.eclipse.rdf4j.model.util.Values;
 import org.eclipse.rdf4j.model.vocabulary.RDF;
 import org.eclipse.rdf4j.rio.ParserConfig;
 import org.eclipse.rdf4j.rio.RDFFormat;
-import org.eclipse.rdf4j.rio.RDFParser;
 import org.eclipse.rdf4j.rio.Rio;
 import org.eclipse.rdf4j.rio.WriterConfig;
 import org.eclipse.rdf4j.rio.csvw.metadata.CSVWMetadataNone;
-import org.eclipse.rdf4j.rio.csvw.metadata.CSVWMetadataProvider;
 import org.eclipse.rdf4j.rio.helpers.BasicWriterSettings;
-import org.eclipse.rdf4j.rio.turtle.TurtleWriterSettings;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
@@ -83,10 +80,14 @@ public class W3cComplianceTest {
 
 		try {
 			ParserConfig cfg = new ParserConfig();
+			URL csv = testCase.getCSV();
 
 			if (testCase.getJsonMetadata() != null) {
+				cfg.set(CSVWParserSettings.METADATA_INPUT_MODE, true);
+				cfg.set(CSVWParserSettings.METADATA_URL, testCase.getJsonMetadata().toString());
+
 				try (InputStream is = testCase.getJsonMetadata().openStream()) {
-					compareResults(testCase, cfg, "http://www.w3.org/2013/csvw/tests/", is);
+					compareResults(testCase, cfg, csv.toString(), is);
 				}
 			} else {
 				// basic tests without metadata file
@@ -94,13 +95,12 @@ public class W3cComplianceTest {
 				cfg.set(CSVWParserSettings.METADATA_PROVIDER, new CSVWMetadataNone());
 				cfg.set(CSVWParserSettings.DATA_URL, testCase.getCSV().toString());
 
-				URL csv = testCase.getCSV();
-				int pos = csv.getPath().lastIndexOf("/") + 1;
+				int pos = csv.getPath().lastIndexOf("/tests/") + 7;
 				String fname = csv.getPath().substring(pos);
 
 				System.err.println("Test " + i + " : " + fname);
 				try (InputStream is = testCase.getCSV().openStream()) {
-					compareResults(testCase, cfg, "http://www.w3.org/2013/csvw/tests/" + fname, is);
+					compareResults(testCase, cfg, csv.toString(), is);
 				}
 			}
 		} catch (AssertionError e) {
