@@ -125,7 +125,7 @@ public class CSVWParser extends AbstractRDFParser {
 				rdfHandler.handleNamespace("", csvFile + "#");
 				metadata.getNamespaces().add(new SimpleNamespace("", csvFile + "#"));
 
-				Resource tableNode = minimal ? null : generateTableNode(rdfHandler, rootNode, metadata, csvFile);
+				Resource tableNode = minimal ? null : generateTableNode(rdfHandler, rootNode, csvFile);
 
 				Model extra = getExtraMetadata(metadata, (Resource) tableNode, CSVW.TABLE_SCHEMA);
 				extra.forEach(s -> rdfHandler.handleStatement(s));
@@ -151,7 +151,7 @@ public class CSVWParser extends AbstractRDFParser {
 				csvFile = baseURI;
 			}
 			rdfHandler.handleNamespace("", csvFile + "#");
-			Resource tableNode = minimal ? null : generateTableNode(rdfHandler, rootNode, null, csvFile);
+			Resource tableNode = minimal ? null : generateTableNode(rdfHandler, rootNode, csvFile);
 			parseCSV(rdfHandler, baseURI, csvFile, input, tableNode);
 		}
 		clear();
@@ -374,7 +374,7 @@ public class CSVWParser extends AbstractRDFParser {
 	 * @param csvURL
 	 * @return
 	 */
-	private Resource generateTableNode(RDFHandler handler, Resource rootNode, Model metadata, String csvUrl) {
+	private Resource generateTableNode(RDFHandler handler, Resource rootNode, String csvUrl) {
 		BNode node = Values.bnode();
 		handler.handleStatement(Statements.statement(rootNode, CSVW.HAS_TABLE, node, null));
 		handler.handleStatement(Statements.statement(node, RDF.TYPE, CSVW.TABLE, null));
@@ -388,19 +388,21 @@ public class CSVWParser extends AbstractRDFParser {
 	 *
 	 * @param handler
 	 * @param tableNode
-	 * @param subject
-	 * @long rownum
+	 * @param rowSubject
+	 * @param rowURL
+	 * @param rownum
 	 * @return
 	 */
-	private Resource generateRowNode(RDFHandler handler, Resource tableNode, Resource subject, long rownum) {
+	private Resource generateRowNode(RDFHandler handler, Resource tableNode, Resource rowSubject, Resource rowURL,
+			long rownum) {
 		BNode rownode = Values.bnode();
-		BNode node = Values.bnode();
+		Resource node = (rowSubject != null) ? rowSubject : Values.bnode();
 
 		handler.handleStatement(Statements.statement(tableNode, CSVW.HAS_ROW, rownode, null));
 		handler.handleStatement(Statements.statement(rownode, RDF.TYPE, CSVW.ROW, null));
 		handler.handleStatement(
 				Statements.statement(rownode, CSVW.ROWNUM, Values.literal(String.valueOf(rownum), XSD.INTEGER), null));
-		handler.handleStatement(Statements.statement(rownode, CSVW.URL, subject, null));
+		handler.handleStatement(Statements.statement(rownode, CSVW.URL, rowURL, null));
 		handler.handleStatement(Statements.statement(rownode, CSVW.DESCRIBES, node, null));
 
 		return node;
@@ -453,8 +455,8 @@ public class CSVWParser extends AbstractRDFParser {
 
 			while ((cells = csv.readNext()) != null) {
 				// row number + 1 to compensate for header
-				Resource about = Values.iri(csvFile + "#row=" + (line + 1));
-				Resource rowNode = minimal ? null : generateRowNode(rdfHandler, tableNode, about, line);
+				Resource rowURL = Values.iri(csvFile + "#row=" + (line + 1));
+				Resource rowNode = minimal ? null : generateRowNode(rdfHandler, tableNode, null, rowURL, line);
 
 				// csv cells
 				for (int i = 0; i < cells.length; i++) {
@@ -511,9 +513,9 @@ public class CSVWParser extends AbstractRDFParser {
 			String[] cells;
 
 			while ((cells = csv.readNext()) != null) {
-				Resource about = Values.iri(csvFile + "#row=" + (line + 1));
-				// Resource aboutSubject = getIRIorBnode(cellParsers, cells, aboutURL, aboutIndex, placeholder);
-				Resource rowNode = minimal ? null : generateRowNode(rdfHandler, tableNode, about, line);
+				Resource rowURL = Values.iri(csvFile + "#row=" + (line + 1));
+				Resource rowSubject = getIRIorBnode(cellParsers, cells, aboutURL, aboutIndex, placeholder);
+				Resource rowNode = minimal ? null : generateRowNode(rdfHandler, tableNode, rowSubject, rowURL, line);
 
 				if (doReplace) {
 					values = new HashMap<>(cells.length + 4, 1.0f);
