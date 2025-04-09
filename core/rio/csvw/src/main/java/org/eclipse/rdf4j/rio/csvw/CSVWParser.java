@@ -125,10 +125,10 @@ public class CSVWParser extends AbstractRDFParser {
 				rdfHandler.handleNamespace("", csvFile + "#");
 				metadata.getNamespaces().add(new SimpleNamespace("", csvFile + "#"));
 
-				Model extra = getExtraMetadata(metadata, (Resource) table, CSVW.TABLE_SCHEMA);
-				extra.forEach(s -> rdfHandler.handleStatement(s));
-
 				Resource tableNode = minimal ? null : generateTableNode(rdfHandler, rootNode, metadata, csvFile);
+
+				Model extra = getExtraMetadata(metadata, (Resource) tableNode, CSVW.TABLE_SCHEMA);
+				extra.forEach(s -> rdfHandler.handleStatement(s));
 
 				Resource tableSchema = getTableSchema(metadata, (Resource) table);
 				List<Value> columns = getColumns(metadata, tableSchema);
@@ -141,7 +141,7 @@ public class CSVWParser extends AbstractRDFParser {
 						.collect(Collectors.toList())
 						.toArray(new CellParser[columns.size()]);
 				try (InputStream inCsv = csvURI.toURL().openStream()) {
-					parseCSV(metadata, rdfHandler, inCsv, cellParsers, (Resource) table, tableNode);
+					parseCSV(metadata, rdfHandler, csvFile, inCsv, cellParsers, (Resource) table, tableNode);
 				}
 			}
 		} else {
@@ -206,6 +206,7 @@ public class CSVWParser extends AbstractRDFParser {
 	private Model getExtraMetadata(Model m, Resource rootNode, IRI predicate) {
 		Model extra = new LinkedHashModel();
 		Resource oldRoot = null;
+
 		if (predicate != null) {
 			Iterable<Statement> roots = m.getStatements(null, predicate, null);
 			if (roots.iterator().hasNext()) {
@@ -475,12 +476,14 @@ public class CSVWParser extends AbstractRDFParser {
 	 *
 	 * @param metadata
 	 * @param handler
+	 * @param csvFile
 	 * @param input
 	 * @param cellParsers
 	 * @param table
 	 * @param tableNode
 	 */
-	private void parseCSV(Model metadata, RDFHandler handler, InputStream input, CellParser[] cellParsers,
+	private void parseCSV(Model metadata, RDFHandler handler, String csvFile, InputStream input,
+			CellParser[] cellParsers,
 			Resource table, Resource tableNode) {
 		String aboutURL = getAboutURL(metadata, table);
 		Charset encoding = CSVWUtil.getEncoding(metadata, table);
@@ -508,8 +511,9 @@ public class CSVWParser extends AbstractRDFParser {
 			String[] cells;
 
 			while ((cells = csv.readNext()) != null) {
-				Resource aboutSubject = getIRIorBnode(cellParsers, cells, aboutURL, aboutIndex, placeholder);
-				Resource rowNode = minimal ? null : generateRowNode(rdfHandler, tableNode, aboutSubject, line);
+				Resource about = Values.iri(csvFile + "#row=" + (line + 1));
+				// Resource aboutSubject = getIRIorBnode(cellParsers, cells, aboutURL, aboutIndex, placeholder);
+				Resource rowNode = minimal ? null : generateRowNode(rdfHandler, tableNode, about, line);
 
 				if (doReplace) {
 					values = new HashMap<>(cells.length + 4, 1.0f);
