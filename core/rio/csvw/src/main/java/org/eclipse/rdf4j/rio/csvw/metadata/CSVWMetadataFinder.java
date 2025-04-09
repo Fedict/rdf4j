@@ -60,20 +60,20 @@ public class CSVWMetadataFinder implements CSVWMetadataProvider {
 		}
 		buffer = null;
 
-		findByExtension();
+		checkSpecific();
 		if (buffer == null) {
-			findInPath();
+			checkGeneric();
 		}
 		if (buffer == null) {
-			findByWellKnown();
+			checkWellKnown();
 		}
 		return buffer;
 	}
 
 	/**
-	 * Find by adding metadata.json as file extension
+	 * Check if there is a "-metadata.json" file relative to the location of the CSV file
 	 */
-	public void findByExtension() {
+	public void checkSpecific() {
 		String s = csvLocation.toString();
 		if (s.endsWith(CSV)) {
 			s = s.substring(0, s.length() - CSV.length());
@@ -83,17 +83,17 @@ public class CSVWMetadataFinder implements CSVWMetadataProvider {
 	}
 
 	/**
-	 * Find by trying to get the csv-metadata.json in the path
+	 * Check if there is a generic "csv-metadata.json" on the server
 	 */
-	public void findInPath() {
+	public void checkGeneric() {
 		URI metaURI = csvLocation.resolve(METADATA_CSV);
 		buffer = openURI(metaURI);
 	}
 
 	/**
-	 * Try reading the well-known location
+	 * Check if there is a file in a ".well-known" location on the server
 	 */
-	public void findByWellKnown() {
+	public void checkWellKnown() {
 		URI wellKnown = csvLocation.resolve(WELL_KNOWN);
 
 		try (InputStream is = wellKnown.toURL().openStream();
@@ -107,20 +107,16 @@ public class CSVWMetadataFinder implements CSVWMetadataProvider {
 					continue;
 				}
 				switch (line.charAt(0)) {
-				case '?':
-					metaURI = URI.create(line + s);
-					break;
-				case '/':
-					metaURI = csvLocation.resolve(s);
-					break;
-				default:
-					metaURI = URI.create(s);
+					case '?':
+						metaURI = URI.create(line + s);
+						break;
+					case '/':
+						metaURI = csvLocation.resolve(s);
+						break;
+					default:
+						metaURI = URI.create(s);
 				}
-				try (InputStream meta = metaURI.toURL().openStream()) {
-					buffer = new ByteArrayInputStream(meta.readAllBytes());
-				} catch (IOException ioe) {
-					LOGGER.debug("Could not open {}", metaURI);
-				}
+				buffer = openURI(metaURI);
 				line = r.readLine();
 			}
 		} catch (IOException ioe) {
