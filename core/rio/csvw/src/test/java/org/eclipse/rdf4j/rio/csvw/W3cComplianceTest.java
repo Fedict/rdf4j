@@ -21,8 +21,17 @@ import java.io.StringWriter;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
+import org.eclipse.jetty.server.Handler;
+import org.eclipse.jetty.server.Server;
+import org.eclipse.jetty.server.handler.ContextHandler;
+import org.eclipse.jetty.server.handler.DefaultHandler;
+import org.eclipse.jetty.server.handler.HandlerList;
+import org.eclipse.jetty.server.handler.ResourceHandler;
+import org.eclipse.jetty.servlet.ServletContextHandler;
+import org.eclipse.jetty.webapp.WebAppContext;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.model.Model;
@@ -40,6 +49,8 @@ import org.eclipse.rdf4j.rio.Rio;
 import org.eclipse.rdf4j.rio.WriterConfig;
 import org.eclipse.rdf4j.rio.csvw.metadata.CSVWMetadataNone;
 import org.eclipse.rdf4j.rio.helpers.BasicWriterSettings;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
@@ -48,6 +59,41 @@ import org.junit.jupiter.params.provider.MethodSource;
  *
  */
 public class W3cComplianceTest {
+	private static String TEST_BASE_URI = "http://www.w3.org/2013/csvw/tests/";
+	private static int PORT = 8989;
+	private static Server server;
+
+	@BeforeAll
+	public static void setup() throws Exception {
+		System.setProperty("http.proxyHost", "localhost");
+		System.setProperty("http.proxyPort", String.valueOf(PORT));
+
+		server = new Server(PORT);
+		String webDir = W3cComplianceTest.class.getClassLoader().getResource("w3c/").toExternalForm();
+		ResourceHandler webHandler = new ResourceHandler();
+		webHandler.setResourceBase(webDir);
+		ContextHandler webContext = new ContextHandler("/2013/csvw/tests");
+		webContext.setHandler(webHandler);
+
+		String nsDir = W3cComplianceTest.class.getClassLoader().getResource("ns/").toExternalForm();
+		ResourceHandler nsHandler = new ResourceHandler();
+		nsHandler.setResourceBase(nsDir);
+		ContextHandler nsContext = new ContextHandler("/ns");
+		nsContext.setHandler(nsHandler);
+
+		HandlerList handlers = new HandlerList();
+		handlers.setHandlers(new Handler[] { nsContext, webContext });
+		server.setHandler(handlers);
+
+		// context.setVirtualHosts(new String[] { "www.w3.org" });
+		System.err.println("WEBDIR: " + webDir);
+		server.start();
+	}
+
+	@AfterAll
+	public static void tearDown() throws Exception {
+		server.stop();
+	}
 
 	private void compareResults(W3CTest testCase, ParserConfig cfg, String baseURI, InputStream is) throws IOException {
 		WriterConfig ttlcfg = new WriterConfig();
@@ -115,7 +161,14 @@ public class W3cComplianceTest {
 	 * @return
 	 */
 	private static URL getLocation(String file) {
-		return W3cComplianceTest.class.getClassLoader().getResource("w3c/" + file);
+		URL url = null;
+		try {
+			url = new URL(file);
+		} catch (Exception e) {
+			//
+		}
+		return url;
+		// return W3cComplianceTest.class.getClassLoader().getResource("w3c/" + file);
 	}
 
 	/*
@@ -136,12 +189,12 @@ public class W3cComplianceTest {
 		String nsMF = "http://www.w3.org/2001/sw/DataAccess/tests/test-manifest#";
 		String csvtMF = "http://www.w3.org/2013/csvw/tests/vocab#";
 
-		URL url = getLocation("manifest-rdf.ttl");
+		URL url = W3cComplianceTest.class.getClassLoader().getResource("w3c/manifest-rdf.ttl");
 
 		if (url != null) {
 			Model model;
 			try {
-				model = Rio.parse(url.openStream(), getLocation("").toString(), RDFFormat.TURTLE, (Resource) null);
+				model = Rio.parse(url.openStream(), TEST_BASE_URI, RDFFormat.TURTLE, (Resource) null);
 			} catch (IOException e) {
 				throw new RuntimeException(e);
 			}
@@ -157,8 +210,7 @@ public class W3cComplianceTest {
 							t.stringValue(),
 							Models.getPropertyLiteral(model, t, Values.iri(nsMF, "name"), (Resource) null).orElse(null),
 							Models.getPropertyIRI(model, t, Values.iri(nsMF, "action"), (Resource) null).orElse(null),
-							Models.getPropertyIRI(model, t, Values.iri(csvtMF, "implicit"), (Resource) null)
-									.orElse(null),
+							Models.getPropertyIRIs(model, t, Values.iri(csvtMF, "implicit"), (Resource) null),
 							Models.getPropertyIRI(model, t, Values.iri(nsMF, "result"), (Resource) null).orElse(null),
 							!Models.getPropertyIRI(model, t, RDF.TYPE, (Resource) null)
 									.orElse(null)
@@ -174,7 +226,7 @@ public class W3cComplianceTest {
 		String id;
 		String name;
 		IRI csv;
-		IRI json;
+		Set<IRI> json;
 		IRI result;
 		boolean positive;
 
@@ -214,13 +266,13 @@ public class W3cComplianceTest {
 		 * @throws IOException
 		 */
 		public URL getJsonMetadata() throws IOException {
-			if (json == null) {
+			if (json == null || json.isEmpty()) {
 				return null;
 			}
-			return new URL(json.toString());
+			return new URL(json.stream().findFirst().get().toString());
 		}
 
-		public W3CTest(String id, Literal name, IRI csv, IRI json, IRI result, boolean positive) {
+		public W3CTest(String id, Literal name, IRI csv, Set<IRI> json, IRI result, boolean positive) {
 			this.id = id;
 			this.name = name.stringValue();
 			this.csv = csv;
