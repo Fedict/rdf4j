@@ -24,14 +24,13 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import org.eclipse.jetty.http.MimeTypes;
 import org.eclipse.jetty.server.Handler;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.handler.ContextHandler;
 import org.eclipse.jetty.server.handler.DefaultHandler;
 import org.eclipse.jetty.server.handler.HandlerList;
 import org.eclipse.jetty.server.handler.ResourceHandler;
-import org.eclipse.jetty.servlet.ServletContextHandler;
-import org.eclipse.jetty.webapp.WebAppContext;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.model.Model;
@@ -59,12 +58,19 @@ import org.junit.jupiter.params.provider.MethodSource;
  *
  */
 public class W3cComplianceTest {
-	private static String TEST_BASE_URI = "http://www.w3.org/2013/csvw/tests/";
-	private static int PORT = 8989;
+	private final static String TEST_BASE_URI = "http://www.w3.org/2013/csvw/tests/";
+	private final static int PORT = 8989;
 	private static Server server;
+
+	private static String proxyHost;
+	private static String proxyPort;
 
 	@BeforeAll
 	public static void setup() throws Exception {
+		// route all request to embedded Jetty
+		proxyHost = System.getProperty("http.proxyHost");
+		proxyPort = System.getProperty("http.proxyPort");
+
 		System.setProperty("http.proxyHost", "localhost");
 		System.setProperty("http.proxyPort", String.valueOf(PORT));
 
@@ -80,19 +86,21 @@ public class W3cComplianceTest {
 		nsHandler.setResourceBase(nsDir);
 		ContextHandler nsContext = new ContextHandler("/ns");
 		nsContext.setHandler(nsHandler);
-
 		HandlerList handlers = new HandlerList();
-		handlers.setHandlers(new Handler[] { nsContext, webContext });
+		handlers.setHandlers(new Handler[] { nsContext, webContext, new DefaultHandler() });
 		server.setHandler(handlers);
 
-		// context.setVirtualHosts(new String[] { "www.w3.org" });
-		System.err.println("WEBDIR: " + webDir);
 		server.start();
 	}
 
 	@AfterAll
 	public static void tearDown() throws Exception {
-		server.stop();
+		System.setProperty("http.proxyHost", proxyHost);
+		System.setProperty("http.proxyPort", proxyPort);
+
+		if (server != null) {
+			server.stop();
+		}
 	}
 
 	private void compareResults(W3CTest testCase, ParserConfig cfg, String baseURI, InputStream is) throws IOException {

@@ -131,17 +131,22 @@ public class CSVWParser extends AbstractRDFParser {
 				extra.forEach(s -> rdfHandler.handleStatement(s));
 
 				Resource tableSchema = getTableSchema(metadata, (Resource) table);
-				List<Value> columns = getColumns(metadata, tableSchema);
-				if (columns.isEmpty()) {
-					throw new RDFParseException("Could not find column definitions in metadata");
-				}
+				if (tableSchema != null) {
+					List<Value> columns = getColumns(metadata, tableSchema);
+					if (columns.isEmpty()) {
+						throw new RDFParseException("Could not find column definitions in metadata");
+					}
 
-				CellParser[] cellParsers = columns.stream()
-						.map(c -> CSVWUtil.getCellParser(metadata, (Resource) c))
-						.collect(Collectors.toList())
-						.toArray(new CellParser[columns.size()]);
-				try (InputStream inCsv = csvURI.toURL().openStream()) {
-					parseCSV(metadata, rdfHandler, csvFile, inCsv, cellParsers, (Resource) table, tableNode);
+					CellParser[] cellParsers = columns.stream()
+							.map(c -> CSVWUtil.getCellParser(metadata, (Resource) c))
+							.collect(Collectors.toList())
+							.toArray(new CellParser[columns.size()]);
+					try (InputStream inCsv = csvURI.toURL().openStream()) {
+						parseCSV(metadata, rdfHandler, csvFile, inCsv, cellParsers, (Resource) table, tableNode);
+					}
+				} else {
+					LOGGER.warn("Metadata file does not contain tableSchema for {}", csvFile);
+					parseCSV(rdfHandler, baseURI, csvFile, input, tableNode);
 				}
 			}
 		} else {
@@ -269,9 +274,8 @@ public class CSVWParser extends AbstractRDFParser {
 	 * @return
 	 * @throws RDFParseException
 	 */
-	private Resource getTableSchema(Model metadata, Resource table) throws RDFParseException {
-		return Models.getPropertyResource(metadata, table, CSVW.TABLE_SCHEMA)
-				.orElseThrow(() -> new RDFParseException("Metadata file does not contain tableSchema for " + table));
+	private Resource getTableSchema(Model metadata, Resource table) {
+		return Models.getPropertyResource(metadata, table, CSVW.TABLE_SCHEMA).orElse(null);
 	}
 
 	/**
@@ -290,7 +294,13 @@ public class CSVWParser extends AbstractRDFParser {
 			}
 			return List.of(it.next().getSubject());
 		}
-		return RDFCollections.asValues(metadata, (Resource) it.next().getObject(), new ArrayList<>());
+		List<Value> tables = new ArrayList<>();
+		while (it.hasNext()) {
+			tables.add(it.next().getObject());
+		}
+		return tables;
+
+		// return RDFCollections.asValues(metadata, (Resource) it.next().getObject(), new ArrayList<>());
 	}
 
 	/**

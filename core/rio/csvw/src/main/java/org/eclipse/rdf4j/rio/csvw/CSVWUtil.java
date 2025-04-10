@@ -67,18 +67,22 @@ public class CSVWUtil {
 		if (metadata != null && table != null) {
 			builder.withSkipLines(1); // first line is assumed to be the header
 			Optional<Value> val = Models.getProperty(metadata, table, CSVW.DIALECT);
+			System.err.println("check for dialect");
 			if (val.isPresent()) {
+				System.err.println("DIALECT");
 				Resource dialect = (Resource) val.get();
-
+				System.err.println(metadata.getStatements(dialect, null, null));
 				// skip header (and possibly other) rows
 				String headerRows = Models.getPropertyString(metadata, dialect, CSVW.HEADER_ROW_COUNT).orElse("1");
 				String skipRows = Models.getPropertyString(metadata, dialect, CSVW.SKIP_ROWS).orElse("0");
 				int skip = Integer.valueOf(headerRows) + Integer.valueOf(skipRows);
 				Models.getPropertyString(metadata, dialect, CSVW.HEADER)
 						.ifPresent(v -> builder.withSkipLines(v.equalsIgnoreCase("false") ? 0 : skip));
-
 				Models.getPropertyString(metadata, dialect, CSVW.DELIMITER)
-						.ifPresent(v -> parserBuilder.withSeparator(v.charAt(0)));
+						.ifPresent(v -> {
+							System.err.println("SEP " + v);
+							parserBuilder.withSeparator(v.charAt(0));
+						});
 				Models.getPropertyString(metadata, dialect, CSVW.QUOTE_CHAR)
 						.ifPresent(v -> parserBuilder.withQuoteChar(v.charAt(0)));
 			}

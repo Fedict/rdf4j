@@ -59,6 +59,9 @@ public class CSVW {
 	/** csvw:columns */
 	public static final IRI COLUMN;
 
+	/** csvw:commentPrefix */
+	public static final IRI COMMENT_PREFIX;
+
 	/** csvw:datatype */
 	public static final IRI DATATYPE;
 
@@ -77,6 +80,9 @@ public class CSVW {
 	/** csvw:dialect */
 	public static final IRI DIALECT;
 
+	/** csvw:doubleQuote */
+	public static final IRI DOUBLE_QUOTE;
+
 	/** csvw:encoding */
 	public static final IRI ENCODING;
 
@@ -94,6 +100,9 @@ public class CSVW {
 
 	/** csvw:lang */
 	public static final IRI LANG;
+
+	/** csvw:lineTerminators */
+	public static final IRI LINE_TERMINATORS;
 
 	/** csvw:name */
 	public static final IRI NAME;
@@ -118,6 +127,9 @@ public class CSVW {
 
 	/** csvw:skipColumns */
 	public static final IRI SKIP_COLUMNS;
+
+	/** csvw:skipInitialSpace */
+	public static final IRI SKIP_INITIAL_SPACE;
 
 	/** csvw:skipRows */
 	public static final IRI SKIP_ROWS;
@@ -155,18 +167,21 @@ public class CSVW {
 		ABOUT_URL = Vocabularies.createIRI(NAMESPACE, "aboutUrl");
 		BASE = Vocabularies.createIRI(NAMESPACE, "base");
 		COLUMN = Vocabularies.createIRI(NAMESPACE, "column");
+		COMMENT_PREFIX = Vocabularies.createIRI(NAMESPACE, "commentPrefix");
 		DATATYPE = Vocabularies.createIRI(NAMESPACE, "datatype");
 		DECIMAL_CHAR = Vocabularies.createIRI(NAMESPACE, "decimalChar");
 		DEFAULT = Vocabularies.createIRI(NAMESPACE, "default");
 		DELIMITER = Vocabularies.createIRI(NAMESPACE, "delimiter");
 		DESCRIBES = Vocabularies.createIRI(NAMESPACE, "describes");
 		DIALECT = Vocabularies.createIRI(NAMESPACE, "dialect");
+		DOUBLE_QUOTE = Vocabularies.createIRI(NAMESPACE, "doubleQuote");
 		ENCODING = Vocabularies.createIRI(NAMESPACE, "encoding");
 		FORMAT = Vocabularies.createIRI(NAMESPACE, "format");
 		GROUP_CHAR = Vocabularies.createIRI(NAMESPACE, "groupChar");
 		HEADER = Vocabularies.createIRI(NAMESPACE, "header");
 		HEADER_ROW_COUNT = Vocabularies.createIRI(NAMESPACE, "headerRowCount");
 		LANG = Vocabularies.createIRI(NAMESPACE, "lang");
+		LINE_TERMINATORS = Vocabularies.createIRI(NAMESPACE, "lineTerminators");
 		NAME = Vocabularies.createIRI(NAMESPACE, "name");
 		NULL = Vocabularies.createIRI(NAMESPACE, "null");
 		PROPERTY_URL = Vocabularies.createIRI(NAMESPACE, "propertyUrl");
@@ -176,6 +191,7 @@ public class CSVW {
 		HAS_TABLE = Vocabularies.createIRI(NAMESPACE, "table");
 		ROWNUM = Vocabularies.createIRI(NAMESPACE, "rownum");
 		SKIP_COLUMNS = Vocabularies.createIRI(NAMESPACE, "skipColumns");
+		SKIP_INITIAL_SPACE = Vocabularies.createIRI(NAMESPACE, "skipInitialSpace");
 		SKIP_ROWS = Vocabularies.createIRI(NAMESPACE, "skipRows");
 		SUPPRESS_OUTPUT = Vocabularies.createIRI(NAMESPACE, "suppressOutput");
 		TABLE_SCHEMA = Vocabularies.createIRI(NAMESPACE, "tableSchema");
