@@ -66,6 +66,9 @@ public class CSVWMetadataFinder implements CSVWMetadataProvider {
 		try {
 			checkSpecific();
 			if (buffer == null) {
+				checkSpecificAfterExt();
+			}
+			if (buffer == null) {
 				checkGeneric();
 			}
 			if (buffer == null) {
@@ -80,7 +83,7 @@ public class CSVWMetadataFinder implements CSVWMetadataProvider {
 	/**
 	 * Check if there is a "-metadata.json" file relative to the location of the CSV file
 	 *
-	 * @throws java.net.MalformedURLException
+	 * @throws MalformedURLException
 	 */
 	public void checkSpecific() throws MalformedURLException {
 		String s = csvLocation.toString();
@@ -88,6 +91,17 @@ public class CSVWMetadataFinder implements CSVWMetadataProvider {
 			s = s.substring(0, s.length() - CSV.length());
 		}
 
+		URL metaURI = new URL(s + METADATA_EXT);
+		buffer = openURL(metaURI);
+	}
+
+	/**
+	 * Check if there is a "-metadata.json" file relative to the location of the CSV file
+	 *
+	 * @throws MalformedURLException
+	 */
+	public void checkSpecificAfterExt() throws MalformedURLException {
+		String s = csvLocation.toString();
 		URL metaURI = new URL(s + METADATA_EXT);
 		buffer = openURL(metaURI);
 	}
@@ -107,6 +121,7 @@ public class CSVWMetadataFinder implements CSVWMetadataProvider {
 	 * Check if there is a file in a ".well-known" location on the server
 	 *
 	 * @throws java.net.URISyntaxException
+	 * @throws java.net.MalformedURLException
 	 */
 	public void checkWellKnown() throws URISyntaxException, MalformedURLException {
 		URL url = csvLocation.toURI().resolve(WELL_KNOWN).toURL();

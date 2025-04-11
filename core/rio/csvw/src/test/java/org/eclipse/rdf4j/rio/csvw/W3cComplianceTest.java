@@ -100,9 +100,14 @@ public class W3cComplianceTest {
 
 	@AfterAll
 	public static void tearDown() throws Exception {
-		System.setProperty("http.proxyHost", proxyHost);
-		System.setProperty("http.proxyPort", proxyPort);
+		if (proxyHost != null) {
+			System.setProperty("http.proxyHost", proxyHost);
+			System.setProperty("http.proxyPort", proxyPort);
+		} else {
+			System.clearProperty("http.proxyHost");
+			System.clearProperty("http.proxyPort");
 
+		}
 		if (server != null) {
 			server.stop();
 		}

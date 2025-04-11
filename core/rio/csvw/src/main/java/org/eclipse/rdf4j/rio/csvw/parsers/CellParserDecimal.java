@@ -25,6 +25,7 @@ public class CellParserDecimal extends CellParser {
 		if (s == null) {
 			return null;
 		}
+
 		if (getGroupChar() != null) {
 			s = s.replace(getGroupChar(), "");
 		}
@@ -32,6 +33,12 @@ public class CellParserDecimal extends CellParser {
 		// always use a '.' in RDF, not the European-style ','
 		if (!getDecimalChar().equals(".")) {
 			s = s.replace(getDecimalChar(), ".");
+		}
+		String end = s.substring(s.length() - 2);
+		if (end.equals("%") || end.equals("‰")) {
+			String tmp = s.substring(0, s.length() - 2);
+			int factor = end.equals("%") ? 100 : 1000;
+			s = String.valueOf(Double.parseDouble(tmp) / factor);
 		}
 		return Values.literal(s, getDataType());
 	}

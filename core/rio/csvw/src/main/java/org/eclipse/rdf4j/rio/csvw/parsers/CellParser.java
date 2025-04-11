@@ -461,7 +461,10 @@ public abstract class CellParser {
 		if (s == null || (nullValue != null && s.equals(nullValue))) {
 			return null;
 		}
-		return trim ? s.trim() : s;
+		if (trim) {
+			s = s.trim();
+		}
+		return s.isEmpty() ? null : s;
 	}
 
 	/**
