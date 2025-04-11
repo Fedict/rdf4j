@@ -21,6 +21,7 @@ import java.io.StringWriter;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -58,6 +59,9 @@ import org.junit.jupiter.params.provider.MethodSource;
  *
  */
 public class W3cComplianceTest {
+	private final static String nsMF = "http://www.w3.org/2001/sw/DataAccess/tests/test-manifest#";
+	private final static String csvtMF = "http://www.w3.org/2013/csvw/tests/vocab#";
+
 	private final static String TEST_BASE_URI = "http://www.w3.org/2013/csvw/tests/";
 	private final static int PORT = 8989;
 	private static Server server;
@@ -139,9 +143,11 @@ public class W3cComplianceTest {
 			if (testCase.getJsonMetadata() != null) {
 				cfg.set(CSVWParserSettings.METADATA_INPUT_MODE, true);
 				cfg.set(CSVWParserSettings.METADATA_URL, testCase.getJsonMetadata().toString());
+				cfg.set(CSVWParserSettings.MINIMAL_MODE, testCase.isMinimal());
+				System.err.println("Parsing JSON " + testCase.getJsonMetadata());
 
 				try (InputStream is = testCase.getJsonMetadata().openStream()) {
-					compareResults(testCase, cfg, csv.toString(), is);
+					compareResults(testCase, cfg, TEST_BASE_URI, is);
 				}
 			} else {
 				// basic tests without metadata file
@@ -154,7 +160,7 @@ public class W3cComplianceTest {
 
 				System.err.println("Test " + i + " : " + fname);
 				try (InputStream is = testCase.getCSV().openStream()) {
-					compareResults(testCase, cfg, csv.toString(), is);
+					compareResults(testCase, cfg, TEST_BASE_URI, is);
 				}
 			}
 		} catch (AssertionError e) {
@@ -186,6 +192,19 @@ public class W3cComplianceTest {
 	 * runParsingTest(testCasePath); }
 	 *
 	 */
+
+	private static boolean optionMinimal(Model model, Resource t) {
+		boolean minimal = false;
+		Optional<Resource> node = Models.getPropertyResource(model, t, Values.iri(csvtMF, "option"), (Resource) null);
+		if (node.isPresent()) {
+			Optional<Value> val = Models.getProperty(model, node.get(), Values.iri(csvtMF, "minimal"), (Resource) null);
+			if (val.isPresent()) {
+				return Boolean.parseBoolean(val.get().stringValue());
+			}
+		}
+		return minimal;
+	}
+
 	/**
 	 * Get test file URLs from manifest file(s)
 	 *
@@ -193,9 +212,6 @@ public class W3cComplianceTest {
 	 */
 	private static List<W3CTest> getTestFiles() {
 		List<W3CTest> tests = null;
-
-		String nsMF = "http://www.w3.org/2001/sw/DataAccess/tests/test-manifest#";
-		String csvtMF = "http://www.w3.org/2013/csvw/tests/vocab#";
 
 		URL url = W3cComplianceTest.class.getClassLoader().getResource("w3c/manifest-rdf.ttl");
 
@@ -218,11 +234,13 @@ public class W3cComplianceTest {
 							t.stringValue(),
 							Models.getPropertyLiteral(model, t, Values.iri(nsMF, "name"), (Resource) null).orElse(null),
 							Models.getPropertyIRI(model, t, Values.iri(nsMF, "action"), (Resource) null).orElse(null),
-							Models.getPropertyIRIs(model, t, Values.iri(csvtMF, "implicit"), (Resource) null),
+							// Models.getPropertyIRIs(model, t, Values.iri(csvtMF, "implicit"), (Resource) null),
 							Models.getPropertyIRI(model, t, Values.iri(nsMF, "result"), (Resource) null).orElse(null),
 							!Models.getPropertyIRI(model, t, RDF.TYPE, (Resource) null)
 									.orElse(null)
-									.equals(Values.iri(csvtMF, "NegativeRdfTest")))
+									.equals(Values.iri(csvtMF, "NegativeRdfTest")),
+							optionMinimal(model, t)
+					)
 					)
 					.collect(Collectors.toList());
 		}
@@ -233,10 +251,10 @@ public class W3cComplianceTest {
 	static class W3CTest {
 		String id;
 		String name;
-		IRI csv;
-		Set<IRI> json;
+		IRI input;
 		IRI result;
 		boolean positive;
+		boolean minimal;
 
 		/**
 		 * Get URL of CSV data file
@@ -245,10 +263,10 @@ public class W3cComplianceTest {
 		 * @throws IOException
 		 */
 		public URL getCSV() throws IOException {
-			if (csv == null) {
+			if (input == null || !input.toString().endsWith("csv")) {
 				return null;
 			}
-			return new URL(csv.toString());
+			return new URL(input.toString());
 		}
 
 		/**
@@ -274,19 +292,23 @@ public class W3cComplianceTest {
 		 * @throws IOException
 		 */
 		public URL getJsonMetadata() throws IOException {
-			if (json == null || json.isEmpty()) {
+			if (input == null || !input.toString().endsWith("json")) {
 				return null;
 			}
-			return new URL(json.stream().findFirst().get().toString());
+			return new URL(input.toString());
 		}
 
-		public W3CTest(String id, Literal name, IRI csv, Set<IRI> json, IRI result, boolean positive) {
+		public boolean isMinimal() {
+			return minimal;
+		}
+
+		public W3CTest(String id, Literal name, IRI input, IRI result, boolean positive, boolean minimal) {
 			this.id = id;
 			this.name = name.stringValue();
-			this.csv = csv;
-			this.json = json;
+			this.input = input;
 			this.result = result;
 			this.positive = positive;
+			this.minimal = minimal;
 		}
 	}
 }

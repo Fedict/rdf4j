@@ -100,6 +100,9 @@ public class CSVWParser extends AbstractRDFParser {
 		rdfHandler.handleNamespace("xsd", XSD.NAMESPACE);
 
 		boolean minimal = getParserConfig().get(CSVWParserSettings.MINIMAL_MODE);
+		if (minimal) {
+			LOGGER.info("Minimal mode set to " + minimal);
+		}
 		Resource rootNode = minimal ? null : generateTablegroupNode(rdfHandler);
 
 		boolean metadataIn = getParserConfig().get(CSVWParserSettings.METADATA_INPUT_MODE);
@@ -146,7 +149,7 @@ public class CSVWParser extends AbstractRDFParser {
 					}
 				} else {
 					LOGGER.warn("Metadata file does not contain tableSchema for {}", csvFile);
-					parseCSV(rdfHandler, baseURI, csvFile, input, tableNode);
+					parseCSV(metadata, rdfHandler, csvFile, input, tableNode);
 				}
 			}
 		} else {
@@ -157,7 +160,7 @@ public class CSVWParser extends AbstractRDFParser {
 			}
 			rdfHandler.handleNamespace("", csvFile + "#");
 			Resource tableNode = minimal ? null : generateTableNode(rdfHandler, rootNode, csvFile);
-			parseCSV(rdfHandler, baseURI, csvFile, input, tableNode);
+			parseCSV(null, rdfHandler, csvFile, input, tableNode);
 		}
 		clear();
 	}
@@ -196,6 +199,8 @@ public class CSVWParser extends AbstractRDFParser {
 			try (InputStream s = new ByteArrayInputStream(str.getBytes(StandardCharsets.UTF_8))) {
 				m = Rio.parse(s, null, RDFFormat.JSONLD, METADATA_CFG);
 			}
+		} else {
+			LOGGER.warn("Metadata could not be found");
 		}
 		return (m != null) ? m : new LinkedHashModel();
 	}
@@ -435,22 +440,20 @@ public class CSVWParser extends AbstractRDFParser {
 	}
 
 	/**
-	 * Parse a CSV file without metadata.
-	 *
-	 * This is not really useful, mainly used in very simple test cases.
+	 * Parse a CSV file without metadata column definitions or without any metadata at all.
 	 *
 	 * @param handler
 	 * @param baseURI
-	 * @param input
+	 * @param csvFile
 	 * @param tableNode
 	 */
-	private void parseCSV(RDFHandler handler, String baseURI, String csvFile, InputStream input, Resource tableNode) {
+	private void parseCSV(Model metadata, RDFHandler handler, String csvFile, InputStream input, Resource tableNode) {
 		Charset encoding = StandardCharsets.UTF_8;
 		boolean minimal = getParserConfig().get(CSVWParserSettings.MINIMAL_MODE);
 
 		long line = 1;
 		try (BufferedReader reader = new BufferedReader(new InputStreamReader(input, encoding));
-				CSVReader csv = CSVWUtil.getCSVReader(null, null, reader)) {
+				CSVReader csv = CSVWUtil.getCSVReader(metadata, tableNode, reader)) {
 
 			String[] cells;
 

@@ -37,6 +37,10 @@ public class CSVW {
 	public static final Namespace NS = Vocabularies.createNamespace(PREFIX, NAMESPACE);
 
 	// Classes
+
+	/** csvw:Dialect */
+	public static final IRI DIALECT;
+
 	/** csvw:Row */
 	public static final IRI ROW;
 
@@ -77,9 +81,6 @@ public class CSVW {
 	/** csvw:describes */
 	public static final IRI DESCRIBES;
 
-	/** csvw:dialect */
-	public static final IRI DIALECT;
-
 	/** csvw:doubleQuote */
 	public static final IRI DOUBLE_QUOTE;
 
@@ -91,6 +92,9 @@ public class CSVW {
 
 	/** csvw:groupChar */
 	public static final IRI GROUP_CHAR;
+
+	/** csvw:dialect */
+	public static final IRI HAS_DIALECT;
 
 	/** csvw:header */
 	public static final IRI HEADER;
@@ -159,6 +163,7 @@ public class CSVW {
 	public static final IRI VIRTUAL;
 
 	static {
+		DIALECT = Vocabularies.createIRI(NAMESPACE, "Dialect");
 		ROW = Vocabularies.createIRI(NAMESPACE, "Row");
 		SCHEMA = Vocabularies.createIRI(NAMESPACE, "Schema");
 		TABLE = Vocabularies.createIRI(NAMESPACE, "Table");
@@ -173,7 +178,7 @@ public class CSVW {
 		DEFAULT = Vocabularies.createIRI(NAMESPACE, "default");
 		DELIMITER = Vocabularies.createIRI(NAMESPACE, "delimiter");
 		DESCRIBES = Vocabularies.createIRI(NAMESPACE, "describes");
-		DIALECT = Vocabularies.createIRI(NAMESPACE, "dialect");
+		HAS_DIALECT = Vocabularies.createIRI(NAMESPACE, "dialect");
 		DOUBLE_QUOTE = Vocabularies.createIRI(NAMESPACE, "doubleQuote");
 		ENCODING = Vocabularies.createIRI(NAMESPACE, "encoding");
 		FORMAT = Vocabularies.createIRI(NAMESPACE, "format");
