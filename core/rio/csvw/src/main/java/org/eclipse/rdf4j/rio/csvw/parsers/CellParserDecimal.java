@@ -22,7 +22,7 @@ public class CellParserDecimal extends CellParser {
 	@Override
 	public Value parse(String cell) {
 		String s = getValueOrDefault(cell);
-		if (s == null || s.isEmpty()) {
+		if (s == null) {
 			return null;
 		}
 		if (getGroupChar() != null) {
@@ -33,7 +33,6 @@ public class CellParserDecimal extends CellParser {
 		if (!getDecimalChar().equals(".")) {
 			s = s.replace(getDecimalChar(), ".");
 		}
-
 		return Values.literal(s, getDataType());
 	}
 

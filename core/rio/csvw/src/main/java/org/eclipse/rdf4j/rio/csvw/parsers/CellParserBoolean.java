@@ -31,10 +31,10 @@ public class CellParserBoolean extends CellParser {
 	@Override
 	public Value parse(String cell) {
 		String s = getValueOrDefault(cell);
-		if (s == null || s.isEmpty()) {
+		if (s == null) {
 			return null;
 		}
-		return Values.literal(valueTrue.equals(s) ? "true" : "false", getDataType());
+		return Values.literal(valueTrue.equals(cell) ? "true" : "false", getDataType());
 	}
 
 }

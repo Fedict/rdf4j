@@ -34,7 +34,7 @@ public class CellParserDate extends CellParser {
 	@Override
 	public Value parse(String cell) {
 		String s = getValueOrDefault(cell);
-		if (s == null || s.isEmpty()) {
+		if (s == null) {
 			return null;
 		}
 		if (formatter != null) {

@@ -47,6 +47,7 @@ import org.eclipse.rdf4j.rio.ParserConfig;
 import org.eclipse.rdf4j.rio.RDFFormat;
 import org.eclipse.rdf4j.rio.Rio;
 import org.eclipse.rdf4j.rio.WriterConfig;
+import org.eclipse.rdf4j.rio.csvw.metadata.CSVWMetadataFinder;
 import org.eclipse.rdf4j.rio.csvw.metadata.CSVWMetadataNone;
 import org.eclipse.rdf4j.rio.helpers.BasicWriterSettings;
 import org.junit.jupiter.api.AfterAll;
@@ -150,17 +151,19 @@ public class W3cComplianceTest {
 					compareResults(testCase, cfg, TEST_BASE_URI, is);
 				}
 			} else {
-				// basic tests without metadata file
+				CSVWMetadataFinder metadataFinder = new CSVWMetadataFinder();
+				metadataFinder.setCsvLocation(testCase.getCSV());
+				// basic tests, possibly without metadata file
 				cfg.set(CSVWParserSettings.METADATA_INPUT_MODE, false);
-				cfg.set(CSVWParserSettings.METADATA_PROVIDER, new CSVWMetadataNone());
-				cfg.set(CSVWParserSettings.DATA_URL, testCase.getCSV().toString());
+				cfg.set(CSVWParserSettings.METADATA_PROVIDER, metadataFinder);
+				// cfg.set(CSVWParserSettings.DATA_URL, testCase.getCSV().toString());
 
 				int pos = csv.getPath().lastIndexOf("/tests/") + 7;
 				String fname = csv.getPath().substring(pos);
 
 				System.err.println("Test " + i + " : " + fname);
 				try (InputStream is = testCase.getCSV().openStream()) {
-					compareResults(testCase, cfg, TEST_BASE_URI, is);
+					compareResults(testCase, cfg, testCase.getCSV().toString(), is);
 				}
 			}
 		} catch (AssertionError e) {

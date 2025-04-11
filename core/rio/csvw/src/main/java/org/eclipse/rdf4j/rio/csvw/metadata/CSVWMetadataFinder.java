@@ -15,7 +15,10 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.net.MalformedURLException;
 import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,14 +36,14 @@ public class CSVWMetadataFinder implements CSVWMetadataProvider {
 	private static final String METADATA_CSV = "csv-metadata.json";
 	private static final String CSV = ".csv";
 
-	private URI csvLocation;
+	private URL csvLocation;
 	private ByteArrayInputStream buffer;
 
 	/**
 	 *
 	 * @return
 	 */
-	public URI getCsvLocation() {
+	public URL getCsvLocation() {
 		return csvLocation;
 	}
 
@@ -48,7 +51,7 @@ public class CSVWMetadataFinder implements CSVWMetadataProvider {
 	 *
 	 * @param location
 	 */
-	public void setCsvLocation(URI location) {
+	public void setCsvLocation(URL location) {
 		this.csvLocation = location;
 	}
 
@@ -60,43 +63,55 @@ public class CSVWMetadataFinder implements CSVWMetadataProvider {
 		}
 		buffer = null;
 
-		checkSpecific();
-		if (buffer == null) {
-			checkGeneric();
-		}
-		if (buffer == null) {
-			checkWellKnown();
+		try {
+			checkSpecific();
+			if (buffer == null) {
+				checkGeneric();
+			}
+			if (buffer == null) {
+				checkWellKnown();
+			}
+		} catch (MalformedURLException | URISyntaxException e) {
+			LOGGER.error("Error in checking URL", e);
 		}
 		return buffer;
 	}
 
 	/**
 	 * Check if there is a "-metadata.json" file relative to the location of the CSV file
+	 *
+	 * @throws java.net.MalformedURLException
 	 */
-	public void checkSpecific() {
+	public void checkSpecific() throws MalformedURLException {
 		String s = csvLocation.toString();
 		if (s.endsWith(CSV)) {
 			s = s.substring(0, s.length() - CSV.length());
 		}
-		URI metaURI = URI.create(s + METADATA_EXT);
-		buffer = openURI(metaURI);
+
+		URL metaURI = new URL(s + METADATA_EXT);
+		buffer = openURL(metaURI);
 	}
 
 	/**
 	 * Check if there is a generic "csv-metadata.json" on the server
+	 *
+	 * @throws URISyntaxException
+	 * @throws MalformedURLException
 	 */
-	public void checkGeneric() {
-		URI metaURI = csvLocation.resolve(METADATA_CSV);
-		buffer = openURI(metaURI);
+	public void checkGeneric() throws URISyntaxException, MalformedURLException {
+		URL url = csvLocation.toURI().resolve(METADATA_CSV).toURL();
+		buffer = openURL(url);
 	}
 
 	/**
 	 * Check if there is a file in a ".well-known" location on the server
+	 *
+	 * @throws java.net.URISyntaxException
 	 */
-	public void checkWellKnown() {
-		URI wellKnown = csvLocation.resolve(WELL_KNOWN);
+	public void checkWellKnown() throws URISyntaxException, MalformedURLException {
+		URL url = csvLocation.toURI().resolve(WELL_KNOWN).toURL();
 
-		try (InputStream is = wellKnown.toURL().openStream();
+		try (InputStream is = url.openStream();
 				BufferedReader r = new BufferedReader(new InputStreamReader(is))) {
 			URI metaURI;
 			String line = r.readLine();
@@ -111,16 +126,16 @@ public class CSVWMetadataFinder implements CSVWMetadataProvider {
 					metaURI = URI.create(line + s);
 					break;
 				case '/':
-					metaURI = csvLocation.resolve(s);
+					metaURI = csvLocation.toURI().resolve(s);
 					break;
 				default:
 					metaURI = URI.create(s);
 				}
-				buffer = openURI(metaURI);
+				buffer = openURL(metaURI.toURL());
 				line = r.readLine();
 			}
 		} catch (IOException ioe) {
-			LOGGER.info("Could not open {}", wellKnown);
+			LOGGER.info("Could not open {}", url);
 		}
 	}
 
@@ -130,11 +145,11 @@ public class CSVWMetadataFinder implements CSVWMetadataProvider {
 	 * @param uri
 	 * @return
 	 */
-	private ByteArrayInputStream openURI(URI uri) {
-		try (InputStream is = uri.toURL().openStream()) {
+	private ByteArrayInputStream openURL(URL url) {
+		try (InputStream is = url.openStream()) {
 			return new ByteArrayInputStream(is.readAllBytes());
 		} catch (IOException ioe) {
-			LOGGER.debug("Could not open {}", uri);
+			LOGGER.debug("Could not open {}", url);
 			return null;
 		}
 	}

@@ -519,6 +519,7 @@ public class CSVWParser extends AbstractRDFParser {
 		}
 
 		long line = 1;
+		int col = 0;
 		try (BufferedReader reader = new BufferedReader(new InputStreamReader(input, encoding));
 				CSVReader csv = CSVWUtil.getCSVReader(metadata, table, reader)) {
 
@@ -536,44 +537,48 @@ public class CSVWParser extends AbstractRDFParser {
 				}
 
 				// csv cells
-				for (int i = 0; i < cells.length; i++) {
+				for (col = 0; col < cells.length; col++) {
 					if (doReplace) {
-						values.put("{_col}", Long.toString(i));
+						values.put("{_col}", Long.toString(col));
 					}
-					if (i == aboutIndex) { // already processed to get subject
+					if (col == aboutIndex) { // already processed to get subject
 						if (doReplace) {
-							values.put(cellParsers[i].getNameEncoded(), cellParsers[i].parse(cells[i]).stringValue());
+							values.put(cellParsers[col].getNameEncoded(),
+									cellParsers[col].parse(cells[col]).stringValue());
 						}
 						// continue;
 					}
-					Value val = cellParsers[i].parse(cells[i]);
+					Value val = cellParsers[col].parse(cells[col]);
+
 					if (val != null && doReplace) {
-						values.put(cellParsers[i].getNameEncoded(), val.stringValue());
+						values.put(cellParsers[col].getNameEncoded(), val.stringValue());
 					}
-					if (!cellParsers[i].isSuppressed() && !needReplacement[i] && val != null) {
-						handler.handleStatement(buildStatement(cellParsers[i], cells[i], rowNode, val));
+					if (!cellParsers[col].isSuppressed() && !needReplacement[col] && val != null) {
+						handler.handleStatement(buildStatement(cellParsers[col], cells[col], rowNode, val));
 					}
 				}
 				// second pass, this time to retrieve replace placeholders in URLs with column values
-				for (int i = 0; i < cells.length; i++) {
-					if (i == aboutIndex || !needReplacement[i]) { // already processed to get subject
+				for (col = 0; col < cells.length; col++) {
+					if (col == aboutIndex || !needReplacement[col]) { // already processed to get subject
 						continue;
 					}
-					if (!cellParsers[i].isSuppressed()) {
-						handler.handleStatement(buildStatement(cellParsers[i], cells[i], rowNode, values));
+					if (!cellParsers[col].isSuppressed()) {
+						handler.handleStatement(buildStatement(cellParsers[col], cells[col], rowNode, values));
 					}
 				}
 				// virtual columns, if any
-				for (int i = cells.length; i < cellParsers.length; i++) {
+				for (col = cells.length; col < cellParsers.length; col++) {
 					if (doReplace) {
-						values.put("{_col}", Long.toString(i));
+						values.put("{_col}", Long.toString(col));
 					}
-					handler.handleStatement(buildStatement(cellParsers[i], null, rowNode, values));
+					handler.handleStatement(buildStatement(cellParsers[col], null, rowNode, values));
 				}
 				line++;
 			}
 		} catch (IOException | CsvValidationException ex) {
 			throw new RDFParseException("Error parsing ", ex, line, -1);
+		} catch (IllegalArgumentException iae) {
+			throw new RDFParseException("Error parsing cell value ", iae, line, col + 1);
 		}
 	}
 

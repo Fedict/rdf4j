@@ -170,6 +170,7 @@ public class CSVWUtil {
 						() -> new RDFParseException("Metadata file does not contain name for column " + column));
 
 		Models.getPropertyString(metadata, column, CSVW.DEFAULT).ifPresent(v -> parser.setDefaultValue(v));
+		Models.getPropertyString(metadata, column, CSVW.NULL).ifPresent(v -> parser.setNullValue(v));
 		Models.getPropertyString(metadata, column, CSVW.REQUIRED)
 				.ifPresent(v -> parser.setRequired(Boolean.parseBoolean(v)));
 		Models.getPropertyString(metadata, column, CSVW.VIRTUAL)
