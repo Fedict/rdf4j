@@ -156,8 +156,7 @@ public class W3cComplianceTest {
 					compareResults(testCase, cfg, TEST_BASE_URI, is);
 				}
 			} else {
-				CSVWMetadataFinder metadataFinder = new CSVWMetadataFinder();
-				metadataFinder.setCsvLocation(testCase.getCSV());
+				CSVWMetadataFinder metadataFinder = new CSVWMetadataFinder(testCase.getCSV());
 				// basic tests, possibly without metadata file
 				cfg.set(CSVWParserSettings.METADATA_INPUT_MODE, false);
 				cfg.set(CSVWParserSettings.METADATA_PROVIDER, metadataFinder);

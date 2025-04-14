@@ -10,7 +10,7 @@
  *******************************************************************************/
 package org.eclipse.rdf4j.rio.csvw;
 
-import org.eclipse.rdf4j.rio.csvw.metadata.CSVWMetadataFinder;
+import org.eclipse.rdf4j.rio.csvw.metadata.CSVWMetadataNone;
 import org.eclipse.rdf4j.rio.csvw.metadata.CSVWMetadataProvider;
 import org.eclipse.rdf4j.rio.helpers.BooleanRioSetting;
 import org.eclipse.rdf4j.rio.helpers.ClassRioSetting;
@@ -70,12 +70,12 @@ public class CSVWParserSettings {
 	 * This implies that the parser's InputStream or Reader parameter points to a CSV file, not to a JSON-LD metadata
 	 * file
 	 * <p>
-	 * Defaults to CSVWMetadataFinder.
+	 * Defaults to CSVWMetadataNone.
 	 * <p>
 	 * Can be overridden by setting system property {@code org.eclipse.rdf4j.rio.csvw.metadata_provider}
 	 */
 	public static final ClassRioSetting<CSVWMetadataProvider> METADATA_PROVIDER = new ClassRioSetting<>(
-			"org.eclipse.rdf4j.rio.csvw.metadata_provider", "Metadata provider", new CSVWMetadataFinder());
+			"org.eclipse.rdf4j.rio.csvw.metadata_provider", "Metadata provider", new CSVWMetadataNone());
 
 	/**
 	 * String setting for parser to provide location of the CSV data file.

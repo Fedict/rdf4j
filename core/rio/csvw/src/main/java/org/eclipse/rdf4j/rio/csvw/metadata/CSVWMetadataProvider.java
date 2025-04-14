@@ -10,19 +10,25 @@
  *******************************************************************************/
 package org.eclipse.rdf4j.rio.csvw.metadata;
 
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.io.InputStream;
+import java.net.URL;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
- * Find metadata info for a given CSV file, using various methods
+ * Provide the JSON metadata for parsing the CSV data
  *
  * @author Bart Hanssens
  */
 public interface CSVWMetadataProvider {
 
 	/**
-	 * Get metadata as string
+	 * Get the metadata as inputstream
 	 *
 	 * @return
 	 */
-	public InputStream getMetadata();
+	public abstract InputStream getMetadata();
 }

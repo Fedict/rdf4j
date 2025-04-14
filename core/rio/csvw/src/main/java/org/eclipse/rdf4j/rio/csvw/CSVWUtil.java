@@ -121,7 +121,7 @@ public class CSVWUtil {
 		if (val.isPresent()) {
 			Value datatype = val.get();
 			// derived datatype
-			if (datatype.isBNode()) {
+			if (datatype.isResource()) {
 				val = Models.getProperty(metadata, (Resource) datatype, CSVW.BASE);
 			}
 		}
@@ -197,7 +197,7 @@ public class CSVWUtil {
 		// use a property from a vocabulary as predicate, or create a property relative to the namespace of the CSV
 		Optional<String> propertyURL = Models.getPropertyString(metadata, column, CSVW.PROPERTY_URL);
 		String s = propertyURL.isPresent() ? propertyURL.get() : ":" + parser.getName();
-		parser.setPropertyIRI(metadata.getNamespaces(), s);
+		parser.setPropertyUrl(metadata.getNamespaces(), s);
 
 		return parser;
 	}

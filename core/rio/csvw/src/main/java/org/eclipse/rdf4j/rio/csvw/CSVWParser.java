@@ -199,9 +199,9 @@ public class CSVWParser extends AbstractRDFParser {
 			try (InputStream s = new ByteArrayInputStream(str.getBytes(StandardCharsets.UTF_8))) {
 				m = Rio.parse(s, null, RDFFormat.JSONLD, METADATA_CFG);
 			}
-		} else {
-			LOGGER.warn("Metadata could not be found");
-		}
+		} // else {
+			// LOGGER.warn("Metadata could not be found");
+			// }
 		return (m != null) ? m : new LinkedHashModel();
 	}
 
@@ -463,7 +463,7 @@ public class CSVWParser extends AbstractRDFParser {
 			for (int i = 0; i < header.length; i++) {
 				cellParsers[i] = CellParserFactory.create(XSD.STRING.getIri());
 				cellParsers[i].setName(header[i]);
-				cellParsers[i].setPropertyIRI(csvFile + "#" + CSVWUtil.encode(header[i]));
+				cellParsers[i].setPropertyUrl(csvFile + "#" + CSVWUtil.encode(header[i]));
 			}
 
 			while ((cells = csv.readNext()) != null) {
@@ -476,7 +476,7 @@ public class CSVWParser extends AbstractRDFParser {
 					Value val = cellParsers[i].parse(cells[i]);
 					if (val != null) {
 						handler.handleStatement(
-								Statements.statement(rowNode, cellParsers[i].getPropertyIRI(), val, null));
+								Statements.statement(rowNode, cellParsers[i].getPropertyUrl(), val, null));
 					}
 				}
 				line++;
@@ -596,7 +596,7 @@ public class CSVWParser extends AbstractRDFParser {
 		if (subj == null) {
 			subj = aboutSubject;
 		}
-		IRI pred = cellParser.getPropertyIRI();
+		IRI pred = cellParser.getPropertyUrl();
 		Value obj = cellParser.getValueUrl(cell);
 		if (obj == null) {
 			obj = val;
@@ -619,7 +619,7 @@ public class CSVWParser extends AbstractRDFParser {
 		if (subj == null) {
 			subj = aboutSubject;
 		}
-		IRI pred = cellParser.getPropertyIRI();
+		IRI pred = cellParser.getPropertyUrl();
 		Value obj = cellParser.getValueUrl(values, cell);
 		if (obj == null && cell != null) {
 			obj = cellParser.parse(cell);

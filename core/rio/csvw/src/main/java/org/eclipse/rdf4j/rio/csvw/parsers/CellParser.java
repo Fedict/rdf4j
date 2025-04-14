@@ -10,6 +10,7 @@
  *******************************************************************************/
 package org.eclipse.rdf4j.rio.csvw.parsers;
 
+import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.MatchResult;
@@ -38,7 +39,7 @@ public abstract class CellParser {
 	private String nullValue;
 	private boolean required;
 	private String aboutUrl;
-	private IRI propertyIRI;
+	private String propertyUrl;
 	private String valueUrl;
 	private String format;
 	private String decimalChar = ".";
@@ -50,6 +51,9 @@ public abstract class CellParser {
 
 	private String aboutPlaceholder;
 	private String[] aboutPlaceholders = new String[0];
+
+	private String propertyPlaceholder;
+	private String[] propertyPlaceholders = new String[0];
 
 	private String valuePlaceholder;
 	private String[] valuePlaceholders = new String[0];
@@ -256,29 +260,52 @@ public abstract class CellParser {
 	/**
 	 * Get propertyUrl as IRI
 	 *
+	 * @param values
 	 * @return
 	 */
-	public IRI getPropertyIRI() {
-		return propertyIRI;
+	public IRI getPropertyUrl() {
+		return Values.iri(this.propertyUrl);
 	}
 
 	/**
-	 * Set property URL (predicate IRI)
+	 * Get propertyUrl as IRI
 	 *
-	 * @param namespaces  set of namespaces
-	 * @param propertyUrl the propertyUrl to set
+	 * @param values
+	 * @return
 	 */
-	public void setPropertyIRI(Set<Namespace> namespaces, String propertyUrl) {
-		this.propertyIRI = Values.iri(namespaces, propertyUrl);
+	public IRI getPropertyUrl(Map<String, String> values) {
+		if (propertyUrl == null) {
+			return null;
+		}
+		String s = propertyUrl;
+		for (String val : valuePlaceholders) {
+			s = valueUrl.replace(val, values.get(val));
+		}
+		return Values.iri(s);
+	}
+
+	public void setPropertyUrl(String propertyUrl) {
+		setPropertyUrl(Collections.emptySet(), propertyUrl);
 	}
 
 	/**
 	 * Set property URL (predicate IRI) relative to document
 	 *
+	 * @param namespaces
 	 * @param propertyUrl the propertyUrl to set
 	 */
-	public void setPropertyIRI(String propertyUrl) {
-		this.propertyIRI = Values.iri(propertyUrl);
+	public void setPropertyUrl(Set<Namespace> namespaces, String propertyUrl) {
+		this.propertyUrl = propertyUrl;
+		if (propertyUrl != null && name != null) {
+			this.propertyUrl = propertyUrl.replace("{_name}", encodedName.substring(1, encodedName.length() - 2));
+		}
+		if (!propertyUrl.startsWith("http")) {
+			this.propertyUrl = Values.iri(namespaces, this.propertyUrl).toString();
+		}
+
+		// check if this URL contains column placeholders
+		// this.propertyPlaceholder = getOwnPlaceholder(propertyUrl);
+		// this.propertyPlaceholders = getPlaceholders(propertyUrl);
 	}
 
 	/**
