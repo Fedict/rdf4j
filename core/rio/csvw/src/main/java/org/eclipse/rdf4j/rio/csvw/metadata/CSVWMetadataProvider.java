@@ -10,13 +10,7 @@
  *******************************************************************************/
 package org.eclipse.rdf4j.rio.csvw.metadata;
 
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
 import java.io.InputStream;
-import java.net.URL;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Provide the JSON metadata for parsing the CSV data

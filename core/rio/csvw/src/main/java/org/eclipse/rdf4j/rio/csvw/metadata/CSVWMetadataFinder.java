@@ -17,12 +17,23 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.MalformedURLException;
+import java.net.ProxySelector;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
+import org.apache.http.Header;
+import org.apache.http.HttpStatus;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpHead;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.impl.conn.SystemDefaultRoutePlanner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,6 +52,51 @@ public class CSVWMetadataFinder implements CSVWMetadataProvider {
 
 	private final URL csvLocation;
 
+	private final static Pattern LINK = Pattern.compile(
+			"<([^>].*)>(?=.*rel=\"describedby\")");
+
+	// "<([^>].*)>(?=.*type=\"application/(csvm\\+json|ld\\+json|json)\")(?=.*rel=\"describedBy\")");
+
+	private CloseableHttpClient getClient() {
+		return HttpClients.custom()
+				.setRoutePlanner(new SystemDefaultRoutePlanner(ProxySelector.getDefault()))
+				.build();
+	}
+
+	/**
+	 * Check if the HTTP Link Header contains an URL matching
+	 *
+	 * @return list of URLs
+	 */
+	private List<URL> linkHeader() {
+		List<URL> urls = new ArrayList<>();
+
+		HttpHead httpHead = new HttpHead(csvLocation.toString());
+
+		// use apache client instead of url.openconnection to be able to use HTTP HEAD
+		try (CloseableHttpClient httpClient = getClient();
+				CloseableHttpResponse response = httpClient.execute(httpHead)) {
+			Header[] headers = response.getHeaders("Link");
+			for (Header header : headers) {
+				Matcher m = LINK.matcher(header.getValue());
+				if (m.matches()) {
+					String file = m.group(1);
+					try {
+						// last should be used first
+						urls.add(0, csvLocation.toURI().resolve(file).toURL());
+						LOGGER.info("Link header {}", urls.get(0));
+					} catch (URISyntaxException ex) {
+						LOGGER.error("Invalid Link-header metadata URL", ex);
+					}
+				}
+				System.err.println(headers.toString());
+			}
+		} catch (IOException ioe) {
+			return null;
+		}
+		return urls;
+	}
+
 	/**
 	 * Check if there is a file in a ".well-known" location on the server.
 	 *
@@ -55,12 +111,18 @@ public class CSVWMetadataFinder implements CSVWMetadataProvider {
 		try {
 			url = csvLocation.toURI().resolve(WELL_KNOWN).toURL();
 		} catch (MalformedURLException | URISyntaxException ex) {
-			LOGGER.error("Invalid well-known URL", ex);
+			LOGGER.error("Invalid well-known metadata URL", ex);
 			return urls;
 		}
 
-		try (InputStream is = url.openStream();
-				BufferedReader r = new BufferedReader(new InputStreamReader(is))) {
+		byte[] buffer = tryURL(url);
+		if (buffer == null) {
+			return urls;
+		}
+
+		try (ByteArrayInputStream bais = new ByteArrayInputStream(buffer);
+				InputStreamReader is = new InputStreamReader(bais);
+				BufferedReader r = new BufferedReader(is)) {
 			URI metaURI;
 			String line = r.readLine();
 
@@ -94,7 +156,7 @@ public class CSVWMetadataFinder implements CSVWMetadataProvider {
 				line = r.readLine();
 			}
 		} catch (IOException ioe) {
-			LOGGER.info("Could not open {}", url);
+			LOGGER.error("Could not parse {}", url);
 		}
 		return urls;
 	}
@@ -158,11 +220,19 @@ public class CSVWMetadataFinder implements CSVWMetadataProvider {
 	private byte[] tryURL(URL url) {
 		byte[] buffer = null;
 
-		try (InputStream is = url.openStream();
-				BufferedInputStream bis = new BufferedInputStream(is)) {
-			buffer = bis.readAllBytes();
-			LOGGER.info("Opened metadata from {}", url);
-			return buffer;
+		HttpGet httpGet = new HttpGet(url.toString());
+
+		try (CloseableHttpClient httpClient = getClient();
+				CloseableHttpResponse response = httpClient.execute(httpGet);
+				BufferedInputStream bis = new BufferedInputStream(response.getEntity().getContent())) {
+			int status = response.getStatusLine().getStatusCode();
+			if (status == HttpStatus.SC_OK) {
+				buffer = bis.readAllBytes();
+				LOGGER.info("Opened metadata from {}", url);
+				return buffer;
+			} else {
+				LOGGER.debug("Could not open possible metadata location {}, status {}", url, status);
+			}
 		} catch (IOException ex) {
 			LOGGER.debug("Could not open possible metadata location {}", url, ex);
 		}
@@ -182,7 +252,8 @@ public class CSVWMetadataFinder implements CSVWMetadataProvider {
 			return null;
 		}
 
-		List<URL> urls = wellKnownURL();
+		List<URL> urls = linkHeader();
+		urls.addAll(wellKnownURL());
 		urls.add(specificURLExtension());
 		urls.add(specificURL());
 		urls.add(genericURL());

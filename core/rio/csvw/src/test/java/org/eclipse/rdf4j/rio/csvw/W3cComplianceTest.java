@@ -20,17 +20,23 @@ import java.io.InputStream;
 import java.io.StringWriter;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
-import org.eclipse.jetty.http.MimeTypes;
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
 import org.eclipse.jetty.server.Handler;
+import org.eclipse.jetty.server.Request;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.handler.ContextHandler;
 import org.eclipse.jetty.server.handler.DefaultHandler;
 import org.eclipse.jetty.server.handler.HandlerList;
+import org.eclipse.jetty.server.handler.HandlerWrapper;
 import org.eclipse.jetty.server.handler.ResourceHandler;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Literal;
@@ -48,7 +54,8 @@ import org.eclipse.rdf4j.rio.RDFFormat;
 import org.eclipse.rdf4j.rio.Rio;
 import org.eclipse.rdf4j.rio.WriterConfig;
 import org.eclipse.rdf4j.rio.csvw.metadata.CSVWMetadataFinder;
-import org.eclipse.rdf4j.rio.csvw.metadata.CSVWMetadataNone;
+import org.eclipse.rdf4j.rio.csvw.metadata.CSVWMetadataLocation;
+import org.eclipse.rdf4j.rio.csvw.metadata.CSVWMetadataProvider;
 import org.eclipse.rdf4j.rio.helpers.BasicWriterSettings;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -66,6 +73,7 @@ public class W3cComplianceTest {
 	private final static String TEST_BASE_URI = "http://www.w3.org/2013/csvw/tests/";
 	private final static int PORT = 8989;
 	private static Server server;
+	private static HandlerList handlerList;
 
 	private static String proxyHost;
 	private static String proxyPort;
@@ -80,6 +88,7 @@ public class W3cComplianceTest {
 		System.setProperty("http.proxyPort", String.valueOf(PORT));
 
 		server = new Server(PORT);
+
 		String webDir = W3cComplianceTest.class.getClassLoader().getResource("w3c/").toExternalForm();
 		ResourceHandler webHandler = new ResourceHandler();
 		webHandler.setResourceBase(webDir);
@@ -91,9 +100,10 @@ public class W3cComplianceTest {
 		nsHandler.setResourceBase(nsDir);
 		ContextHandler nsContext = new ContextHandler("/ns");
 		nsContext.setHandler(nsHandler);
-		HandlerList handlers = new HandlerList();
-		handlers.setHandlers(new Handler[] { nsContext, webContext, new DefaultHandler() });
-		server.setHandler(handlers);
+
+		handlerList = new HandlerList();
+		handlerList.setHandlers(new Handler[] { nsContext, webContext, new DefaultHandler() });
+		server.setHandler(handlerList);
 
 		server.start();
 	}
@@ -120,6 +130,7 @@ public class W3cComplianceTest {
 
 		Model expected = testCase.getExpected();
 		Model result = Rio.parse(is, baseURI, RDFFormat.CSVW, cfg, (Resource) null);
+
 		if (testCase.positive) {
 			try {
 				assertTrue(Models.isomorphic(result, expected), testCase.name);
@@ -142,24 +153,48 @@ public class W3cComplianceTest {
 	public void test(W3CTest testCase) throws IOException {
 		int i = 1;
 
+		if (testCase.link != null) {
+			HandlerWrapper wrapper = new HandlerWrapper() {
+				@Override
+				public void handle(String target, Request baseRequest, HttpServletRequest request,
+						HttpServletResponse response) throws ServletException, IOException {
+					System.err.println("wrapped");
+					response.setHeader("Link", testCase.link);
+					super.handle(target, baseRequest, request, response);
+				}
+			};
+
+			System.err.println(testCase.link);
+			HandlerList handlerListWrapped = new HandlerList();
+			Handler[] oldHandlers = handlerList.getHandlers();
+			System.err.println("Oldhandler " + oldHandlers[1].getClass().getName());
+			wrapper.setHandler(oldHandlers[1]);
+			handlerListWrapped.setHandlers(new Handler[] { oldHandlers[0], wrapper, oldHandlers[2] });
+			server.setHandler(handlerListWrapped);
+		}
+
 		try {
 			ParserConfig cfg = new ParserConfig();
 			URL csv = testCase.getCSV();
 
 			if (testCase.getJsonMetadata() != null) {
+				// CSVWMetadataLocation metadataLocation = new
+				// CSVWMetadataLocation(testCase.getJsonMetadata().toString());
 				cfg.set(CSVWParserSettings.METADATA_INPUT_MODE, true);
+				// cfg.set(CSVWParserSettings.METADATA_PROVIDER, metadataFinder);
 				cfg.set(CSVWParserSettings.METADATA_URL, testCase.getJsonMetadata().toString());
 				cfg.set(CSVWParserSettings.MINIMAL_MODE, testCase.isMinimal());
-				System.err.println("Parsing JSON " + testCase.getJsonMetadata());
 
 				try (InputStream is = testCase.getJsonMetadata().openStream()) {
 					compareResults(testCase, cfg, TEST_BASE_URI, is);
 				}
 			} else {
-				CSVWMetadataFinder metadataFinder = new CSVWMetadataFinder(testCase.getCSV());
+				CSVWMetadataProvider meta = (testCase.metadata == null)
+						? new CSVWMetadataFinder(testCase.getCSV())
+						: new CSVWMetadataLocation(new URL(testCase.metadata));
 				// basic tests, possibly without metadata file
 				cfg.set(CSVWParserSettings.METADATA_INPUT_MODE, false);
-				cfg.set(CSVWParserSettings.METADATA_PROVIDER, metadataFinder);
+				cfg.set(CSVWParserSettings.METADATA_PROVIDER, meta);
 				// cfg.set(CSVWParserSettings.DATA_URL, testCase.getCSV().toString());
 
 				int pos = csv.getPath().lastIndexOf("/tests/") + 7;
@@ -173,23 +208,9 @@ public class W3cComplianceTest {
 		} catch (AssertionError e) {
 			fail();
 		}
-	}
-
-	/**
-	 * Get classpath location for a file
-	 *
-	 * @param file
-	 * @return
-	 */
-	private static URL getLocation(String file) {
-		URL url = null;
-		try {
-			url = new URL(file);
-		} catch (Exception e) {
-			//
+		if (testCase.link != null) {
+			server.setHandler(handlerList);
 		}
-		return url;
-		// return W3cComplianceTest.class.getClassLoader().getResource("w3c/" + file);
 	}
 
 	/*
@@ -200,16 +221,28 @@ public class W3cComplianceTest {
 	 *
 	 */
 
-	private static boolean optionMinimal(Model model, Resource t) {
-		boolean minimal = false;
+	private static Value option(Model model, Resource t, String option) {
 		Optional<Resource> node = Models.getPropertyResource(model, t, Values.iri(csvtMF, "option"), (Resource) null);
 		if (node.isPresent()) {
-			Optional<Value> val = Models.getProperty(model, node.get(), Values.iri(csvtMF, "minimal"), (Resource) null);
+			Optional<Value> val = Models.getProperty(model, node.get(), Values.iri(csvtMF, option), (Resource) null);
 			if (val.isPresent()) {
-				return Boolean.parseBoolean(val.get().stringValue());
+				return val.get();
 			}
 		}
-		return minimal;
+		return null;
+	}
+
+	private static boolean optionMinimal(Model model, Resource t) {
+		Value val = option(model, t, "minimal");
+		if (val != null) {
+			return Boolean.parseBoolean(val.stringValue());
+		}
+		return false;
+	}
+
+	private static String optionMetadata(Model model, Resource t) {
+		Value val = option(model, t, "metadata");
+		return (val != null) ? val.stringValue() : null;
 	}
 
 	/**
@@ -243,10 +276,13 @@ public class W3cComplianceTest {
 							Models.getPropertyIRI(model, t, Values.iri(nsMF, "action"), (Resource) null).orElse(null),
 							// Models.getPropertyIRIs(model, t, Values.iri(csvtMF, "implicit"), (Resource) null),
 							Models.getPropertyIRI(model, t, Values.iri(nsMF, "result"), (Resource) null).orElse(null),
+							Models.getPropertyString(model, t, Values.iri(csvtMF, "httpLink"), (Resource) null)
+									.orElse(null),
 							!Models.getPropertyIRI(model, t, RDF.TYPE, (Resource) null)
 									.orElse(null)
 									.equals(Values.iri(csvtMF, "NegativeRdfTest")),
-							optionMinimal(model, t)
+							optionMinimal(model, t),
+							optionMetadata(model, t)
 					)
 					)
 					.collect(Collectors.toList());
@@ -260,8 +296,10 @@ public class W3cComplianceTest {
 		String name;
 		IRI input;
 		IRI result;
+		String link;
 		boolean positive;
 		boolean minimal;
+		String metadata;
 
 		/**
 		 * Get URL of CSV data file
@@ -309,13 +347,16 @@ public class W3cComplianceTest {
 			return minimal;
 		}
 
-		public W3CTest(String id, Literal name, IRI input, IRI result, boolean positive, boolean minimal) {
+		public W3CTest(String id, Literal name, IRI input, IRI result, String link,
+				boolean positive, boolean minimal, String metadata) {
 			this.id = id;
 			this.name = name.stringValue();
 			this.input = input;
 			this.result = result;
+			this.link = link;
 			this.positive = positive;
 			this.minimal = minimal;
+			this.metadata = metadata;
 		}
 	}
 }

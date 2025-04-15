@@ -33,6 +33,7 @@ public class CSVWMetadataLocation implements CSVWMetadataProvider {
 	@Override
 	public InputStream getMetadata() {
 		if (metadataURL == null) {
+			LOGGER.error("No metadata for location");
 			return null;
 		}
 
@@ -40,7 +41,7 @@ public class CSVWMetadataLocation implements CSVWMetadataProvider {
 			LOGGER.info("Using metadata from {} ", metadataURL);
 			return new ByteArrayInputStream(is.readAllBytes());
 		} catch (IOException ioe) {
-			LOGGER.debug("Could not open metadata file {}", metadataURL);
+			LOGGER.error("Could not open metadata file {}", metadataURL);
 			return null;
 		}
 	}
@@ -49,6 +50,7 @@ public class CSVWMetadataLocation implements CSVWMetadataProvider {
 	 * Constructor
 	 *
 	 * @param metadataPath
+	 * @throws java.net.MalformedURLException
 	 */
 	public CSVWMetadataLocation(Path metadataPath) throws MalformedURLException {
 		this.metadataURL = metadataPath.toFile().toURI().toURL();
