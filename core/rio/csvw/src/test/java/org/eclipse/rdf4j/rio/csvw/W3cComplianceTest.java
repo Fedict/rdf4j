@@ -20,11 +20,9 @@ import java.io.InputStream;
 import java.io.StringWriter;
 import java.net.URL;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
@@ -148,29 +146,33 @@ public class W3cComplianceTest {
 		}
 	}
 
+	private void installWrapper(String header) throws Exception {
+		server.stop();
+
+		HandlerWrapper wrapper = new HandlerWrapper() {
+			@Override
+			public void handle(String target, Request baseRequest, HttpServletRequest request,
+					HttpServletResponse response) throws ServletException, IOException {
+				response.setHeader("Link", header);
+				getHandler().handle(target, baseRequest, request, response);
+			}
+		};
+		HandlerList handlerListWrapped = new HandlerList();
+		Handler[] oldHandlers = handlerList.getHandlers();
+		wrapper.setHandler(oldHandlers[1]);
+		handlerListWrapped.setHandlers(new Handler[] { oldHandlers[0], wrapper, oldHandlers[2] });
+		server.setHandler(handlerListWrapped);
+
+		server.start();
+	}
+
 	@ParameterizedTest
 	@MethodSource("getTestFiles")
-	public void test(W3CTest testCase) throws IOException {
+	public void test(W3CTest testCase) throws IOException, Exception {
 		int i = 1;
 
 		if (testCase.link != null) {
-			HandlerWrapper wrapper = new HandlerWrapper() {
-				@Override
-				public void handle(String target, Request baseRequest, HttpServletRequest request,
-						HttpServletResponse response) throws ServletException, IOException {
-					System.err.println("wrapped");
-					response.setHeader("Link", testCase.link);
-					super.handle(target, baseRequest, request, response);
-				}
-			};
-
-			System.err.println(testCase.link);
-			HandlerList handlerListWrapped = new HandlerList();
-			Handler[] oldHandlers = handlerList.getHandlers();
-			System.err.println("Oldhandler " + oldHandlers[1].getClass().getName());
-			wrapper.setHandler(oldHandlers[1]);
-			handlerListWrapped.setHandlers(new Handler[] { oldHandlers[0], wrapper, oldHandlers[2] });
-			server.setHandler(handlerListWrapped);
+			installWrapper(testCase.link);
 		}
 
 		try {
@@ -209,7 +211,9 @@ public class W3cComplianceTest {
 			fail();
 		}
 		if (testCase.link != null) {
+			server.stop();
 			server.setHandler(handlerList);
+			server.start();
 		}
 	}
 

@@ -53,7 +53,7 @@ public class CSVWMetadataFinder implements CSVWMetadataProvider {
 	private final URL csvLocation;
 
 	private final static Pattern LINK = Pattern.compile(
-			"<([^>].*)>(?=.*rel=\"describedby\")");
+			"<([^>].*)>(.*rel=\"describedby\")");
 
 	// "<([^>].*)>(?=.*type=\"application/(csvm\\+json|ld\\+json|json)\")(?=.*rel=\"describedBy\")");
 
@@ -89,7 +89,7 @@ public class CSVWMetadataFinder implements CSVWMetadataProvider {
 						LOGGER.error("Invalid Link-header metadata URL", ex);
 					}
 				}
-				System.err.println(headers.toString());
+				System.err.println(header.toString());
 			}
 		} catch (IOException ioe) {
 			return null;
