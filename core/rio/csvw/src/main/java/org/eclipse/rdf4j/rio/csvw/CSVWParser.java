@@ -225,9 +225,10 @@ public class CSVWParser extends AbstractRDFParser {
 		}
 		if (oldRoot != null) {
 			m.getStatements(oldRoot, null, null).forEach(s -> {
-				if (!s.getPredicate().getNamespace().equals(CSVW.NAMESPACE)) {
+				IRI p = s.getPredicate();
+				if (!p.getNamespace().equals(CSVW.NAMESPACE) || p.equals(CSVW.NOTE)) {
 					Value obj = s.getObject();
-					extra.add(Statements.statement(rootNode, s.getPredicate(), obj, null));
+					extra.add(Statements.statement(rootNode, p, obj, null));
 					if (obj instanceof Resource) {
 						Iterable<Statement> second = m.getStatements((Resource) obj, null, null);
 						second.forEach(t -> extra.add(t));
@@ -447,18 +448,30 @@ public class CSVWParser extends AbstractRDFParser {
 	 * @param csvFile
 	 * @param tableNode
 	 */
-	private void parseCSV(Model metadata, RDFHandler handler, String csvFile, InputStream input, Resource tableNode) {
-		Charset encoding = StandardCharsets.UTF_8;
+	private void parseCSV(Model metadata, RDFHandler handler, String csvFile, InputStream input,
+			Resource tableNode) {
 		boolean minimal = getParserConfig().get(CSVWParserSettings.MINIMAL_MODE);
+
+		Map<IRI, Object> dialect = CSVWUtil.getDialectConfig(metadata, tableNode);
+		Charset encoding = Charset.forName((String) dialect.get(CSVW.ENCODING));
 
 		long line = 1;
 		try (BufferedReader reader = new BufferedReader(new InputStreamReader(input, encoding));
-				CSVReader csv = CSVWUtil.getCSVReader(metadata, tableNode, reader)) {
+				CSVReader csv = CSVWUtil.getCSVReader(dialect, reader)) {
 
 			String[] cells;
-
 			// assume first line is header
-			String[] header = csv.readNext();
+			String[] header;
+
+			if ((boolean) dialect.get(CSVW.HEADER)) {
+				header = csv.readNext();
+			} else {
+				header = csv.peek();
+				for (int i = 0; i < header.length; i++) {
+					header[i] = "_col" + i;
+				}
+			}
+
 			CellParser[] cellParsers = new CellParser[header.length];
 			for (int i = 0; i < header.length; i++) {
 				cellParsers[i] = CellParserFactory.create(XSD.STRING.getIri());
@@ -473,6 +486,10 @@ public class CSVWParser extends AbstractRDFParser {
 
 				// csv cells
 				for (int i = 0; i < cells.length; i++) {
+					if (cells.length < header.length) {
+						System.err.println("Error, different number of columns line " + line);
+						break;
+					}
 					Value val = cellParsers[i].parse(cells[i]);
 					if (val != null) {
 						handler.handleStatement(
@@ -498,10 +515,11 @@ public class CSVWParser extends AbstractRDFParser {
 	 * @param tableNode
 	 */
 	private void parseCSV(Model metadata, RDFHandler handler, String csvFile, InputStream input,
-			CellParser[] cellParsers,
-			Resource table, Resource tableNode) {
+			CellParser[] cellParsers, Resource table, Resource tableNode) {
+		Map<IRI, Object> dialect = CSVWUtil.getDialectConfig(metadata, tableNode);
+		Charset encoding = Charset.forName((String) dialect.get(CSVW.ENCODING));
+
 		String aboutURL = getAboutURL(metadata, table);
-		Charset encoding = CSVWUtil.getEncoding(metadata, table);
 		boolean minimal = getParserConfig().get(CSVWParserSettings.MINIMAL_MODE);
 
 		// check for placeholder / column name that's being used to create subject IRI
@@ -521,10 +539,13 @@ public class CSVWParser extends AbstractRDFParser {
 		long line = 1;
 		int col = 0;
 		try (BufferedReader reader = new BufferedReader(new InputStreamReader(input, encoding));
-				CSVReader csv = CSVWUtil.getCSVReader(metadata, table, reader)) {
+				CSVReader csv = CSVWUtil.getCSVReader(dialect, reader)) {
 
 			Map<String, String> values = null;
 			String[] cells;
+
+			// assume first line is header
+			String[] header = csv.readNext();
 
 			while ((cells = csv.readNext()) != null) {
 				Resource rowURL = Values.iri(csvFile + "#row=" + (line + 1));

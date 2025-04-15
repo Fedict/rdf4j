@@ -111,6 +111,9 @@ public class CSVW {
 	/** csvw:name */
 	public static final IRI NAME;
 
+	/** csvw:note */
+	public static final IRI NOTE;
+
 	/** csvw:null */
 	public static final IRI NULL;
 
@@ -188,6 +191,7 @@ public class CSVW {
 		LANG = Vocabularies.createIRI(NAMESPACE, "lang");
 		LINE_TERMINATORS = Vocabularies.createIRI(NAMESPACE, "lineTerminators");
 		NAME = Vocabularies.createIRI(NAMESPACE, "name");
+		NOTE = Vocabularies.createIRI(NAMESPACE, "note");
 		NULL = Vocabularies.createIRI(NAMESPACE, "null");
 		PROPERTY_URL = Vocabularies.createIRI(NAMESPACE, "propertyUrl");
 		QUOTE_CHAR = Vocabularies.createIRI(NAMESPACE, "quoteChar");

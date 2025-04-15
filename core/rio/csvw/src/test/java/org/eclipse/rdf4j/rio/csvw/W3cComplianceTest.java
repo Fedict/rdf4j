@@ -197,6 +197,7 @@ public class W3cComplianceTest {
 				// basic tests, possibly without metadata file
 				cfg.set(CSVWParserSettings.METADATA_INPUT_MODE, false);
 				cfg.set(CSVWParserSettings.METADATA_PROVIDER, meta);
+				cfg.set(CSVWParserSettings.MINIMAL_MODE, testCase.isMinimal());
 				// cfg.set(CSVWParserSettings.DATA_URL, testCase.getCSV().toString());
 
 				int pos = csv.getPath().lastIndexOf("/tests/") + 7;

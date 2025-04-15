@@ -14,14 +14,19 @@ import java.io.Reader;
 import java.net.URLEncoder;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 
+import org.eclipse.rdf4j.model.BNode;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Model;
 import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.base.CoreDatatype;
+import org.eclipse.rdf4j.model.impl.LinkedHashModel;
 import org.eclipse.rdf4j.model.util.Models;
+import org.eclipse.rdf4j.model.util.Values;
 import org.eclipse.rdf4j.model.vocabulary.CSVW;
 import org.eclipse.rdf4j.rio.RDFParseException;
 import org.eclipse.rdf4j.rio.csvw.parsers.CellParser;
@@ -52,42 +57,79 @@ public class CSVWUtil {
 	}
 
 	/**
-	 * Get configured CSV file reader
+	 * Get dialect node if present
 	 *
 	 * @param metadata
 	 * @param table
+	 * @return
+	 */
+	private static Resource getDialect(Model metadata, Resource table) {
+		if (metadata == null) {
+			return null;
+		}
+		Optional<Value> val = Models.getProperty(metadata, table, CSVW.HAS_DIALECT);
+		if (!val.isPresent()) {
+			// not on table, maybe at root level
+			val = Models.object(metadata.filter(null, CSVW.HAS_DIALECT, null));
+		}
+		return val.isPresent() ? (Resource) val.get() : null;
+	}
+
+	/**
+	 * Get the CSV dialect from metadata configuration
+	 *
+	 * @param model
+	 * @param table
+	 * @return map with dialect config
+	 */
+	protected static Map<IRI, Object> getDialectConfig(Model model, Resource table) {
+		Map<IRI, Object> map = new HashMap<>();
+
+		// for default values
+		Model metadata = (model == null) ? new LinkedHashModel() : model;
+
+		Resource dialect = getDialect(metadata, table);
+		if (dialect == null) {
+			dialect = Values.bnode();
+		}
+		map.put(CSVW.ENCODING,
+				Models.getPropertyString(metadata, dialect, CSVW.ENCODING).orElse("utf-8"));
+		map.put(CSVW.HEADER,
+				Boolean.valueOf(Models.getPropertyString(metadata, dialect, CSVW.HEADER).orElse("true")));
+		map.put(CSVW.HEADER_ROW_COUNT, (boolean) map.get(CSVW.HEADER)
+				? Integer.valueOf(Models.getPropertyString(metadata, dialect, CSVW.HEADER_ROW_COUNT).orElse("1"))
+				: 0);
+		map.put(CSVW.SKIP_ROWS,
+				Integer.valueOf(Models.getPropertyString(metadata, dialect, CSVW.SKIP_ROWS).orElse("0")));
+		map.put(CSVW.DELIMITER,
+				Models.getPropertyString(metadata, dialect, CSVW.DELIMITER).orElse(","));
+		map.put(CSVW.QUOTE_CHAR,
+				Models.getPropertyString(metadata, dialect, CSVW.QUOTE_CHAR).orElse("\""));
+		map.put(CSVW.DOUBLE_QUOTE,
+				Models.getPropertyString(metadata, dialect, CSVW.DOUBLE_QUOTE).orElse("\\"));
+		map.put(CSVW.ENCODING,
+				Models.getPropertyString(metadata, dialect, CSVW.ENCODING).orElse("utf-8"));
+
+		return map;
+	}
+
+	/**
+	 * Get configured CSV file reader
+	 *
+	 * @param config
 	 * @param reader
 	 * @return
 	 */
-	protected static CSVReader getCSVReader(Model metadata, Resource table, Reader reader) {
+	protected static CSVReader getCSVReader(Map<IRI, Object> config, Reader reader) {
 		CSVParserBuilder parserBuilder = new CSVParserBuilder();
 		CSVReaderBuilder builder = new CSVReaderBuilder(reader);
-		builder.withSkipLines(0); // set to zero to allow CSVW without metadata to read the header
 
-		if (metadata != null) {
-			builder.withSkipLines(1); // first line is assumed to be the header
+		builder.withSkipLines((int) config.get(CSVW.SKIP_ROWS));
 
-			Optional<Value> val = Models.getProperty(metadata, table, CSVW.HAS_DIALECT);
-			if (!val.isPresent()) {
-				// not on table, maybe at root level
-				val = Models.object(metadata.filter(null, CSVW.HAS_DIALECT, null));
-			}
+		parserBuilder.withSeparator(((String) config.get(CSVW.DELIMITER)).charAt(0));
+		parserBuilder.withQuoteChar(((String) config.get(CSVW.QUOTE_CHAR)).charAt(0));
+		parserBuilder.withEscapeChar(((String) config.get(CSVW.DOUBLE_QUOTE)).charAt(0));
 
-			if (val.isPresent()) {
-				Resource dialect = (Resource) val.get();
-				// skip header (and possibly other) rows
-				String headerRows = Models.getPropertyString(metadata, dialect, CSVW.HEADER_ROW_COUNT).orElse("1");
-				String skipRows = Models.getPropertyString(metadata, dialect, CSVW.SKIP_ROWS).orElse("0");
-				int skip = Integer.valueOf(headerRows) + Integer.valueOf(skipRows);
-
-				Models.getPropertyString(metadata, dialect, CSVW.HEADER)
-						.ifPresent(v -> builder.withSkipLines(v.equalsIgnoreCase("false") ? 0 : skip));
-				Models.getPropertyString(metadata, dialect, CSVW.DELIMITER)
-						.ifPresent(v -> parserBuilder.withSeparator(v.charAt(0)));
-				Models.getPropertyString(metadata, dialect, CSVW.QUOTE_CHAR)
-						.ifPresent(v -> parserBuilder.withQuoteChar(v.charAt(0)));
-			}
-		}
 		return builder.withCSVParser(parserBuilder.build()).build();
 	}
 
@@ -121,7 +163,7 @@ public class CSVWUtil {
 		if (val.isPresent()) {
 			Value datatype = val.get();
 			// derived datatype
-			if (datatype.isResource()) {
+			if (datatype.isBNode()) {
 				val = Models.getProperty(metadata, (Resource) datatype, CSVW.BASE);
 			}
 		}
