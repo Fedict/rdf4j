@@ -57,63 +57,6 @@ public class CSVWUtil {
 	}
 
 	/**
-	 * Get dialect node if present
-	 *
-	 * @param metadata
-	 * @param table
-	 * @return
-	 */
-	private static Resource getDialect(Model metadata, Resource table) {
-		if (metadata == null) {
-			return null;
-		}
-		Optional<Value> val = Models.getProperty(metadata, table, CSVW.HAS_DIALECT);
-		if (!val.isPresent()) {
-			// not on table, maybe at root level
-			val = Models.object(metadata.filter(null, CSVW.HAS_DIALECT, null));
-		}
-		return val.isPresent() ? (Resource) val.get() : null;
-	}
-
-	/**
-	 * Get the CSV dialect from metadata configuration
-	 *
-	 * @param model
-	 * @param table
-	 * @return map with dialect config
-	 */
-	protected static Map<IRI, Object> getDialectConfig(Model model, Resource table) {
-		Map<IRI, Object> map = new HashMap<>();
-
-		// for default values
-		Model metadata = (model == null) ? new LinkedHashModel() : model;
-
-		Resource dialect = getDialect(metadata, table);
-		if (dialect == null) {
-			dialect = Values.bnode();
-		}
-		map.put(CSVW.ENCODING,
-				Models.getPropertyString(metadata, dialect, CSVW.ENCODING).orElse("utf-8"));
-		map.put(CSVW.HEADER,
-				Boolean.valueOf(Models.getPropertyString(metadata, dialect, CSVW.HEADER).orElse("true")));
-		map.put(CSVW.HEADER_ROW_COUNT, (boolean) map.get(CSVW.HEADER)
-				? Integer.valueOf(Models.getPropertyString(metadata, dialect, CSVW.HEADER_ROW_COUNT).orElse("1"))
-				: 0);
-		map.put(CSVW.SKIP_ROWS,
-				Integer.valueOf(Models.getPropertyString(metadata, dialect, CSVW.SKIP_ROWS).orElse("0")));
-		map.put(CSVW.DELIMITER,
-				Models.getPropertyString(metadata, dialect, CSVW.DELIMITER).orElse(","));
-		map.put(CSVW.QUOTE_CHAR,
-				Models.getPropertyString(metadata, dialect, CSVW.QUOTE_CHAR).orElse("\""));
-		map.put(CSVW.DOUBLE_QUOTE,
-				Models.getPropertyString(metadata, dialect, CSVW.DOUBLE_QUOTE).orElse("\\"));
-		map.put(CSVW.ENCODING,
-				Models.getPropertyString(metadata, dialect, CSVW.ENCODING).orElse("utf-8"));
-
-		return map;
-	}
-
-	/**
 	 * Get configured CSV file reader
 	 *
 	 * @param config
@@ -210,15 +153,15 @@ public class CSVWUtil {
 		Models.getPropertyString(metadata, column, CSVW.NAME)
 				.ifPresentOrElse(v -> parser.setName(v),
 						() -> new RDFParseException("Metadata file does not contain name for column " + column));
-
-		Models.getPropertyString(metadata, column, CSVW.DEFAULT).ifPresent(v -> parser.setDefaultValue(v));
-		Models.getPropertyString(metadata, column, CSVW.NULL).ifPresent(v -> parser.setNullValue(v));
-		Models.getPropertyString(metadata, column, CSVW.REQUIRED)
-				.ifPresent(v -> parser.setRequired(Boolean.parseBoolean(v)));
 		Models.getPropertyString(metadata, column, CSVW.VIRTUAL)
 				.ifPresent(v -> parser.setVirtual(Boolean.parseBoolean(v)));
+
+		Models.getPropertyString(metadata, column, CSVW.REQUIRED)
+				.ifPresent(v -> parser.setRequired(Boolean.parseBoolean(v)));
+		Models.getPropertyString(metadata, column, CSVW.DEFAULT).ifPresent(v -> parser.setDefaultValue(v));
+		Models.getPropertyString(metadata, column, CSVW.NULL).ifPresent(v -> parser.setNullValue(v));
 		Models.getPropertyString(metadata, column, CSVW.SUPPRESS_OUTPUT)
-				.ifPresent(v -> parser.setVirtual(Boolean.parseBoolean(v)));
+				.ifPresent(v -> parser.setSuppressed(Boolean.parseBoolean(v)));
 
 		// only useful for strings
 		Models.getPropertyString(metadata, column, CSVW.LANG).ifPresent(v -> parser.setLang(v));
@@ -229,9 +172,6 @@ public class CSVWUtil {
 
 		// mostly for date formats
 		getFormat(metadata, column).ifPresent(v -> parser.setFormat(v));
-
-		Models.getPropertyString(metadata, column, CSVW.TRIM)
-				.ifPresent(v -> parser.setVirtual(Boolean.parseBoolean(v)));
 
 		Models.getPropertyString(metadata, column, CSVW.ABOUT_URL).ifPresent(v -> parser.setAboutUrl(v));
 		Models.getPropertyString(metadata, column, CSVW.VALUE_URL).ifPresent(v -> parser.setValueUrl(v));

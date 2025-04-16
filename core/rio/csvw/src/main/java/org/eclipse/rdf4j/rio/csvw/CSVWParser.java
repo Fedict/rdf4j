@@ -51,8 +51,10 @@ import org.eclipse.rdf4j.rio.RDFHandler;
 import org.eclipse.rdf4j.rio.RDFHandlerException;
 import org.eclipse.rdf4j.rio.RDFParseException;
 import org.eclipse.rdf4j.rio.Rio;
+import org.eclipse.rdf4j.rio.csvw.metadata.CSVWMetadataInputStream;
 import org.eclipse.rdf4j.rio.csvw.metadata.CSVWMetadataNone;
 import org.eclipse.rdf4j.rio.csvw.metadata.CSVWMetadataProvider;
+import org.eclipse.rdf4j.rio.csvw.metadata.CSVWMetadataUtil;
 import org.eclipse.rdf4j.rio.csvw.parsers.CellParser;
 import org.eclipse.rdf4j.rio.csvw.parsers.CellParserFactory;
 import org.eclipse.rdf4j.rio.helpers.AbstractRDFParser;
@@ -80,9 +82,6 @@ import com.opencsv.exceptions.CsvValidationException;
 public class CSVWParser extends AbstractRDFParser {
 	private static final Logger LOGGER = LoggerFactory.getLogger(CSVWParser.class);
 
-	private static final ParserConfig METADATA_CFG = new ParserConfig().set(JSONLDSettings.WHITELIST,
-			Set.of("http://www.w3.org/ns/csvw", "https://www.w3.org/ns/csvw", "https://www.w3.org/ns/csvw.jsonld"));
-
 	@Override
 	public RDFFormat getRDFFormat() {
 		return RDFFormat.CSVW;
@@ -95,9 +94,6 @@ public class CSVWParser extends AbstractRDFParser {
 		clear();
 
 		rdfHandler = getRDFHandler();
-		rdfHandler.handleNamespace(CSVW.PREFIX, CSVW.NAMESPACE);
-		rdfHandler.handleNamespace(RDF.PREFIX, RDF.NAMESPACE);
-		rdfHandler.handleNamespace("xsd", XSD.NAMESPACE);
 
 		boolean minimal = getParserConfig().get(CSVWParserSettings.MINIMAL_MODE);
 		if (minimal) {
@@ -106,7 +102,10 @@ public class CSVWParser extends AbstractRDFParser {
 		Resource rootNode = minimal ? null : generateTablegroupNode(rdfHandler);
 
 		boolean metadataIn = getParserConfig().get(CSVWParserSettings.METADATA_INPUT_MODE);
-		Model metadata = getMetadataAsModel(input, metadataIn);
+		CSVWMetadataProvider provider = (metadataIn)
+				? new CSVWMetadataInputStream(input)
+				: getParserConfig().get(CSVWParserSettings.METADATA_PROVIDER);
+		Model metadata = CSVWMetadataUtil.getMetadataAsModel(provider);
 
 		if (metadataIn && metadata.isEmpty()) {
 			throw new RDFParseException("CSVW metadata input mode, but no metadata found");
@@ -130,7 +129,7 @@ public class CSVWParser extends AbstractRDFParser {
 
 				Resource tableNode = minimal ? null : generateTableNode(rdfHandler, rootNode, csvFile);
 
-				Model extra = getExtraMetadata(metadata, (Resource) tableNode, CSVW.TABLE_SCHEMA);
+				Model extra = CSVWMetadataUtil.getExtraMetadata(metadata, (Resource) tableNode, CSVW.TABLE_SCHEMA);
 				extra.forEach(s -> rdfHandler.handleStatement(s));
 
 				Resource tableSchema = getTableSchema(metadata, (Resource) table);
@@ -170,73 +169,6 @@ public class CSVWParser extends AbstractRDFParser {
 			throws IOException, RDFParseException, RDFHandlerException {
 		throw new IOException("not implemented yet");
 //		Model metadata = parseMetadata(null, reader, baseURI);
-	}
-
-	/**
-	 * Get the JSON-LD metadata as an RDF model
-	 *
-	 * @param in
-	 * @return
-	 * @throws IOException
-	 */
-	private Model getMetadataAsModel(InputStream inputStream, boolean metadataIn) throws IOException {
-		Model m = null;
-		InputStream minput = null;
-
-		if (metadataIn) {
-			minput = inputStream;
-		} else {
-			// input is CSV, so try to find associated metadata
-			CSVWMetadataProvider provider = getParserConfig().get(CSVWParserSettings.METADATA_PROVIDER);
-			if ((provider != null) && !(provider instanceof CSVWMetadataNone)) {
-				minput = provider.getMetadata();
-			}
-		}
-
-		if (minput != null) {
-			byte[] bytes = minput.readAllBytes();
-			String str = new String(bytes, StandardCharsets.UTF_8);
-			try (InputStream s = new ByteArrayInputStream(str.getBytes(StandardCharsets.UTF_8))) {
-				m = Rio.parse(s, null, RDFFormat.JSONLD, METADATA_CFG);
-			}
-		} // else {
-			// LOGGER.warn("Metadata could not be found");
-			// }
-		return (m != null) ? m : new LinkedHashModel();
-	}
-
-	/**
-	 * Get metadata that does not help parsing the CSVW, but is included anyway.
-	 *
-	 * E.g last update, license, long descriptions...
-	 *
-	 * @param m
-	 * @return
-	 */
-	private Model getExtraMetadata(Model m, Resource rootNode, IRI predicate) {
-		Model extra = new LinkedHashModel();
-		Resource oldRoot = null;
-
-		if (predicate != null) {
-			Iterable<Statement> roots = m.getStatements(null, predicate, null);
-			if (roots.iterator().hasNext()) {
-				oldRoot = roots.iterator().next().getSubject();
-			}
-		}
-		if (oldRoot != null) {
-			m.getStatements(oldRoot, null, null).forEach(s -> {
-				IRI p = s.getPredicate();
-				if (!p.getNamespace().equals(CSVW.NAMESPACE) || p.equals(CSVW.NOTE)) {
-					Value obj = s.getObject();
-					extra.add(Statements.statement(rootNode, p, obj, null));
-					if (obj instanceof Resource) {
-						Iterable<Statement> second = m.getStatements((Resource) obj, null, null);
-						second.forEach(t -> extra.add(t));
-					}
-				}
-			});
-		}
-		return extra;
 	}
 
 	/**
@@ -452,7 +384,7 @@ public class CSVWParser extends AbstractRDFParser {
 			Resource tableNode) {
 		boolean minimal = getParserConfig().get(CSVWParserSettings.MINIMAL_MODE);
 
-		Map<IRI, Object> dialect = CSVWUtil.getDialectConfig(metadata, tableNode);
+		Map<IRI, Object> dialect = CSVWMetadataUtil.getDialectConfig(metadata, tableNode);
 		Charset encoding = Charset.forName((String) dialect.get(CSVW.ENCODING));
 
 		long line = 1;
@@ -516,7 +448,7 @@ public class CSVWParser extends AbstractRDFParser {
 	 */
 	private void parseCSV(Model metadata, RDFHandler handler, String csvFile, InputStream input,
 			CellParser[] cellParsers, Resource table, Resource tableNode) {
-		Map<IRI, Object> dialect = CSVWUtil.getDialectConfig(metadata, tableNode);
+		Map<IRI, Object> dialect = CSVWMetadataUtil.getDialectConfig(metadata, tableNode);
 		Charset encoding = Charset.forName((String) dialect.get(CSVW.ENCODING));
 
 		String aboutURL = getAboutURL(metadata, table);
