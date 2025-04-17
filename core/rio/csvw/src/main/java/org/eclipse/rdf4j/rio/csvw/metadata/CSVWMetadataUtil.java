@@ -94,7 +94,7 @@ public class CSVWMetadataUtil {
 	/**
 	 * Get the CSV dialect from m configuration as a map of IRIs and values
 	 *
-	 * @param metadata     RDF model
+	 * @param metadata RDF model
 	 * @param table
 	 * @return map with dialect configuration
 	 */
@@ -130,14 +130,20 @@ public class CSVWMetadataUtil {
 	}
 
 	/**
-	 * Get m that does not help parsing the CSVW, but is included anyway.E.g last update, license, long descriptions...
+	 * Get metadata that does not help parsing the CSVW, but is included anyway.
 	 *
+	 * E.g last update, license, long descriptions...
 	 *
 	 * @param metadata
+	 * @param rootNode
 	 * @return
 	 */
 	public static Model getExtraMetadata(Model metadata, Resource rootNode, IRI predicate) {
 		Model extra = new LinkedHashModel();
+		if (rootNode == null) {
+			return extra;
+		}
+
 		Resource oldRoot = null;
 
 		if (predicate != null) {
@@ -168,7 +174,6 @@ public class CSVWMetadataUtil {
 		}
 		return extra;
 	}
-
 
 	/**
 	 * Get the (blank node of the) tableschema for a given table

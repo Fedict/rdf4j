@@ -38,7 +38,7 @@ public class CSVWMetadataLocation implements CSVWMetadataProvider {
 		}
 
 		try (InputStream is = metadataURL.openStream()) {
-			LOGGER.info("Using metadata from {} ", metadataURL);
+			LOGGER.info("Using metadata from location {} ", metadataURL);
 			return new ByteArrayInputStream(is.readAllBytes());
 		} catch (IOException ioe) {
 			LOGGER.error("Could not open metadata file {}", metadataURL);

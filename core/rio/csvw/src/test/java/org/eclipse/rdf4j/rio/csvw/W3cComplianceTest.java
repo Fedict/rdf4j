@@ -169,8 +169,6 @@ public class W3cComplianceTest {
 	@ParameterizedTest
 	@MethodSource("getTestFiles")
 	public void test(W3CTest testCase) throws IOException, Exception {
-		int i = 1;
-
 		if (testCase.link != null) {
 			installWrapper(testCase.link);
 		}
@@ -203,7 +201,7 @@ public class W3cComplianceTest {
 				int pos = csv.getPath().lastIndexOf("/tests/") + 7;
 				String fname = csv.getPath().substring(pos);
 
-				System.err.println("Test " + i + " : " + fname);
+				System.err.println("Test " + testCase.name + " (" + fname + ")");
 				try (InputStream is = testCase.getCSV().openStream()) {
 					compareResults(testCase, cfg, testCase.getCSV().toString(), is);
 				}

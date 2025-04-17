@@ -228,7 +228,7 @@ public class CSVWMetadataFinder implements CSVWMetadataProvider {
 			int status = response.getStatusLine().getStatusCode();
 			if (status == HttpStatus.SC_OK) {
 				buffer = bis.readAllBytes();
-				LOGGER.info("Opened metadata from {}", url);
+				LOGGER.info("Using metadata found on {}", url);
 				return buffer;
 			} else {
 				LOGGER.debug("Could not open possible metadata location {}, status {}", url, status);

@@ -71,7 +71,7 @@ public class CSVWUtil {
 
 		parserBuilder.withSeparator(((String) config.get(CSVW.DELIMITER)).charAt(0));
 		parserBuilder.withQuoteChar(((String) config.get(CSVW.QUOTE_CHAR)).charAt(0));
-		parserBuilder.withEscapeChar(((String) config.get(CSVW.DOUBLE_QUOTE)).charAt(0));
+		// parserBuilder.withEscapeChar(((String) config.get(CSVW.DOUBLE_QUOTE)).charAt(0));
 
 		return builder.withCSVParser(parserBuilder.build()).build();
 	}

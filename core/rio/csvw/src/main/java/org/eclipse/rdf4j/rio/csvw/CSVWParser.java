@@ -18,6 +18,7 @@ import java.io.Reader;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.Charset;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -48,7 +49,6 @@ import org.eclipse.rdf4j.rio.csvw.metadata.CSVWMetadataUtil;
 import org.eclipse.rdf4j.rio.csvw.parsers.CellParser;
 import org.eclipse.rdf4j.rio.csvw.parsers.CellParserFactory;
 import org.eclipse.rdf4j.rio.helpers.AbstractRDFParser;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -203,7 +203,8 @@ public class CSVWParser extends AbstractRDFParser {
 	 */
 	private String getAboutURL(Model metadata, Resource table) {
 		String url = Models.getPropertyString(metadata, table, CSVW.ABOUT_URL)
-				.orElse(Models.getPropertyString(metadata, CSVWMetadataUtil.getTableSchema(metadata, table), CSVW.ABOUT_URL)
+				.orElse(Models
+						.getPropertyString(metadata, CSVWMetadataUtil.getTableSchema(metadata, table), CSVW.ABOUT_URL)
 						.orElse(null));
 		if (url == null) {
 			return null;
@@ -332,12 +333,14 @@ public class CSVWParser extends AbstractRDFParser {
 			// assume first line is header
 			String[] header;
 
+			int headerRows = 1;
 			if ((boolean) dialect.get(CSVW.HEADER)) {
 				header = csv.readNext();
 			} else {
-				header = csv.peek();
+				headerRows = 0;
+				header = csv.peek().clone(); // make sure to don't change the CSV itself
 				for (int i = 0; i < header.length; i++) {
-					header[i] = "_col" + i;
+					header[i] = "_col." + (i + 1);
 				}
 			}
 
@@ -350,15 +353,11 @@ public class CSVWParser extends AbstractRDFParser {
 
 			while ((cells = csv.readNext()) != null) {
 				// row number + 1 to compensate for header
-				Resource rowURL = Values.iri(csvFile + "#row=" + (line + 1));
+				Resource rowURL = Values.iri(csvFile + "#row=" + (line + headerRows));
 				Resource rowNode = minimal ? null : generateRowNode(rdfHandler, tableNode, null, rowURL, line);
 
 				// csv cells
 				for (int i = 0; i < cells.length; i++) {
-					if (cells.length < header.length) {
-						System.err.println("Error, different number of columns line " + line);
-						break;
-					}
 					Value val = cellParsers[i].parse(cells[i]);
 					if (val != null) {
 						handler.handleStatement(
@@ -429,7 +428,7 @@ public class CSVWParser extends AbstractRDFParser {
 				// csv cells
 				for (col = 0; col < cells.length; col++) {
 					if (doReplace) {
-						values.put("{_col}", Long.toString(col));
+						values.put("{_col}", Long.toString(col + 1));
 					}
 					if (col == aboutIndex) { // already processed to get subject
 						if (doReplace) {
