@@ -17,7 +17,7 @@ import java.io.InputStream;
  *
  * @author Bart Hanssens
  */
-public class CSVWMetadataInputStream implements CSVWMetadataProvider {
+public class CSVWMetadataInputStream extends CSVWMetadataProvider {
 	private final InputStream input;
 
 	@Override

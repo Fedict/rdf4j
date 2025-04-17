@@ -58,6 +58,7 @@ public class CSVWMetadataUtil {
 	 */
 	public static Model getMetadataAsModel(CSVWMetadataProvider provider) throws IOException {
 		Model m = null;
+
 		InputStream minput = (provider != null) ? provider.getMetadata() : null;
 
 		if (minput != null) {
@@ -66,9 +67,7 @@ public class CSVWMetadataUtil {
 			try (InputStream s = new ByteArrayInputStream(str.getBytes(StandardCharsets.UTF_8))) {
 				m = Rio.parse(s, null, RDFFormat.JSONLD, METADATA_CFG);
 			}
-		} // else {
-			// LOGGER.warn("Metadata could not be found");
-			// }
+		}
 		return (m != null) ? m : new LinkedHashModel();
 	}
 

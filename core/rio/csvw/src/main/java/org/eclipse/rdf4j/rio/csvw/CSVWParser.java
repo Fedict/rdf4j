@@ -87,7 +87,7 @@ public class CSVWParser extends AbstractRDFParser {
 
 		boolean minimal = getParserConfig().get(CSVWParserSettings.MINIMAL_MODE);
 		if (minimal) {
-			LOGGER.info("Minimal mode set to " + minimal);
+			LOGGER.info("Minimal mode is set");
 		}
 		Resource rootNode = minimal ? null : generateTablegroupNode(rdfHandler);
 

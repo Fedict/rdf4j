@@ -10,30 +10,25 @@
  *******************************************************************************/
 package org.eclipse.rdf4j.rio.csvw.metadata;
 
-import java.io.BufferedInputStream;
 import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.MalformedURLException;
-import java.net.ProxySelector;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.net.http.HttpRequest;
+import java.net.http.HttpRequest.BodyPublishers;
+import java.net.http.HttpResponse;
+import java.net.http.HttpResponse.BodyHandlers;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.logging.Level;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.apache.http.Header;
-import org.apache.http.HttpStatus;
-import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.client.methods.HttpHead;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClients;
-import org.apache.http.impl.conn.SystemDefaultRoutePlanner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -42,7 +37,7 @@ import org.slf4j.LoggerFactory;
  *
  * @author Bart Hanssens
  */
-public class CSVWMetadataFinder implements CSVWMetadataProvider {
+public class CSVWMetadataFinder extends CSVWMetadataProvider {
 	private static final Logger LOGGER = LoggerFactory.getLogger(CSVWMetadataFinder.class);
 
 	private static final String WELL_KNOWN = "/.well-known/csvm";
@@ -57,12 +52,6 @@ public class CSVWMetadataFinder implements CSVWMetadataProvider {
 
 	// "<([^>].*)>(?=.*type=\"application/(csvm\\+json|ld\\+json|json)\")(?=.*rel=\"describedBy\")");
 
-	private CloseableHttpClient getClient() {
-		return HttpClients.custom()
-				.setRoutePlanner(new SystemDefaultRoutePlanner(ProxySelector.getDefault()))
-				.build();
-	}
-
 	/**
 	 * Check if the HTTP Link Header contains an URL matching
 	 *
@@ -71,28 +60,36 @@ public class CSVWMetadataFinder implements CSVWMetadataProvider {
 	private List<URL> linkHeader() {
 		List<URL> urls = new ArrayList<>();
 
-		HttpHead httpHead = new HttpHead(csvLocation.toString());
+		URI uri;
+		try {
+			uri = csvLocation.toURI();
+		} catch (URISyntaxException ex) {
+			LOGGER.error("Invalid link header URL {}", csvLocation, ex);
+			return urls;
+		}
 
-		// use apache client instead of url.openconnection to be able to use HTTP HEAD
-		try (CloseableHttpClient httpClient = getClient();
-				CloseableHttpResponse response = httpClient.execute(httpHead)) {
-			Header[] headers = response.getHeaders("Link");
-			for (Header header : headers) {
-				Matcher m = LINK.matcher(header.getValue());
+		HttpRequest head = HttpRequest.newBuilder()
+				.uri(uri)
+				.method("HEAD", BodyPublishers.noBody())
+				.build();
+
+		try {
+			HttpResponse<byte[]> response = HTTP_CLIENT.send(head, BodyHandlers.ofByteArray());
+
+			List<String> headers = response.headers().allValues("Link");
+			for (String header : headers) {
+				Matcher m = LINK.matcher(header);
 				if (m.matches()) {
 					String file = m.group(1);
-					try {
-						// last should be used first
-						urls.add(0, csvLocation.toURI().resolve(file).toURL());
-						LOGGER.info("Link header {}", urls.get(0));
-					} catch (URISyntaxException ex) {
-						LOGGER.error("Invalid Link-header metadata URL", ex);
-					}
+					// last should be used first
+					urls.add(0, uri.resolve(file).toURL());
+					LOGGER.info("Link header {}", urls.get(0));
 				}
-				System.err.println(header.toString());
 			}
-		} catch (IOException ioe) {
-			return null;
+		} catch (IOException ex) {
+			LOGGER.error("Could not open URL {}", csvLocation, ex);
+		} catch (InterruptedException ie) {
+			Thread.currentThread().interrupt();
 		}
 		return urls;
 	}
@@ -107,15 +104,15 @@ public class CSVWMetadataFinder implements CSVWMetadataProvider {
 	private List<URL> wellKnownURL() {
 		List<URL> urls = new ArrayList<>();
 
-		URL url;
+		URI uri;
 		try {
-			url = csvLocation.toURI().resolve(WELL_KNOWN).toURL();
-		} catch (MalformedURLException | URISyntaxException ex) {
+			uri = csvLocation.toURI().resolve(WELL_KNOWN);
+		} catch (URISyntaxException ex) {
 			LOGGER.error("Invalid well-known metadata URL", ex);
 			return urls;
 		}
 
-		byte[] buffer = tryURL(url);
+		byte[] buffer = tryURI(uri);
 		if (buffer == null) {
 			return urls;
 		}
@@ -136,27 +133,18 @@ public class CSVWMetadataFinder implements CSVWMetadataProvider {
 					metaURI = URI.create(line + s);
 					break;
 				case '/':
-					try {
-						metaURI = csvLocation.toURI().resolve(s);
-					} catch (URISyntaxException ex) {
-						metaURI = null;
-						LOGGER.error("Invalid metadata URL", ex);
-					}
+					metaURI = uri.resolve(s);
 					break;
 				default:
 					metaURI = URI.create(s);
 				}
-				try {
-					if (metaURI != null) {
-						urls.add(metaURI.toURL());
-					}
-				} catch (MalformedURLException ex) {
-					LOGGER.error("Error converting metadata URI {} to URL c", metaURI, ex);
+				if (metaURI != null) {
+					urls.add(metaURI.toURL());
 				}
 				line = r.readLine();
 			}
 		} catch (IOException ioe) {
-			LOGGER.error("Could not parse {}", url);
+			LOGGER.error("Could not parse {}", uri);
 		}
 		return urls;
 	}
@@ -212,34 +200,6 @@ public class CSVWMetadataFinder implements CSVWMetadataProvider {
 	}
 
 	/**
-	 * Try to open URL, silently fail if there is an error
-	 *
-	 * @param url
-	 * @return
-	 */
-	private byte[] tryURL(URL url) {
-		byte[] buffer = null;
-
-		HttpGet httpGet = new HttpGet(url.toString());
-
-		try (CloseableHttpClient httpClient = getClient();
-				CloseableHttpResponse response = httpClient.execute(httpGet);
-				BufferedInputStream bis = new BufferedInputStream(response.getEntity().getContent())) {
-			int status = response.getStatusLine().getStatusCode();
-			if (status == HttpStatus.SC_OK) {
-				buffer = bis.readAllBytes();
-				LOGGER.info("Using metadata found on {}", url);
-				return buffer;
-			} else {
-				LOGGER.debug("Could not open possible metadata location {}, status {}", url, status);
-			}
-		} catch (IOException ex) {
-			LOGGER.debug("Could not open possible metadata location {}", url, ex);
-		}
-		return buffer;
-	}
-
-	/**
 	 * Try different ways of finding the JSON metadata file
 	 *
 	 * @see https://w3c.github.io/csvw/syntax/#locating-metadata
@@ -261,9 +221,13 @@ public class CSVWMetadataFinder implements CSVWMetadataProvider {
 		byte[] bytes = null;
 
 		for (URL url : urls) {
-			bytes = tryURL(url);
-			if (bytes != null) {
-				break;
+			try {
+				bytes = tryURI(url.toURI());
+				if (bytes != null) {
+					break;
+				}
+			} catch (URISyntaxException ex) {
+				LOGGER.error("Invalid URL {}", url, ex);
 			}
 		}
 

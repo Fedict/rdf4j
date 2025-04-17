@@ -11,7 +11,6 @@
 package org.eclipse.rdf4j.rio.csvw.metadata;
 
 import java.io.InputStream;
-import java.net.URL;
 
 /**
  * Dummy metadata provider.
@@ -20,7 +19,7 @@ import java.net.URL;
  *
  * @author Bart Hanssens
  */
-public class CSVWMetadataNone implements CSVWMetadataProvider {
+public class CSVWMetadataNone extends CSVWMetadataProvider {
 
 	@Override
 	public InputStream getMetadata() {

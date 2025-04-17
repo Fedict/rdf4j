@@ -205,6 +205,8 @@ public class W3cComplianceTest {
 				try (InputStream is = testCase.getCSV().openStream()) {
 					compareResults(testCase, cfg, testCase.getCSV().toString(), is);
 				}
+				System.err.println("Test is done");
+
 			}
 		} catch (AssertionError e) {
 			fail();

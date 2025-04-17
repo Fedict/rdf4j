@@ -10,14 +10,42 @@
  *******************************************************************************/
 package org.eclipse.rdf4j.rio.csvw.metadata;
 
+import java.io.BufferedInputStream;
+import java.io.IOException;
 import java.io.InputStream;
+import java.net.ProxySelector;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.net.http.HttpClient;
+import java.net.http.HttpClient.Redirect;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.net.http.HttpResponse.BodyHandlers;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.logging.Level;
+
+import org.apache.http.HttpStatus;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Provide the JSON metadata for parsing the CSV data
  *
  * @author Bart Hanssens
  */
-public interface CSVWMetadataProvider {
+public abstract class CSVWMetadataProvider {
+	private static final Logger LOGGER = LoggerFactory.getLogger(CSVWMetadataProvider.class);
+
+	protected static final HttpClient HTTP_CLIENT = HttpClient.newBuilder()
+			.followRedirects(Redirect.NORMAL)
+			.proxy(ProxySelector.getDefault())
+			.build();
 
 	/**
 	 * Get the metadata as inputstream
@@ -25,4 +53,31 @@ public interface CSVWMetadataProvider {
 	 * @return
 	 */
 	public abstract InputStream getMetadata();
+
+	/**
+	 * Try to open URL, silently fail if there is an error
+	 *
+	 * @param uri
+	 * @return
+	 */
+	protected byte[] tryURI(URI uri) {
+		HttpRequest httpGet = HttpRequest.newBuilder().uri(uri).GET().build();
+
+		CompletableFuture<HttpResponse<byte[]>> future = HTTP_CLIENT.sendAsync(httpGet, BodyHandlers.ofByteArray());
+		try {
+			HttpResponse<byte[]> response = future.get();
+			if (response.statusCode() == 200) {
+				LOGGER.info("Using metadata found on {}", uri);
+				return response.body();
+			} else {
+				LOGGER.debug("Could not open URL {}, received status {}", uri, response.statusCode());
+			}
+		} catch (ExecutionException ex) {
+			LOGGER.error("Could not open URL {}", uri, ex);
+		} catch (InterruptedException ie) {
+			Thread.currentThread().interrupt();
+		}
+		return null;
+	}
+
 }

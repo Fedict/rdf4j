@@ -10,22 +10,12 @@
  *******************************************************************************/
 package org.eclipse.rdf4j.rio.csvw.metadata;
 
-import static org.eclipse.rdf4j.rio.csvw.metadata.CSVWMetadataProvider.HTTP_CLIENT;
-
 import java.io.BufferedInputStream;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.MalformedURLException;
-import java.net.URISyntaxException;
-import java.net.URL;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.concurrent.CompletableFuture;
-import java.util.logging.Level;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,20 +25,23 @@ import org.slf4j.LoggerFactory;
  *
  * @author Bart Hanssens
  */
-public class CSVWMetadataLocation extends CSVWMetadataProvider {
-	private static final Logger LOGGER = LoggerFactory.getLogger(CSVWMetadataLocation.class);
+public class CSVWMetadataPath extends CSVWMetadataProvider {
+	private static final Logger LOGGER = LoggerFactory.getLogger(CSVWMetadataPath.class);
 
-	private final URL metadataURL;
+	private final Path metadataPath;
 
 	@Override
 	public InputStream getMetadata() {
-		if (metadataURL == null) {
+		if (metadataPath == null) {
 			LOGGER.error("Meta data path is null");
 		}
-		try {
-			return new ByteArrayInputStream(tryURI(metadataURL.toURI()));
-		} catch (URISyntaxException ex) {
-			LOGGER.error("Invalid URL {}", metadataURL, ex);
+
+		try (InputStream is = Files.newInputStream(metadataPath);
+				BufferedInputStream bis = new BufferedInputStream(is)) {
+			LOGGER.info("Using metadata from path {} ", metadataPath);
+			return new ByteArrayInputStream(bis.readAllBytes());
+		} catch (IOException ioe) {
+			LOGGER.error("Could not open metadata from path {}", metadataPath);
 		}
 		return null;
 	}
@@ -56,9 +49,9 @@ public class CSVWMetadataLocation extends CSVWMetadataProvider {
 	/**
 	 * Constructor
 	 *
-	 * @param metadataURL
+	 * @param metadataPath
 	 */
-	public CSVWMetadataLocation(URL metadataURL) {
-		this.metadataURL = metadataURL;
+	public CSVWMetadataPath(Path metadataPath) {
+		this.metadataPath = metadataPath;
 	}
 }
