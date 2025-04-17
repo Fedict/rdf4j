@@ -11,7 +11,6 @@
 package org.eclipse.rdf4j.rio.csvw;
 
 import java.io.BufferedReader;
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -19,14 +18,10 @@ import java.io.Reader;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.eclipse.rdf4j.model.BNode;
@@ -37,28 +32,23 @@ import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.base.CoreDatatype.XSD;
-import org.eclipse.rdf4j.model.impl.LinkedHashModel;
 import org.eclipse.rdf4j.model.impl.SimpleNamespace;
 import org.eclipse.rdf4j.model.util.Models;
-import org.eclipse.rdf4j.model.util.RDFCollections;
 import org.eclipse.rdf4j.model.util.Statements;
 import org.eclipse.rdf4j.model.util.Values;
 import org.eclipse.rdf4j.model.vocabulary.CSVW;
 import org.eclipse.rdf4j.model.vocabulary.RDF;
-import org.eclipse.rdf4j.rio.ParserConfig;
 import org.eclipse.rdf4j.rio.RDFFormat;
 import org.eclipse.rdf4j.rio.RDFHandler;
 import org.eclipse.rdf4j.rio.RDFHandlerException;
 import org.eclipse.rdf4j.rio.RDFParseException;
-import org.eclipse.rdf4j.rio.Rio;
 import org.eclipse.rdf4j.rio.csvw.metadata.CSVWMetadataInputStream;
-import org.eclipse.rdf4j.rio.csvw.metadata.CSVWMetadataNone;
 import org.eclipse.rdf4j.rio.csvw.metadata.CSVWMetadataProvider;
 import org.eclipse.rdf4j.rio.csvw.metadata.CSVWMetadataUtil;
 import org.eclipse.rdf4j.rio.csvw.parsers.CellParser;
 import org.eclipse.rdf4j.rio.csvw.parsers.CellParserFactory;
 import org.eclipse.rdf4j.rio.helpers.AbstractRDFParser;
-import org.eclipse.rdf4j.rio.helpers.JSONLDSettings;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -112,7 +102,7 @@ public class CSVWParser extends AbstractRDFParser {
 		}
 
 		if (!metadata.isEmpty()) {
-			List<Value> tables = getTables(metadata);
+			List<Value> tables = CSVWMetadataUtil.getTables(metadata);
 			if (tables.isEmpty()) {
 				throw new RDFParseException("CSVW metadata does not contain table info");
 			}
@@ -132,9 +122,9 @@ public class CSVWParser extends AbstractRDFParser {
 				Model extra = CSVWMetadataUtil.getExtraMetadata(metadata, (Resource) tableNode, CSVW.TABLE_SCHEMA);
 				extra.forEach(s -> rdfHandler.handleStatement(s));
 
-				Resource tableSchema = getTableSchema(metadata, (Resource) table);
+				Resource tableSchema = CSVWMetadataUtil.getTableSchema(metadata, (Resource) table);
 				if (tableSchema != null) {
-					List<Value> columns = getColumns(metadata, tableSchema);
+					List<Value> columns = CSVWMetadataUtil.getColumns(metadata, tableSchema);
 					if (columns.isEmpty()) {
 						throw new RDFParseException("Could not find column definitions in metadata");
 					}
@@ -205,59 +195,6 @@ public class CSVWParser extends AbstractRDFParser {
 	}
 
 	/**
-	 * Get the (blank node of the) tableschema for a given table
-	 *
-	 * @param metadata
-	 * @param table
-	 * @return
-	 * @throws RDFParseException
-	 */
-	private Resource getTableSchema(Model metadata, Resource table) {
-		return Models.getPropertyResource(metadata, table, CSVW.TABLE_SCHEMA).orElse(null);
-	}
-
-	/**
-	 * Get (the blank nodes of) the table(s)
-	 *
-	 * @param metadata
-	 * @return
-	 */
-	private List<Value> getTables(Model metadata) throws RDFParseException {
-		Iterator<Statement> it = metadata.getStatements(null, CSVW.HAS_TABLE, null).iterator();
-		if (!it.hasNext()) {
-			// only one table, simplified structure
-			it = metadata.getStatements(null, CSVW.TABLE_SCHEMA, null).iterator();
-			if (!it.hasNext()) {
-				throw new RDFParseException("Metadata file has no tables and no tableSschema");
-			}
-			return List.of(it.next().getSubject());
-		}
-		List<Value> tables = new ArrayList<>();
-		while (it.hasNext()) {
-			tables.add(it.next().getObject());
-		}
-		return tables;
-
-		// return RDFCollections.asValues(metadata, (Resource) it.next().getObject(), new ArrayList<>());
-	}
-
-	/**
-	 * Get the (blank nodes of the) columns for a given tableschema
-	 *
-	 * @param metadata
-	 * @param tableSchema
-	 * @return list of blank nodes
-	 * @throws RDFParseException
-	 */
-	private List<Value> getColumns(Model metadata, Resource tableSchema) throws RDFParseException {
-		Optional<Resource> head = Models.getPropertyResource(metadata, tableSchema, CSVW.COLUMN);
-		if (!head.isPresent()) {
-			throw new RDFParseException("Metadata file does not contain columns for " + tableSchema);
-		}
-		return RDFCollections.asValues(metadata, head.get(), new ArrayList<>());
-	}
-
-	/**
 	 * Get "about" URL template, to be used to create the subject of the triples
 	 *
 	 * @param metadata
@@ -266,7 +203,7 @@ public class CSVWParser extends AbstractRDFParser {
 	 */
 	private String getAboutURL(Model metadata, Resource table) {
 		String url = Models.getPropertyString(metadata, table, CSVW.ABOUT_URL)
-				.orElse(Models.getPropertyString(metadata, getTableSchema(metadata, table), CSVW.ABOUT_URL)
+				.orElse(Models.getPropertyString(metadata, CSVWMetadataUtil.getTableSchema(metadata, table), CSVW.ABOUT_URL)
 						.orElse(null));
 		if (url == null) {
 			return null;
