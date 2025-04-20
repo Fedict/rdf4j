@@ -10,13 +10,9 @@
  *******************************************************************************/
 package org.eclipse.rdf4j.rio.csvw.metadata;
 
-import java.io.BufferedInputStream;
-import java.io.IOException;
 import java.io.InputStream;
 import java.net.ProxySelector;
 import java.net.URI;
-import java.net.URISyntaxException;
-import java.net.URL;
 import java.net.http.HttpClient;
 import java.net.http.HttpClient.Redirect;
 import java.net.http.HttpRequest;
@@ -24,13 +20,7 @@ import java.net.http.HttpResponse;
 import java.net.http.HttpResponse.BodyHandlers;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
-import java.util.logging.Level;
 
-import org.apache.http.HttpStatus;
-import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClients;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

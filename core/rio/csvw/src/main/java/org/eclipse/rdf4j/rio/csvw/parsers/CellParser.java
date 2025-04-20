@@ -10,10 +10,8 @@
  *******************************************************************************/
 package org.eclipse.rdf4j.rio.csvw.parsers;
 
-import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
-import java.util.regex.MatchResult;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -29,8 +27,9 @@ import org.eclipse.rdf4j.rio.csvw.CSVWUtil;
  * @author Bart Hanssens
  */
 public abstract class CellParser {
-	private static final Pattern PLACEHOLDERS = Pattern.compile("(\\{#?_?[^\\}]+\\})");
+	private static final Pattern PLACEHOLDERS = Pattern.compile("\\{#?(_?[^\\}]+)\\}");
 
+	private Set<Namespace> namespaces;
 	private String name;
 	private String encodedName;
 	private IRI dataType;
@@ -49,14 +48,13 @@ public abstract class CellParser {
 	private boolean virtual = false;
 	private boolean suppressed = false;
 
-	private String aboutPlaceholder;
 	private String[] aboutPlaceholders = new String[0];
-
-	private String propertyPlaceholder;
 	private String[] propertyPlaceholders = new String[0];
-
-	private String valuePlaceholder;
 	private String[] valuePlaceholders = new String[0];
+
+	public void setNamespaces(Set<Namespace> namespaces) {
+		this.namespaces = namespaces;
+	}
 
 	/**
 	 * Get name of the column
@@ -68,7 +66,7 @@ public abstract class CellParser {
 	}
 
 	/**
-	 * Get URL encoded name
+	 * Get URL-encoded name
 	 *
 	 * @return encoded name
 	 */
@@ -83,7 +81,7 @@ public abstract class CellParser {
 	 */
 	public void setName(String name) {
 		this.name = name;
-		this.encodedName = "{" + CSVWUtil.encode(name) + "}";
+		this.encodedName = CSVWUtil.encode(name);
 	}
 
 	/**
@@ -95,14 +93,29 @@ public abstract class CellParser {
 		return dataType;
 	}
 
+	/**
+	 * Set datatype IRI
+	 *
+	 * @param dataType
+	 */
 	public void setDataType(IRI dataType) {
 		this.dataType = dataType;
 	}
 
+	/**
+	 * Get language
+	 *
+	 * @return
+	 */
 	public String getLang() {
 		return lang;
 	}
 
+	/**
+	 * Set language
+	 *
+	 * @param lang
+	 */
 	public void setLang(String lang) {
 		this.lang = lang;
 	}
@@ -147,12 +160,17 @@ public abstract class CellParser {
 		return required;
 	}
 
+	/**
+	 * Set
+	 *
+	 * @param isRequired
+	 */
 	public void setRequired(boolean isRequired) {
 		this.required = isRequired;
 	}
 
 	/**
-	 * IS virtual table ?
+	 * Does this a cell belongs to a virtual column
 	 *
 	 * @return
 	 */
@@ -170,19 +188,28 @@ public abstract class CellParser {
 	}
 
 	/**
-	 * Extract placeholder name for the own column, if any
+	 * Replace placeholders in URL with values
 	 *
-	 * @param template URI template string
-	 * @return placeholder name or null
+	 * @param str
+	 * @param placeholders
+	 * @param values
+	 * @return
 	 */
-	private String getOwnPlaceholder(String template) {
-		if (encodedName != null) {
-			String placeholder = "{" + encodedName + "}";
-			if (template.contains(placeholder)) {
-				return placeholder;
+	private IRI replacePlaceholders(String str, String[] placeholders, Map<String, String> values) {
+		for (String p : placeholders) {
+			String val = values.get(p);
+			if (val != null) {
+				str = str.replace("{" + p + "}", val)
+						.replace("{#" + p + "}", "#" + val);
 			}
 		}
-		return null;
+		if (!str.startsWith("http") && namespaces != null) {
+			if (!str.contains(":")) {
+				str = ":" + (str.startsWith("#") ? str.substring(1) : str);
+			}
+			return Values.iri(namespaces, str);
+		}
+		return Values.iri(str);
 	}
 
 	/**
@@ -193,30 +220,11 @@ public abstract class CellParser {
 	 */
 	private String[] getPlaceholders(String template) {
 		Matcher matcher = PLACEHOLDERS.matcher(template);
-		String ownPlaceholder = getOwnPlaceholder(template);
 
 		Set<String> placeholders = matcher.results()
-				.map(MatchResult::group)
-				.filter(m -> !m.equals(ownPlaceholder))
+				.map(m -> m.group(1))
 				.collect(Collectors.toSet());
 		return placeholders.toArray(String[]::new);
-	}
-
-	/**
-	 * Get aboutURL
-	 *
-	 * @param cell
-	 * @return
-	 */
-	public IRI getAboutUrl(String cell) {
-		if (aboutUrl == null) {
-			return null;
-		}
-		String s = aboutUrl;
-		if (aboutPlaceholder != null && cell != null) {
-			s = aboutUrl.replace(aboutPlaceholder, getValueOrDefault(cell));
-		}
-		return Values.iri(s);
 	}
 
 	/**
@@ -229,27 +237,21 @@ public abstract class CellParser {
 		if (aboutUrl == null) {
 			return null;
 		}
-		String s = aboutUrl;
-		for (String val : aboutPlaceholders) {
-			s = aboutUrl.replace(val, values.get(val));
-		}
-		return Values.iri(s);
+		return replacePlaceholders(aboutUrl, aboutPlaceholders, values);
 	}
 
 	/**
-	 * Set aboutUrl
+	 * Set aboutURL
 	 *
 	 * @param aboutUrl
 	 */
 	public void setAboutUrl(String aboutUrl) {
 		this.aboutUrl = aboutUrl;
-		// check if this URL contains column placeholders
-		this.aboutPlaceholder = getOwnPlaceholder(aboutUrl);
-		this.aboutPlaceholders = getPlaceholders(aboutUrl);
+		aboutPlaceholders = getPlaceholders(aboutUrl);
 	}
 
 	/**
-	 * Get about placeholders
+	 * Get aboutURL placeholders
 	 *
 	 * @return
 	 */
@@ -260,15 +262,20 @@ public abstract class CellParser {
 	/**
 	 * Get propertyUrl as IRI
 	 *
-	 * @param values
 	 * @return
 	 */
 	public IRI getPropertyUrl() {
-		return Values.iri(this.propertyUrl);
+		if (propertyUrl == null) {
+			return null;
+		}
+		if (!propertyUrl.startsWith("http") && namespaces != null) {
+			return Values.iri(namespaces, propertyUrl);
+		}
+		return Values.iri(propertyUrl);
 	}
 
 	/**
-	 * Get propertyUrl as IRI
+	 * Get propertyUrl as IRI, replacing placeholders with values
 	 *
 	 * @param values
 	 * @return
@@ -277,73 +284,37 @@ public abstract class CellParser {
 		if (propertyUrl == null) {
 			return null;
 		}
-		String s = propertyUrl;
-		for (String val : valuePlaceholders) {
-			s = valueUrl.replace(val, values.get(val));
-		}
-		return Values.iri(s);
+		return replacePlaceholders(propertyUrl, propertyPlaceholders, values);
 	}
 
 	public void setPropertyUrl(String propertyUrl) {
-		setPropertyUrl(Collections.emptySet(), propertyUrl);
-	}
-
-	/**
-	 * Set property URL (predicate IRI) relative to document
-	 *
-	 * @param namespaces
-	 * @param propertyUrl the propertyUrl to set
-	 */
-	public void setPropertyUrl(Set<Namespace> namespaces, String propertyUrl) {
+		if (propertyUrl == null) {
+			throw new IllegalArgumentException();
+		}
 		this.propertyUrl = propertyUrl;
-		if (propertyUrl != null && name != null) {
-			this.propertyUrl = propertyUrl.replace("{_name}", encodedName.substring(1, encodedName.length() - 2));
-		}
-		if (!propertyUrl.startsWith("http")) {
-			this.propertyUrl = Values.iri(namespaces, this.propertyUrl).toString();
-		}
-
-		// check if this URL contains column placeholders
-		// this.propertyPlaceholder = getOwnPlaceholder(propertyUrl);
-		// this.propertyPlaceholders = getPlaceholders(propertyUrl);
+		propertyPlaceholders = getPlaceholders(propertyUrl);
 	}
 
 	/**
-	 * Get valueURL
+	 * Get propertyURL placeholders
 	 *
-	 * @param cell
 	 * @return
 	 */
-	public IRI getValueUrl(String cell) {
-		if (valueUrl == null) {
-			return null;
-		}
-		String s = valueUrl;
-		if (valuePlaceholder != null && cell != null) {
-			s = valueUrl.replace(valuePlaceholder, getValueOrDefault(cell));
-		}
-		return Values.iri(s);
+	public String[] getPropertyPlaceholders() {
+		return propertyPlaceholders;
 	}
 
 	/**
 	 * Get valueURL with placeholders replaced with values
 	 *
 	 * @param values
-	 * @param cell
 	 * @return
 	 */
-	public IRI getValueUrl(Map<String, String> values, String cell) {
+	public IRI getValueUrl(Map<String, String> values) {
 		if (valueUrl == null) {
 			return null;
 		}
-		String s = valueUrl;
-		if (valuePlaceholder != null && cell != null) {
-			s = valueUrl.replace(encodedName, getValueOrDefault(cell));
-		}
-		for (String val : valuePlaceholders) {
-			s = valueUrl.replace(val, values.get(val));
-		}
-		return Values.iri(s);
+		return replacePlaceholders(valueUrl, valuePlaceholders, values);
 	}
 
 	/**
@@ -353,9 +324,7 @@ public abstract class CellParser {
 	 */
 	public void setValueUrl(String valueUrl) {
 		this.valueUrl = valueUrl;
-		// check if this URL contains column placeholders
-		this.valuePlaceholder = getOwnPlaceholder(valueUrl);
-		this.valuePlaceholders = getPlaceholders(valueUrl);
+		valuePlaceholders = getPlaceholders(valueUrl);
 	}
 
 	/**

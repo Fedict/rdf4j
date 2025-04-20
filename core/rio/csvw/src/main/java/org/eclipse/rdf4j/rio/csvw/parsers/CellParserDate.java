@@ -11,6 +11,7 @@
 package org.eclipse.rdf4j.rio.csvw.parsers;
 
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.TemporalAccessor;
 
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.util.Values;
@@ -28,6 +29,9 @@ public class CellParserDate extends CellParser {
 	@Override
 	public void setFormat(String format) {
 		super.setFormat(format);
+		if (format.contains("T") && !format.contains("'T'")) {
+			format = format.replace("T", "'T'");
+		}
 		formatter = DateTimeFormatter.ofPattern(format);
 	}
 
@@ -38,7 +42,8 @@ public class CellParserDate extends CellParser {
 			return null;
 		}
 		if (formatter != null) {
-			s = DateTimeFormatter.ISO_DATE.format(formatter.parse(s));
+			TemporalAccessor temp = formatter.parse(s);
+			return Values.literal(temp);
 		}
 		return Values.literal(s, getDataType());
 	}

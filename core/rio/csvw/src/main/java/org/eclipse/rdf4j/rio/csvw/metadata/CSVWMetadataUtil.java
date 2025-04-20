@@ -47,7 +47,8 @@ import org.eclipse.rdf4j.rio.helpers.JSONLDSettings;
 public class CSVWMetadataUtil {
 
 	private static final ParserConfig METADATA_CFG = new ParserConfig().set(JSONLDSettings.WHITELIST,
-			Set.of("http://www.w3.org/ns/csvw", "https://www.w3.org/ns/csvw", "https://www.w3.org/ns/csvw.jsonld"));
+			Set.of("http://www.w3.org/ns/csvw", "https://www.w3.org/ns/csvw",
+					"https://www.w3.org/ns/csvw.jsonld", "https://schema.org"));
 
 	/**
 	 * Get the JSON-LD m as an RDF model
@@ -68,6 +69,7 @@ public class CSVWMetadataUtil {
 				m = Rio.parse(s, null, RDFFormat.JSONLD, METADATA_CFG);
 			}
 		}
+		System.err.println(m);
 		return (m != null) ? m : new LinkedHashModel();
 	}
 

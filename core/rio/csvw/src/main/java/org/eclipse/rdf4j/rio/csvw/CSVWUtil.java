@@ -141,10 +141,11 @@ public class CSVWUtil {
 	 * @param column
 	 * @return
 	 */
-	protected static CellParser getCellParser(Model metadata, Resource column) {
+	protected static CellParser getCellParser(Model metadata, Resource tableSchema, Resource column) {
 		IRI datatype = getDatatypeIRI(metadata, column);
 
 		CellParser parser = CellParserFactory.create(datatype);
+		parser.setNamespaces(metadata.getNamespaces());
 
 		Models.getPropertyString(metadata, column, CSVW.NAME)
 				.ifPresentOrElse(v -> parser.setName(v),
@@ -172,10 +173,13 @@ public class CSVWUtil {
 		Models.getPropertyString(metadata, column, CSVW.ABOUT_URL).ifPresent(v -> parser.setAboutUrl(v));
 		Models.getPropertyString(metadata, column, CSVW.VALUE_URL).ifPresent(v -> parser.setValueUrl(v));
 
-		// use a property from a vocabulary as predicate, or create a property relative to the namespace of the CSV
+		// check for property URL on column level, or if not found, on table level
 		Optional<String> propertyURL = Models.getPropertyString(metadata, column, CSVW.PROPERTY_URL);
-		String s = propertyURL.isPresent() ? propertyURL.get() : ":" + parser.getName();
-		parser.setPropertyUrl(metadata.getNamespaces(), s);
+		if (!propertyURL.isPresent()) {
+			propertyURL = Models.getPropertyString(metadata, tableSchema, CSVW.PROPERTY_URL);
+		}
+		String s = propertyURL.isPresent() ? propertyURL.get() : ":" + parser.getNameEncoded();
+		parser.setPropertyUrl(s);
 
 		return parser;
 	}

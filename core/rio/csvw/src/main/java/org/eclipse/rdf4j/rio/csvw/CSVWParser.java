@@ -83,7 +83,9 @@ public class CSVWParser extends AbstractRDFParser {
 
 		clear();
 
-		rdfHandler = getRDFHandler();
+		if (rdfHandler != null) {
+			rdfHandler.startRDF();
+		}
 
 		boolean minimal = getParserConfig().get(CSVWParserSettings.MINIMAL_MODE);
 		if (minimal) {
@@ -114,9 +116,12 @@ public class CSVWParser extends AbstractRDFParser {
 				}
 				String csvFile = csvURI.toString();
 				// add dummy namespace for resolving unspecified column names / predicates relative to CSV file
-				rdfHandler.handleNamespace("", csvFile + "#");
+				// rdfHandler.handleNamespace("", csvFile + "#");
+				metadata.getNamespaces().removeIf(ns -> ns.getPrefix().equals(""));
 				metadata.getNamespaces().add(new SimpleNamespace("", csvFile + "#"));
-
+				metadata.getNamespaces().add(new SimpleNamespace("schema", "https://www.schema.org/"));
+				metadata.getNamespaces().add(RDF.NS);
+				// metadata.getNamespaces().add(XMLSchema.NS);
 				Resource tableNode = minimal ? null : generateTableNode(rdfHandler, rootNode, csvFile);
 
 				Model extra = CSVWMetadataUtil.getExtraMetadata(metadata, (Resource) tableNode, CSVW.TABLE_SCHEMA);
@@ -130,7 +135,7 @@ public class CSVWParser extends AbstractRDFParser {
 					}
 
 					CellParser[] cellParsers = columns.stream()
-							.map(c -> CSVWUtil.getCellParser(metadata, (Resource) c))
+							.map(c -> CSVWUtil.getCellParser(metadata, tableSchema, (Resource) c))
 							.collect(Collectors.toList())
 							.toArray(new CellParser[columns.size()]);
 					try (InputStream inCsv = csvURI.toURL().openStream()) {
@@ -151,6 +156,11 @@ public class CSVWParser extends AbstractRDFParser {
 			Resource tableNode = minimal ? null : generateTableNode(rdfHandler, rootNode, csvFile);
 			parseCSV(null, rdfHandler, csvFile, input, tableNode);
 		}
+
+		if (rdfHandler != null) {
+			rdfHandler.endRDF();
+		}
+
 		clear();
 	}
 
@@ -169,22 +179,16 @@ public class CSVWParser extends AbstractRDFParser {
 	 * @param baseURI
 	 */
 	private URI getURI(Model metadata, Resource table, String baseURI) {
-		if (metadata == null || table == null) {
-			if (baseURI != null && !baseURI.isEmpty()) {
-				try {
-					return new URI(baseURI);
-				} catch (URISyntaxException ex) {
-					LOGGER.error("BaseURI is invalid: ", ex.getMessage());
-				}
-			}
-			return null;
-		}
-
 		Optional<String> val = Models.getPropertyString(metadata, table, CSVW.URL);
 		if (val.isPresent()) {
 			String s = val.get();
 			if (s.startsWith("http")) {
 				return URI.create(s);
+			}
+			// relative path
+			String jsonURL = getParserConfig().get(CSVWParserSettings.METADATA_URL);
+			if (jsonURL != null) {
+				return URI.create(jsonURL).resolve(s);
 			}
 			if (baseURI != null) {
 				return URI.create(baseURI).resolve(s);
@@ -233,7 +237,7 @@ public class CSVWParser extends AbstractRDFParser {
 		String s;
 		for (int i = 0; i < cellParsers.length; i++) {
 			s = cellParsers[i].getName();
-			if (s != null && aboutURL.contains("{" + s + "}")) {
+			if (s != null && (aboutURL.contains("{#" + s + "}") || aboutURL.contains("{" + s + "}"))) {
 				return i;
 			}
 		}
@@ -295,22 +299,6 @@ public class CSVWParser extends AbstractRDFParser {
 	}
 
 	/**
-	 * Check which cellparsers have placeholders that need to be replaced
-	 *
-	 * @param cellParsers
-	 * @return
-	 */
-	private boolean[] needReplacement(CellParser[] cellParsers) {
-		boolean[] placeholders = new boolean[cellParsers.length];
-
-		for (int i = 0; i < cellParsers.length; i++) {
-			placeholders[i] = (cellParsers[i].getAboutPlaceholders().length > 0) ||
-					(cellParsers[i].getValuePlaceholders().length > 0);
-		}
-		return placeholders;
-	}
-
-	/**
 	 * Parse a CSV file without metadata column definitions or without any metadata at all.
 	 *
 	 * @param handler
@@ -334,7 +322,7 @@ public class CSVWParser extends AbstractRDFParser {
 			String[] header;
 
 			int headerRows = 1;
-			if ((boolean) dialect.get(CSVW.HEADER)) {
+			if ((int) dialect.get(CSVW.HEADER_ROW_COUNT) > 0) {
 				header = csv.readNext();
 			} else {
 				headerRows = 0;
@@ -354,7 +342,8 @@ public class CSVWParser extends AbstractRDFParser {
 			while ((cells = csv.readNext()) != null) {
 				// row number + 1 to compensate for header
 				Resource rowURL = Values.iri(csvFile + "#row=" + (line + headerRows));
-				Resource rowNode = minimal ? null : generateRowNode(rdfHandler, tableNode, null, rowURL, line);
+				Resource rowNode = minimal ? Values.bnode()
+						: generateRowNode(rdfHandler, tableNode, null, rowURL, line);
 
 				// csv cells
 				for (int i = 0; i < cells.length; i++) {
@@ -394,73 +383,60 @@ public class CSVWParser extends AbstractRDFParser {
 		int aboutIndex = getAboutIndex(aboutURL, cellParsers);
 		String placeholder = (aboutIndex > -1) ? cellParsers[aboutIndex].getNameEncoded() : null;
 
-		// check which columns need replacement in aboutURL/valueURL
-		boolean[] needReplacement = needReplacement(cellParsers);
-		boolean doReplace = false;
-		for (int i = 0; i < needReplacement.length; i++) {
-			if (needReplacement[i]) {
-				doReplace = true;
-				break;
-			}
-		}
-
 		long line = 1;
 		int col = 0;
+
 		try (BufferedReader reader = new BufferedReader(new InputStreamReader(input, encoding));
 				CSVReader csv = CSVWUtil.getCSVReader(dialect, reader)) {
 
-			Map<String, String> values = null;
+			Map<String, String> replaceValues = new HashMap<>();
 			String[] cells;
 
 			// assume first line is header
-			String[] header = csv.readNext();
+			if ((int) dialect.get(CSVW.HEADER_ROW_COUNT) > 0) {
+				csv.readNext();
+			}
 
 			while ((cells = csv.readNext()) != null) {
 				Resource rowURL = Values.iri(csvFile + "#row=" + (line + 1));
 				Resource rowSubject = getIRIorBnode(cellParsers, cells, aboutURL, aboutIndex, placeholder);
-				Resource rowNode = minimal ? null : generateRowNode(rdfHandler, tableNode, rowSubject, rowURL, line);
+				Resource rowNode = minimal ? rowSubject
+						: generateRowNode(rdfHandler, tableNode, rowSubject, rowURL, line);
 
-				if (doReplace) {
-					values = new HashMap<>(cells.length + 4, 1.0f);
-					values.put("{_row}", Long.toString(line));
-				}
+				replaceValues = new HashMap<>(cells.length + 5, 1.0f);
+				replaceValues.put("_row", Long.toString(line));
 
 				// csv cells
 				for (col = 0; col < cells.length; col++) {
-					if (doReplace) {
-						values.put("{_col}", Long.toString(col + 1));
-					}
-					if (col == aboutIndex) { // already processed to get subject
-						if (doReplace) {
-							values.put(cellParsers[col].getNameEncoded(),
-									cellParsers[col].parse(cells[col]).stringValue());
-						}
-						// continue;
-					}
+					replaceValues.put("_col", Long.toString(col + 1));
+					String encoded = cellParsers[col].getNameEncoded();
+					replaceValues.put("_name", encoded);
 					Value val = cellParsers[col].parse(cells[col]);
-
-					if (val != null && doReplace) {
-						values.put(cellParsers[col].getNameEncoded(), val.stringValue());
+					if (val != null) {
+						replaceValues.put(encoded, cellParsers[col].parse(cells[col]).stringValue());
 					}
-					if (!cellParsers[col].isSuppressed() && !needReplacement[col] && val != null) {
-						handler.handleStatement(buildStatement(cellParsers[col], cells[col], rowNode, val));
-					}
-				}
-				// second pass, this time to retrieve replace placeholders in URLs with column values
-				for (col = 0; col < cells.length; col++) {
-					if (col == aboutIndex || !needReplacement[col]) { // already processed to get subject
-						continue;
-					}
+					/*
+					 * Value cellValue = cellParsers[col].parse(cells[col]); if (cellValue != null) {
+					 * replaceValues.put(cellParsers[col].getNameEncoded(), cellValue.stringValue()); }
+					 */
 					if (!cellParsers[col].isSuppressed()) {
-						handler.handleStatement(buildStatement(cellParsers[col], cells[col], rowNode, values));
+						handler.handleStatement(
+								buildStatement(cellParsers[col], cells[col], rowNode, replaceValues));
 					}
 				}
+				// second pass, this time to replace placeholders in URLs with column replaceValues
+				// for (col = 0; col < cells.length; col++) {
+				// if (col == aboutIndex) { // already processed to get subject
+				// continue;
+				// }
+				// if (!cellParsers[col].isSuppressed()) {
+				// handler.handleStatement(buildStatement(cellParsers[col], cells[col], rowNode, replaceValues));
+				// }
+				// }
 				// virtual columns, if any
 				for (col = cells.length; col < cellParsers.length; col++) {
-					if (doReplace) {
-						values.put("{_col}", Long.toString(col));
-					}
-					handler.handleStatement(buildStatement(cellParsers[col], null, rowNode, values));
+					replaceValues.put("_col", Long.toString(col));
+					handler.handleStatement(buildStatement(cellParsers[col], (String) null, rowNode, replaceValues));
 				}
 				line++;
 			}
@@ -472,21 +448,22 @@ public class CSVWParser extends AbstractRDFParser {
 	}
 
 	/**
-	 * Generate triple statement, using the cell parser to obtain the predicate
+	 * Generate triple statement, using the cellValue parser to obtain the predicate
 	 *
 	 * @param handler
 	 * @param cellParser
-	 * @param cell
+	 * @param cellValue
 	 * @param aboutSubject
 	 * @param val
 	 */
-	private Statement buildStatement(CellParser cellParser, String cell, Resource aboutSubject, Value val) {
-		Resource subj = cellParser.getAboutUrl(cell);
+	private Statement buildStatement(CellParser cellParser, Resource aboutSubject, Value val,
+			Map<String, String> values) {
+		Resource subj = cellParser.getAboutUrl(values);
 		if (subj == null) {
 			subj = aboutSubject;
 		}
-		IRI pred = cellParser.getPropertyUrl();
-		Value obj = cellParser.getValueUrl(cell);
+		IRI pred = cellParser.getPropertyUrl(values);
+		Value obj = cellParser.getValueUrl(values);
 		if (obj == null) {
 			obj = val;
 		}
@@ -500,20 +477,22 @@ public class CSVWParser extends AbstractRDFParser {
 	 * @param cellParser
 	 * @param cell
 	 * @param aboutSubject
-	 * @param values
+	 * @param replaceValues
 	 */
 	private Statement buildStatement(CellParser cellParser, String cell, Resource aboutSubject,
-			Map<String, String> values) {
-		Resource subj = cellParser.getAboutUrl(values);
+			Map<String, String> replaceValues) {
+		Resource subj = cellParser.getAboutUrl(replaceValues);
 		if (subj == null) {
 			subj = aboutSubject;
 		}
-		IRI pred = cellParser.getPropertyUrl();
-		Value obj = cellParser.getValueUrl(values, cell);
+		IRI pred = cellParser.getPropertyUrl(replaceValues);
+		Value obj = cellParser.getValueUrl(replaceValues);
 		if (obj == null && cell != null) {
 			obj = cellParser.parse(cell);
 		}
-
+		if (obj == null) {
+			return null;
+		}
 		return Statements.statement(subj, pred, obj, null);
 	}
 
@@ -527,10 +506,14 @@ public class CSVWParser extends AbstractRDFParser {
 	 */
 	private Resource getIRIorBnode(CellParser[] cellParsers, String[] cells, String aboutURL, int aboutIndex,
 			String placeholder) {
+
 		if (aboutIndex > -1) {
 			Value val = cellParsers[aboutIndex].parse(cells[aboutIndex]);
 			if (val != null) {
-				return Values.iri(aboutURL.replace(placeholder, val.stringValue()));
+				String s = val.stringValue();
+				aboutURL = aboutURL.replace("{#" + placeholder + "}", "#" + s)
+						.replace("{" + placeholder + "}", s);
+				return Values.iri(aboutURL);
 			} else {
 				throw new RDFParseException("NULL value in aboutURL");
 			}
