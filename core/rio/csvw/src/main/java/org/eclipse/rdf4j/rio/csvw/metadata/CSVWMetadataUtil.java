@@ -13,14 +13,22 @@ package org.eclipse.rdf4j.rio.csvw.metadata;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.ProxySelector;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Model;
@@ -38,6 +46,8 @@ import org.eclipse.rdf4j.rio.RDFFormat;
 import org.eclipse.rdf4j.rio.RDFParseException;
 import org.eclipse.rdf4j.rio.Rio;
 import org.eclipse.rdf4j.rio.helpers.JSONLDSettings;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Utility class for CSVW m
@@ -45,6 +55,12 @@ import org.eclipse.rdf4j.rio.helpers.JSONLDSettings;
  * @author Bart.Hanssens
  */
 public class CSVWMetadataUtil {
+	private static final Logger LOGGER = LoggerFactory.getLogger(CSVWMetadataUtil.class);
+
+	protected static final HttpClient HTTP_CLIENT = HttpClient.newBuilder()
+			.followRedirects(HttpClient.Redirect.NORMAL)
+			.proxy(ProxySelector.getDefault())
+			.build();
 
 	private static final ParserConfig METADATA_CFG = new ParserConfig().set(JSONLDSettings.WHITELIST,
 			Set.of("http://www.w3.org/ns/csvw", "https://www.w3.org/ns/csvw",
@@ -65,6 +81,7 @@ public class CSVWMetadataUtil {
 		if (minput != null) {
 			byte[] bytes = minput.readAllBytes();
 			String str = new String(bytes, StandardCharsets.UTF_8);
+
 			try (InputStream s = new ByteArrayInputStream(str.getBytes(StandardCharsets.UTF_8))) {
 				m = Rio.parse(s, null, RDFFormat.JSONLD, METADATA_CFG);
 			}
@@ -131,12 +148,12 @@ public class CSVWMetadataUtil {
 	}
 
 	/**
-	 * Get metadata that does not help parsing the CSVW, but is included anyway.
-	 *
+	 * Get metadata that does not help parsing the CSVW, but is included for documentation purposes.
 	 * E.g last update, license, long descriptions...
 	 *
 	 * @param metadata
 	 * @param rootNode
+	 * @param predicate
 	 * @return
 	 */
 	public static Model getExtraMetadata(Model metadata, Resource rootNode, IRI predicate) {
@@ -146,33 +163,42 @@ public class CSVWMetadataUtil {
 		}
 
 		Resource oldRoot = null;
-
 		if (predicate != null) {
 			Iterable<Statement> roots = metadata.getStatements(null, predicate, null);
 			if (roots.iterator().hasNext()) {
 				oldRoot = roots.iterator().next().getSubject();
 			}
 		}
-		if (oldRoot != null) {
-			metadata.getStatements(oldRoot, null, null).forEach(s -> {
-				IRI p = s.getPredicate();
-				if (!p.getNamespace().equals(CSVW.NAMESPACE) || p.equals(CSVW.NOTE)) {
-					Value obj = s.getObject();
-					extra.add(Statements.statement(rootNode, p, obj, null));
-					if (obj instanceof Resource) {
-						Iterable<Statement> second = metadata.getStatements((Resource) obj, null, null);
-						second.forEach(s2 -> {
-							extra.add(s2);
-							Value obj2 = s2.getObject();
-							if (obj2 instanceof Resource) {
-								Iterable<Statement> third = metadata.getStatements((Resource) obj2, null, null);
-								third.forEach(s3 -> extra.add(s3));
-							}
-						});
-					}
-				}
-			});
+		if (oldRoot == null) {
+			return extra;
 		}
+
+		// extra metadata, can be anything
+		Iterable<Statement> statements = metadata.getStatements(oldRoot, null, null);
+		for (Statement s : statements) {
+			IRI p = s.getPredicate();
+			if (!p.getNamespace().equals(CSVW.NAMESPACE) || p.equals(CSVW.NOTE)) {
+				Value obj = s.getObject();
+				extra.add(Statements.statement(rootNode, p, obj, null));
+			}
+		}
+
+		// get metadata regardless how deep the statements are nasted,
+		// but avoid looping forever by keeping track of processed subjects
+		Set<Resource> subjects = new HashSet<>();
+		boolean newStatements;
+		do {
+			newStatements = false;
+			Set<Value> values = Set.copyOf(extra.objects());
+			for (Value val : values) {
+				if (val instanceof Resource && !subjects.contains((Resource) val)) {
+					newStatements = true;
+					subjects.add((Resource) val);
+					extra.addAll(metadata.filter((Resource) val, null, null));
+				}
+			}
+		} while (newStatements);
+
 		return extra;
 	}
 
@@ -227,6 +253,33 @@ public class CSVWMetadataUtil {
 			throw new RDFParseException("Metadata file does not contain columns for " + tableSchema);
 		}
 		return RDFCollections.asValues(metadata, head.get(), new ArrayList<>());
+	}
+
+	/**
+	 * Try to open URL, silently fail if there is an error
+	 *
+	 * @param uri
+	 * @return
+	 */
+	protected static byte[] tryURI(URI uri) {
+		HttpRequest httpGet = HttpRequest.newBuilder().uri(uri).GET().build();
+
+		CompletableFuture<HttpResponse<byte[]>> future = HTTP_CLIENT.sendAsync(httpGet,
+				HttpResponse.BodyHandlers.ofByteArray());
+		try {
+			HttpResponse<byte[]> response = future.get();
+			if (response.statusCode() == 200) {
+				LOGGER.info("Using metadata found on {}", uri);
+				return response.body();
+			} else {
+				LOGGER.debug("Could not open URL {}, received status {}", uri, response.statusCode());
+			}
+		} catch (ExecutionException ex) {
+			LOGGER.error("Could not open URL {}", uri, ex);
+		} catch (InterruptedException ie) {
+			Thread.currentThread().interrupt();
+		}
+		return null;
 	}
 
 }

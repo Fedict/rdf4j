@@ -74,7 +74,7 @@ public class CSVWMetadataFinder extends CSVWMetadataProvider {
 				.build();
 
 		try {
-			HttpResponse<byte[]> response = HTTP_CLIENT.send(head, BodyHandlers.ofByteArray());
+			HttpResponse<byte[]> response = CSVWMetadataUtil.HTTP_CLIENT.send(head, BodyHandlers.ofByteArray());
 
 			List<String> headers = response.headers().allValues("Link");
 			for (String header : headers) {
@@ -112,7 +112,7 @@ public class CSVWMetadataFinder extends CSVWMetadataProvider {
 			return urls;
 		}
 
-		byte[] buffer = tryURI(uri);
+		byte[] buffer = CSVWMetadataUtil.tryURI(uri);
 		if (buffer == null) {
 			return urls;
 		}
@@ -222,7 +222,7 @@ public class CSVWMetadataFinder extends CSVWMetadataProvider {
 
 		for (URL url : urls) {
 			try {
-				bytes = tryURI(url.toURI());
+				bytes = CSVWMetadataUtil.tryURI(url.toURI());
 				if (bytes != null) {
 					break;
 				}

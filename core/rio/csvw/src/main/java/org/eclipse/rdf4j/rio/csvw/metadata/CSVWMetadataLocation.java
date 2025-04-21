@@ -10,22 +10,10 @@
  *******************************************************************************/
 package org.eclipse.rdf4j.rio.csvw.metadata;
 
-import static org.eclipse.rdf4j.rio.csvw.metadata.CSVWMetadataProvider.HTTP_CLIENT;
-
-import java.io.BufferedInputStream;
 import java.io.ByteArrayInputStream;
-import java.io.IOException;
 import java.io.InputStream;
-import java.net.MalformedURLException;
 import java.net.URISyntaxException;
 import java.net.URL;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.concurrent.CompletableFuture;
-import java.util.logging.Level;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -44,9 +32,10 @@ public class CSVWMetadataLocation extends CSVWMetadataProvider {
 	public InputStream getMetadata() {
 		if (metadataURL == null) {
 			LOGGER.error("Meta data path is null");
+			return null;
 		}
 		try {
-			return new ByteArrayInputStream(tryURI(metadataURL.toURI()));
+			return new ByteArrayInputStream(CSVWMetadataUtil.tryURI(metadataURL.toURI()));
 		} catch (URISyntaxException ex) {
 			LOGGER.error("Invalid URL {}", metadataURL, ex);
 		}
