@@ -36,16 +36,11 @@ public class CellParserDate extends CellParser {
 	}
 
 	@Override
-	public Value parse(String cell) {
-		String s = getValueOrDefault(cell);
-		if (s == null) {
-			return null;
-		}
+	protected Value parseOne(String str) {
 		if (formatter != null) {
-			TemporalAccessor temp = formatter.parse(s);
+			TemporalAccessor temp = formatter.parse(str);
 			return Values.literal(temp);
 		}
-		return Values.literal(s, getDataType());
+		return Values.literal(str, getDataType());
 	}
-
 }

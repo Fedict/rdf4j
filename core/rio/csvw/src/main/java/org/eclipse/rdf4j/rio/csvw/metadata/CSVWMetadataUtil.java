@@ -148,8 +148,8 @@ public class CSVWMetadataUtil {
 	}
 
 	/**
-	 * Get metadata that does not help parsing the CSVW, but is included for documentation purposes.
-	 * E.g last update, license, long descriptions...
+	 * Get metadata that does not help parsing the CSVW, but is included for documentation purposes. E.g last update,
+	 * license, long descriptions...
 	 *
 	 * @param metadata
 	 * @param rootNode

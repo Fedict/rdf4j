@@ -103,6 +103,114 @@ public abstract class CellParser {
 	}
 
 	/**
+	 * Get format
+	 *
+	 * @return
+	 */
+	public String getFormat() {
+		return format;
+	}
+
+	/**
+	 * Set format
+	 *
+	 * @param format
+	 */
+	public void setFormat(String format) {
+		this.format = format;
+	}
+
+	/**
+	 * Get decimal character
+	 *
+	 * @return
+	 */
+	public String getDecimalChar() {
+		return decimalChar;
+	}
+
+	/**
+	 * Set decimal character
+	 *
+	 * @param decimalChar
+	 */
+	public void setDecimalChar(String decimalChar) {
+		this.decimalChar = decimalChar;
+	}
+
+	/**
+	 * Get group character
+	 *
+	 * @return
+	 */
+	public String getGroupChar() {
+		return groupChar;
+	}
+
+	/**
+	 * Set group character
+	 *
+	 * @param groupChar
+	 */
+	public void setGroupChar(String groupChar) {
+		this.groupChar = groupChar;
+	}
+
+	/**
+	 * Get separator character
+	 *
+	 * @return
+	 */
+	public String getSeparator() {
+		return separator;
+	}
+
+	/**
+	 * Set separator character
+	 *
+	 * @param separator
+	 */
+	public void setSeparator(String separator) {
+		this.separator = separator;
+	}
+
+	/**
+	 * Is trim enabled
+	 *
+	 * @return
+	 */
+	public boolean isTrim() {
+		return trim;
+	}
+
+	/**
+	 * Set if value needs to be trimmed
+	 *
+	 * @param trim
+	 */
+	public void setTrim(boolean trim) {
+		this.trim = trim;
+	}
+
+	/**
+	 * Set if output needs to be suppressed
+	 *
+	 * @return
+	 */
+	public boolean isSuppressed() {
+		return suppressed;
+	}
+
+	/**
+	 * Set if output needs to be suppressed
+	 *
+	 * @param suppressed
+	 */
+	public void setSuppressed(boolean suppressed) {
+		this.suppressed = suppressed;
+	}
+
+	/**
 	 * Get language
 	 *
 	 * @return
@@ -337,114 +445,6 @@ public abstract class CellParser {
 	}
 
 	/**
-	 * Get format
-	 *
-	 * @return
-	 */
-	public String getFormat() {
-		return format;
-	}
-
-	/**
-	 * Set format
-	 *
-	 * @param format
-	 */
-	public void setFormat(String format) {
-		this.format = format;
-	}
-
-	/**
-	 * Get decimal character
-	 *
-	 * @return
-	 */
-	public String getDecimalChar() {
-		return decimalChar;
-	}
-
-	/**
-	 * Set decimal character
-	 *
-	 * @param decimalChar
-	 */
-	public void setDecimalChar(String decimalChar) {
-		this.decimalChar = decimalChar;
-	}
-
-	/**
-	 * Get group character
-	 *
-	 * @return
-	 */
-	public String getGroupChar() {
-		return groupChar;
-	}
-
-	/**
-	 * Set group character
-	 *
-	 * @param groupChar
-	 */
-	public void setGroupChar(String groupChar) {
-		this.groupChar = groupChar;
-	}
-
-	/**
-	 * Get separator character
-	 *
-	 * @return
-	 */
-	public String getSeparator() {
-		return separator;
-	}
-
-	/**
-	 * Set separator character
-	 *
-	 * @param separator
-	 */
-	public void setSeparator(String separator) {
-		this.separator = separator;
-	}
-
-	/**
-	 * Is trim enabled
-	 *
-	 * @return
-	 */
-	public boolean isTrim() {
-		return trim;
-	}
-
-	/**
-	 * Set if value needs to be trimmed
-	 *
-	 * @param trim
-	 */
-	public void setTrim(boolean trim) {
-		this.trim = trim;
-	}
-
-	/**
-	 * Set if output needs to be suppressed
-	 *
-	 * @return
-	 */
-	public boolean isSuppressed() {
-		return suppressed;
-	}
-
-	/**
-	 * Set if output needs to be suppressed
-	 *
-	 * @param suppressed
-	 */
-	public void setSuppressed(boolean suppressed) {
-		this.suppressed = suppressed;
-	}
-
-	/**
 	 * Get the (possibly trimmed) value or default value
 	 *
 	 * @param s
@@ -463,12 +463,39 @@ public abstract class CellParser {
 		return s.isEmpty() ? null : s;
 	}
 
+	protected abstract Value parseOne(String str);
+
 	/**
 	 * Get the value from a cell
 	 *
 	 * @param cell
 	 * @return
 	 */
-	public abstract Value parse(String cell);
+	public Value parse(String cell) {
+		String str = getValueOrDefault(cell);
+		if (str == null) {
+			return null;
+		}
+		return parseOne(str);
+	}
+
+	/**
+	 * Get multiple values from a cell with a separator in it
+	 *
+	 * @param cell
+	 * @return
+	 */
+	public Value[] parseMultiple(String cell) {
+		String str = getValueOrDefault(cell);
+		if (str == null) {
+			return null;
+		}
+		String[] parts = str.split(getSeparator());
+		Value[] values = new Value[parts.length];
+		for (int i = 0; i < parts.length; i++) {
+			values[i] = parseOne(parts[i]);
+		}
+		return values;
+	}
 
 }

@@ -132,6 +132,9 @@ public class CSVW {
 	/** csvw:rownum */
 	public static final IRI ROWNUM;
 
+	/** csvw:separator */
+	public static final IRI SEPARATOR;
+
 	/** csvw:skipColumns */
 	public static final IRI SKIP_COLUMNS;
 
@@ -199,6 +202,7 @@ public class CSVW {
 		HAS_ROW = Vocabularies.createIRI(NAMESPACE, "row");
 		HAS_TABLE = Vocabularies.createIRI(NAMESPACE, "table");
 		ROWNUM = Vocabularies.createIRI(NAMESPACE, "rownum");
+		SEPARATOR = Vocabularies.createIRI(NAMESPACE, "separator");
 		SKIP_COLUMNS = Vocabularies.createIRI(NAMESPACE, "skipColumns");
 		SKIP_INITIAL_SPACE = Vocabularies.createIRI(NAMESPACE, "skipInitialSpace");
 		SKIP_ROWS = Vocabularies.createIRI(NAMESPACE, "skipRows");

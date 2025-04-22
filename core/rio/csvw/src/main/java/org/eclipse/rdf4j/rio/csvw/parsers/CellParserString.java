@@ -19,16 +19,12 @@ import org.eclipse.rdf4j.model.util.Values;
  */
 public class CellParserString extends CellParser {
 	@Override
-	public Value parse(String cell) {
-		String s = getValueOrDefault(cell);
-		if (s == null) {
-			return null;
-		}
+	protected Value parseOne(String str) {
 		String lang = getLang();
 		if (lang != null) {
-			return Values.literal(s, lang);
+			return Values.literal(str, lang);
 		}
-		return Values.literal(s, getDataType());
+		return Values.literal(str, getDataType());
 	}
 
 }

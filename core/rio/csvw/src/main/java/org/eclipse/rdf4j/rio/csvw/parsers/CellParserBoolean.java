@@ -29,12 +29,8 @@ public class CellParserBoolean extends CellParser {
 	}
 
 	@Override
-	public Value parse(String cell) {
-		String s = getValueOrDefault(cell);
-		if (s == null) {
-			return null;
-		}
-		return Values.literal(valueTrue.equals(cell) ? "true" : "false", getDataType());
+	protected Value parseOne(String str) {
+		return Values.literal(valueTrue.equals(str) ? "true" : "false", getDataType());
 	}
 
 }

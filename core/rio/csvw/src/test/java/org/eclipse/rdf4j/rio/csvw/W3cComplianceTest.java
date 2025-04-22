@@ -166,7 +166,7 @@ public class W3cComplianceTest {
 		server.start();
 	}
 
-	@ParameterizedTest
+	@ParameterizedTest(name = "{index} - {0}")
 	@MethodSource("getTestFiles")
 	public void test(W3CTest testCase) throws IOException, Exception {
 		if (testCase.link != null) {
@@ -305,6 +305,11 @@ public class W3cComplianceTest {
 		boolean positive;
 		boolean minimal;
 		String metadata;
+
+		@Override
+		public String toString() {
+			return name;
+		}
 
 		/**
 		 * Get URL of CSV data file

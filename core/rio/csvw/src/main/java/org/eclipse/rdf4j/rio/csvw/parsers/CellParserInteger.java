@@ -20,15 +20,11 @@ import org.eclipse.rdf4j.model.util.Values;
 public class CellParserInteger extends CellParser {
 
 	@Override
-	public Value parse(String cell) {
-		String s = getValueOrDefault(cell);
-		if (s == null) {
-			return null;
-		}
+	protected Value parseOne(String str) {
 		if (getGroupChar() != null) {
-			s = s.replace(getGroupChar(), "");
+			str = str.replace(getGroupChar(), "");
 		}
-		return Values.literal(s, getDataType());
+		return Values.literal(str, getDataType());
 	}
 
 }

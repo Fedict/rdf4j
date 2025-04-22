@@ -20,27 +20,22 @@ import org.eclipse.rdf4j.model.util.Values;
 public class CellParserDecimal extends CellParser {
 
 	@Override
-	public Value parse(String cell) {
-		String s = getValueOrDefault(cell);
-		if (s == null) {
-			return null;
-		}
-
+	protected Value parseOne(String str) {
 		if (getGroupChar() != null) {
-			s = s.replace(getGroupChar(), "");
+			str = str.replace(getGroupChar(), "");
 		}
 
 		// always use a '.' in RDF, not the European-style ','
 		if (!getDecimalChar().equals(".")) {
-			s = s.replace(getDecimalChar(), ".");
+			str = str.replace(getDecimalChar(), ".");
 		}
-		String end = s.substring(s.length() - 2);
+		String end = str.substring(str.length() - 2);
 		if (end.equals("%") || end.equals("‰")) {
-			String tmp = s.substring(0, s.length() - 2);
+			String tmp = str.substring(0, str.length() - 2);
 			int factor = end.equals("%") ? 100 : 1000;
-			s = String.valueOf(Double.parseDouble(tmp) / factor);
+			str = String.valueOf(Double.parseDouble(tmp) / factor);
 		}
-		return Values.literal(s, getDataType());
+		return Values.literal(str, getDataType());
 	}
 
 }

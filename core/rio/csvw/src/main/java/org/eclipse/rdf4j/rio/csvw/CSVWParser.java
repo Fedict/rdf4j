@@ -98,7 +98,7 @@ public class CSVWParser extends AbstractRDFParser {
 				? new CSVWMetadataInputStream(input)
 				: getParserConfig().get(CSVWParserSettings.METADATA_PROVIDER);
 		Model metadata = CSVWMetadataUtil.getMetadataAsModel(provider);
-
+		System.err.println(metadata);
 		if (metadataIn && metadata.isEmpty()) {
 			throw new RDFParseException("CSVW metadata input mode, but no metadata found");
 		}
@@ -415,28 +415,16 @@ public class CSVWParser extends AbstractRDFParser {
 					if (val != null) {
 						replaceValues.put(encoded, cellParsers[col].parse(cells[col]).stringValue());
 					}
-					/*
-					 * Value cellValue = cellParsers[col].parse(cells[col]); if (cellValue != null) {
-					 * replaceValues.put(cellParsers[col].getNameEncoded(), cellValue.stringValue()); }
-					 */
+
 					if (!cellParsers[col].isSuppressed()) {
-						handler.handleStatement(
-								buildStatement(cellParsers[col], cells[col], rowNode, replaceValues));
+						generateStatements(handler, cellParsers[col], cells[col], rowNode, replaceValues, line, col);
 					}
 				}
-				// second pass, this time to replace placeholders in URLs with column replaceValues
-				// for (col = 0; col < cells.length; col++) {
-				// if (col == aboutIndex) { // already processed to get subject
-				// continue;
-				// }
-				// if (!cellParsers[col].isSuppressed()) {
-				// handler.handleStatement(buildStatement(cellParsers[col], cells[col], rowNode, replaceValues));
-				// }
-				// }
+
 				// virtual columns, if any
 				for (col = cells.length; col < cellParsers.length; col++) {
 					replaceValues.put("_col", Long.toString(col));
-					handler.handleStatement(buildStatement(cellParsers[col], (String) null, rowNode, replaceValues));
+					generateStatements(handler, cellParsers[col], (String) null, rowNode, replaceValues, line, col);
 				}
 				line++;
 			}
@@ -448,29 +436,6 @@ public class CSVWParser extends AbstractRDFParser {
 	}
 
 	/**
-	 * Generate triple statement, using the cellValue parser to obtain the predicate
-	 *
-	 * @param handler
-	 * @param cellParser
-	 * @param cellValue
-	 * @param aboutSubject
-	 * @param val
-	 */
-	private Statement buildStatement(CellParser cellParser, Resource aboutSubject, Value val,
-			Map<String, String> values) {
-		Resource subj = cellParser.getAboutUrl(values);
-		if (subj == null) {
-			subj = aboutSubject;
-		}
-		IRI pred = cellParser.getPropertyUrl(values);
-		Value obj = cellParser.getValueUrl(values);
-		if (obj == null) {
-			obj = val;
-		}
-		return Statements.statement(subj, pred, obj, null);
-	}
-
-	/**
 	 * Generate triple statement
 	 *
 	 * @param handler
@@ -479,21 +444,33 @@ public class CSVWParser extends AbstractRDFParser {
 	 * @param aboutSubject
 	 * @param replaceValues
 	 */
-	private Statement buildStatement(CellParser cellParser, String cell, Resource aboutSubject,
-			Map<String, String> replaceValues) {
+	private void generateStatements(RDFHandler handler, CellParser cellParser, String cell, Resource aboutSubject,
+			Map<String, String> replaceValues, long line, int col) {
 		Resource subj = cellParser.getAboutUrl(replaceValues);
 		if (subj == null) {
 			subj = aboutSubject;
 		}
 		IRI pred = cellParser.getPropertyUrl(replaceValues);
-		Value obj = cellParser.getValueUrl(replaceValues);
-		if (obj == null && cell != null) {
-			obj = cellParser.parse(cell);
+		if (subj == null || pred == null) {
+			throw new RDFParseException("Subject of predicate in statement is null", line, col);
 		}
-		if (obj == null) {
-			return null;
+
+		if (cellParser.getSeparator() == null) {
+			Value obj = cellParser.getValueUrl(replaceValues);
+			if (obj == null && cell != null) {
+				obj = cellParser.parse(cell);
+			}
+			if (obj != null) {
+				handler.handleStatement(Statements.statement(subj, pred, obj, null));
+			}
+		} else {
+			Value[] objs = cellParser.parseMultiple(cell);
+			if (objs != null) {
+				for (int i = 0; i < objs.length; i++) {
+					handler.handleStatement(Statements.statement(subj, pred, objs[i], null));
+				}
+			}
 		}
-		return Statements.statement(subj, pred, obj, null);
 	}
 
 	/**

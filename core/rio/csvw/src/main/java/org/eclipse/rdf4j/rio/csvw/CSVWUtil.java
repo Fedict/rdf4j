@@ -170,6 +170,7 @@ public class CSVWUtil {
 		// mostly for date formats
 		getFormat(metadata, column).ifPresent(v -> parser.setFormat(v));
 
+		Models.getPropertyString(metadata, column, CSVW.SEPARATOR).ifPresent(v -> parser.setSeparator(v));
 		Models.getPropertyString(metadata, column, CSVW.ABOUT_URL).ifPresent(v -> parser.setAboutUrl(v));
 		Models.getPropertyString(metadata, column, CSVW.VALUE_URL).ifPresent(v -> parser.setValueUrl(v));
 
