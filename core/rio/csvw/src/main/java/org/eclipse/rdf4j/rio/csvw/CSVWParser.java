@@ -341,7 +341,7 @@ public class CSVWParser extends AbstractRDFParser {
 			for (int i = 0; i < header.length; i++) {
 				cellParsers[i] = CellParserFactory.create(XSD.STRING.getIri());
 				cellParsers[i].setName(header[i]);
-				cellParsers[i].setPropertyUrl(csvFile + "#" + CSVWUtil.encode(header[i]));
+				cellParsers[i].setPropertyUrl(csvFile + "#" + cellParsers[i].getNameEncoded());
 			}
 
 			while ((cells = csv.readNext()) != null) {
@@ -413,9 +413,7 @@ public class CSVWParser extends AbstractRDFParser {
 
 				// csv cells
 				for (col = 0; col < cells.length; col++) {
-					replaceValues.put("_col", Long.toString(col + 1));
 					String encoded = cellParsers[col].getNameEncoded();
-					replaceValues.put("_name", encoded);
 					Value val = cellParsers[col].parse(cells[col]);
 					if (val != null) {
 						replaceValues.put(encoded, cellParsers[col].parse(cells[col]).stringValue());
@@ -427,7 +425,6 @@ public class CSVWParser extends AbstractRDFParser {
 
 				// virtual columns, if any
 				for (col = cells.length; col < cellParsers.length; col++) {
-					replaceValues.put("_col", Long.toString(col));
 					generateStatements(handler, cellParsers[col], (String) null, rowNode, replaceValues, line, col);
 				}
 				line++;

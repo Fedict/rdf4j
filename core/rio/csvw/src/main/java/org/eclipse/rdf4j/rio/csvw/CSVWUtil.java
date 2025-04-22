@@ -192,7 +192,7 @@ public class CSVWUtil {
 			Models.getPropertyString(metadata, level, CSVW.SEPARATOR).ifPresent(v -> parser.setSeparator(v));
 		}
 		if (parser.getPropertyUrl() == null) {
-			parser.setPropertyUrl(parser.getNameEncoded());
+			parser.setPropertyUrl(":" + parser.getNameEncoded());
 		}
 		return parser;
 	}

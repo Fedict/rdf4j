@@ -30,6 +30,7 @@ public abstract class CellParser {
 	private static final Pattern PLACEHOLDERS = Pattern.compile("\\{#?(_?[^\\}]+)\\}");
 
 	private Set<Namespace> namespaces;
+	private int column;
 	private String name;
 	private String encodedName;
 	private IRI dataType;
@@ -54,6 +55,14 @@ public abstract class CellParser {
 
 	public void setNamespaces(Set<Namespace> namespaces) {
 		this.namespaces = namespaces;
+	}
+
+	public int getColumn() {
+		return column;
+	}
+
+	public int setColumn() {
+		return this.column;
 	}
 
 	/**
@@ -296,7 +305,29 @@ public abstract class CellParser {
 	}
 
 	/**
-	 * Replace placeholders in URL with values
+	 * Replace placeholders in URL with (fixed) values
+	 *
+	 * @param str
+	 * @param placeholders
+	 * @param values
+	 * @return
+	 */
+	private String replacePlaceholders(String str) {
+		if (str == null) {
+			return null;
+		}
+		if (encodedName != null) {
+			str = str.replace("{#_name}", '#' + encodedName).replace("{_name}", encodedName);
+		}
+		if (column > 1) {
+			String colno = String.valueOf(column);
+			str = str.replace("{#_col}", '#' + colno).replace("{_col}", colno);
+		}
+		return str;
+	}
+
+	/**
+	 * Replace placeholders in URL with (dynamic) values
 	 *
 	 * @param str
 	 * @param placeholders
@@ -354,7 +385,7 @@ public abstract class CellParser {
 	 * @param aboutUrl
 	 */
 	public void setAboutUrl(String aboutUrl) {
-		this.aboutUrl = aboutUrl;
+		this.aboutUrl = replacePlaceholders(aboutUrl);
 		aboutPlaceholders = getPlaceholders(aboutUrl);
 	}
 
@@ -403,7 +434,7 @@ public abstract class CellParser {
 		if (propertyUrl == null) {
 			throw new IllegalArgumentException();
 		}
-		this.propertyUrl = propertyUrl;
+		this.propertyUrl = replacePlaceholders(propertyUrl);
 		propertyPlaceholders = getPlaceholders(propertyUrl);
 	}
 
@@ -435,7 +466,7 @@ public abstract class CellParser {
 	 * @param valueUrl
 	 */
 	public void setValueUrl(String valueUrl) {
-		this.valueUrl = valueUrl;
+		this.valueUrl = replacePlaceholders(valueUrl);
 		valuePlaceholders = getPlaceholders(valueUrl);
 	}
 
@@ -501,5 +532,4 @@ public abstract class CellParser {
 		}
 		return values;
 	}
-
 }
