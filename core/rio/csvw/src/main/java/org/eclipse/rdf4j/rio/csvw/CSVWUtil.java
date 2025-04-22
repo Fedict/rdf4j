@@ -138,10 +138,14 @@ public class CSVWUtil {
 	 * Get parser for specific column
 	 *
 	 * @param metadata
+	 * @param root
+	 * @param table
+	 * @param tableSchema
 	 * @param column
 	 * @return
 	 */
-	protected static CellParser getCellParser(Model metadata, Resource tableSchema, Resource column) {
+	protected static CellParser getCellParser(Model metadata, Resource root, Resource table, Resource tableSchema,
+			Resource column) {
 		IRI datatype = getDatatypeIRI(metadata, column);
 
 		CellParser parser = CellParserFactory.create(datatype);
@@ -149,19 +153,14 @@ public class CSVWUtil {
 
 		Models.getPropertyString(metadata, column, CSVW.NAME)
 				.ifPresentOrElse(v -> parser.setName(v),
-						() -> new RDFParseException("Metadata file does not contain name for column " + column));
+						() -> Models.getPropertyString(metadata, column, CSVW.TITLE)
+								.ifPresentOrElse(t -> parser.setName(t),
+										() -> new RDFParseException(
+												"Metadata file does not contain name for column " + column)));
 		Models.getPropertyString(metadata, column, CSVW.VIRTUAL)
 				.ifPresent(v -> parser.setVirtual(Boolean.parseBoolean(v)));
-
-		Models.getPropertyString(metadata, column, CSVW.REQUIRED)
-				.ifPresent(v -> parser.setRequired(Boolean.parseBoolean(v)));
-		Models.getPropertyString(metadata, column, CSVW.DEFAULT).ifPresent(v -> parser.setDefaultValue(v));
-		Models.getPropertyString(metadata, column, CSVW.NULL).ifPresent(v -> parser.setNullValue(v));
 		Models.getPropertyString(metadata, column, CSVW.SUPPRESS_OUTPUT)
 				.ifPresent(v -> parser.setSuppressed(Boolean.parseBoolean(v)));
-
-		// only useful for strings
-		Models.getPropertyString(metadata, column, CSVW.LANG).ifPresent(v -> parser.setLang(v));
 
 		// only useful for numeric
 		Models.getPropertyString(metadata, column, CSVW.DECIMAL_CHAR).ifPresent(v -> parser.setDecimalChar(v));
@@ -170,18 +169,31 @@ public class CSVWUtil {
 		// mostly for date formats
 		getFormat(metadata, column).ifPresent(v -> parser.setFormat(v));
 
-		Models.getPropertyString(metadata, column, CSVW.SEPARATOR).ifPresent(v -> parser.setSeparator(v));
-		Models.getPropertyString(metadata, column, CSVW.ABOUT_URL).ifPresent(v -> parser.setAboutUrl(v));
-		Models.getPropertyString(metadata, column, CSVW.VALUE_URL).ifPresent(v -> parser.setValueUrl(v));
+		// check properties that can be inherited
+		Resource[] levels = new Resource[] { root, table, tableSchema, column };
+		for (Resource level : levels) {
+			if (level == null) {
+				continue;
+			}
 
-		// check for property URL on column level, or if not found, on table level
-		Optional<String> propertyURL = Models.getPropertyString(metadata, column, CSVW.PROPERTY_URL);
-		if (!propertyURL.isPresent()) {
-			propertyURL = Models.getPropertyString(metadata, tableSchema, CSVW.PROPERTY_URL);
+			Models.getPropertyString(metadata, level, CSVW.ABOUT_URL).ifPresent(v -> parser.setAboutUrl(v));
+			Models.getPropertyString(metadata, level, CSVW.PROPERTY_URL).ifPresent(v -> parser.setPropertyUrl(v));
+			Models.getPropertyString(metadata, level, CSVW.VALUE_URL).ifPresent(v -> parser.setValueUrl(v));
+
+			Models.getPropertyString(metadata, level, CSVW.DEFAULT).ifPresent(v -> parser.setDefaultValue(v));
+			Models.getPropertyString(metadata, level, CSVW.NULL).ifPresent(v -> parser.setNullValue(v));
+
+			// only useful for strings
+			Models.getPropertyString(metadata, level, CSVW.LANG).ifPresent(v -> parser.setLang(v));
+
+			Models.getPropertyString(metadata, level, CSVW.REQUIRED)
+					.ifPresent(v -> parser.setRequired(Boolean.parseBoolean(v)));
+
+			Models.getPropertyString(metadata, level, CSVW.SEPARATOR).ifPresent(v -> parser.setSeparator(v));
 		}
-		String s = propertyURL.isPresent() ? propertyURL.get() : ":" + parser.getNameEncoded();
-		parser.setPropertyUrl(s);
-
+		if (parser.getPropertyUrl() == null) {
+			parser.setPropertyUrl(parser.getNameEncoded());
+		}
 		return parser;
 	}
 }

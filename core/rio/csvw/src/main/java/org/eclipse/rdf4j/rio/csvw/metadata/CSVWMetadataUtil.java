@@ -29,6 +29,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.stream.Collectors;
 
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Model;
@@ -79,14 +80,14 @@ public class CSVWMetadataUtil {
 		InputStream minput = (provider != null) ? provider.getMetadata() : null;
 
 		if (minput != null) {
-			byte[] bytes = minput.readAllBytes();
-			String str = new String(bytes, StandardCharsets.UTF_8);
-
-			try (InputStream s = new ByteArrayInputStream(str.getBytes(StandardCharsets.UTF_8))) {
-				m = Rio.parse(s, null, RDFFormat.JSONLD, METADATA_CFG);
-			}
+			/*
+			 * byte[] bytes = minput.readAllBytes(); String str = new String(bytes, StandardCharsets.UTF_8);
+			 *
+			 * try (InputStream s = new ByteArrayInputStream(str.getBytes(StandardCharsets.UTF_8))) {
+			 */ m = Rio.parse(minput, null, RDFFormat.JSONLD, METADATA_CFG);
+			/* } */
 		}
-		System.err.println(m);
+
 		return (m != null) ? m : new LinkedHashModel();
 	}
 
@@ -220,7 +221,7 @@ public class CSVWMetadataUtil {
 	 * @param metadata
 	 * @return
 	 */
-	public static List<Value> getTables(Model metadata) throws RDFParseException {
+	public static List<Resource> getTables(Model metadata) throws RDFParseException {
 		Iterator<Statement> it = metadata.getStatements(null, CSVW.HAS_TABLE, null).iterator();
 		if (!it.hasNext()) {
 			// only one table, simplified structure
@@ -230,13 +231,11 @@ public class CSVWMetadataUtil {
 			}
 			return List.of(it.next().getSubject());
 		}
-		List<Value> tables = new ArrayList<>();
+		List<Resource> tables = new ArrayList<>();
 		while (it.hasNext()) {
-			tables.add(it.next().getObject());
+			tables.add((Resource) it.next().getObject());
 		}
 		return tables;
-
-		// return RDFCollections.asValues(m, (Resource) it.next().getObject(), new ArrayList<>());
 	}
 
 	/**
@@ -247,12 +246,15 @@ public class CSVWMetadataUtil {
 	 * @return list of blank nodes
 	 * @throws RDFParseException
 	 */
-	public static List<Value> getColumns(Model metadata, Resource tableSchema) throws RDFParseException {
+	public static List<Resource> getColumns(Model metadata, Resource tableSchema) throws RDFParseException {
 		Optional<Resource> head = Models.getPropertyResource(metadata, tableSchema, CSVW.COLUMN);
 		if (!head.isPresent()) {
 			throw new RDFParseException("Metadata file does not contain columns for " + tableSchema);
 		}
-		return RDFCollections.asValues(metadata, head.get(), new ArrayList<>());
+		return RDFCollections.asValues(metadata, head.get(), new ArrayList<>())
+				.stream()
+				.map(c -> (Resource) c)
+				.collect(Collectors.toList());
 	}
 
 	/**

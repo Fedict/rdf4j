@@ -91,26 +91,31 @@ public class CSVWParser extends AbstractRDFParser {
 		if (minimal) {
 			LOGGER.info("Minimal mode is set");
 		}
-		Resource rootNode = minimal ? null : generateTablegroupNode(rdfHandler);
+		Resource dataRoot = minimal ? null : generateTablegroupNode(rdfHandler);
 
 		boolean metadataIn = getParserConfig().get(CSVWParserSettings.METADATA_INPUT_MODE);
 		CSVWMetadataProvider provider = (metadataIn)
 				? new CSVWMetadataInputStream(input)
 				: getParserConfig().get(CSVWParserSettings.METADATA_PROVIDER);
 		Model metadata = CSVWMetadataUtil.getMetadataAsModel(provider);
-		System.err.println(metadata);
+		Resource root = (Resource) metadata.filter(null, CSVW.HAS_TABLE, null)
+				.subjects()
+				.stream()
+				.findFirst()
+				.orElse(null);
+
 		if (metadataIn && metadata.isEmpty()) {
 			throw new RDFParseException("CSVW metadata input mode, but no metadata found");
 		}
 
 		if (!metadata.isEmpty()) {
-			List<Value> tables = CSVWMetadataUtil.getTables(metadata);
+			List<Resource> tables = CSVWMetadataUtil.getTables(metadata);
 			if (tables.isEmpty()) {
 				throw new RDFParseException("CSVW metadata does not contain table info");
 			}
 
-			for (Value table : tables) {
-				URI csvURI = getURI(metadata, (Resource) table, baseURI);
+			for (Resource table : tables) {
+				URI csvURI = getURI(metadata, table, baseURI);
 				if (csvURI == null) {
 					throw new RDFParseException("Could not find URL for CSV file");
 				}
@@ -122,24 +127,24 @@ public class CSVWParser extends AbstractRDFParser {
 				metadata.getNamespaces().add(new SimpleNamespace("schema", "https://www.schema.org/"));
 				metadata.getNamespaces().add(RDF.NS);
 				// metadata.getNamespaces().add(XMLSchema.NS);
-				Resource tableNode = minimal ? null : generateTableNode(rdfHandler, rootNode, csvFile);
+				Resource tableNode = minimal ? null : generateTableNode(rdfHandler, dataRoot, csvFile);
 
-				Model extra = CSVWMetadataUtil.getExtraMetadata(metadata, (Resource) tableNode, CSVW.TABLE_SCHEMA);
+				Model extra = CSVWMetadataUtil.getExtraMetadata(metadata, tableNode, CSVW.TABLE_SCHEMA);
 				extra.forEach(s -> rdfHandler.handleStatement(s));
 
-				Resource tableSchema = CSVWMetadataUtil.getTableSchema(metadata, (Resource) table);
+				Resource tableSchema = CSVWMetadataUtil.getTableSchema(metadata, table);
 				if (tableSchema != null) {
-					List<Value> columns = CSVWMetadataUtil.getColumns(metadata, tableSchema);
+					List<Resource> columns = CSVWMetadataUtil.getColumns(metadata, tableSchema);
 					if (columns.isEmpty()) {
 						throw new RDFParseException("Could not find column definitions in metadata");
 					}
 
 					CellParser[] cellParsers = columns.stream()
-							.map(c -> CSVWUtil.getCellParser(metadata, tableSchema, (Resource) c))
+							.map(c -> CSVWUtil.getCellParser(metadata, root, table, tableSchema, c))
 							.collect(Collectors.toList())
 							.toArray(new CellParser[columns.size()]);
 					try (InputStream inCsv = csvURI.toURL().openStream()) {
-						parseCSV(metadata, rdfHandler, csvFile, inCsv, cellParsers, (Resource) table, tableNode);
+						parseCSV(metadata, rdfHandler, csvFile, inCsv, cellParsers, table, tableNode);
 					}
 				} else {
 					LOGGER.warn("Metadata file does not contain tableSchema for {}", csvFile);
@@ -153,7 +158,7 @@ public class CSVWParser extends AbstractRDFParser {
 				csvFile = baseURI;
 			}
 			rdfHandler.handleNamespace("", csvFile + "#");
-			Resource tableNode = minimal ? null : generateTableNode(rdfHandler, rootNode, csvFile);
+			Resource tableNode = minimal ? null : generateTableNode(rdfHandler, dataRoot, csvFile);
 			parseCSV(null, rdfHandler, csvFile, input, tableNode);
 		}
 
@@ -415,7 +420,6 @@ public class CSVWParser extends AbstractRDFParser {
 					if (val != null) {
 						replaceValues.put(encoded, cellParsers[col].parse(cells[col]).stringValue());
 					}
-
 					if (!cellParsers[col].isSuppressed()) {
 						generateStatements(handler, cellParsers[col], cells[col], rowNode, replaceValues, line, col);
 					}
@@ -450,9 +454,13 @@ public class CSVWParser extends AbstractRDFParser {
 		if (subj == null) {
 			subj = aboutSubject;
 		}
+		if (subj == null) {
+			throw new RDFParseException("Subject in statement is null", line, col);
+		}
+
 		IRI pred = cellParser.getPropertyUrl(replaceValues);
-		if (subj == null || pred == null) {
-			throw new RDFParseException("Subject of predicate in statement is null", line, col);
+		if (pred == null) {
+			throw new RDFParseException("Predicate in statement is null", line, col);
 		}
 
 		if (cellParser.getSeparator() == null) {

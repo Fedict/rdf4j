@@ -395,6 +395,10 @@ public abstract class CellParser {
 		return replacePlaceholders(propertyUrl, propertyPlaceholders, values);
 	}
 
+	/**
+	 *
+	 * @param propertyUrl
+	 */
 	public void setPropertyUrl(String propertyUrl) {
 		if (propertyUrl == null) {
 			throw new IllegalArgumentException();
