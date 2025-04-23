@@ -24,7 +24,11 @@ public class CellParserString extends CellParser {
 		if (lang != null) {
 			return Values.literal(str, lang);
 		}
-		return Values.literal(str, getDataType());
+		try {
+			return Values.literal(str, getDataType());
+		} catch (IllegalArgumentException ioe) {
+			throw new IllegalArgumentException(str + " " + getDataType());
+		}
 	}
 
 }

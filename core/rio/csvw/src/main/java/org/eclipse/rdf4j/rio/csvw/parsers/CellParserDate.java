@@ -41,6 +41,10 @@ public class CellParserDate extends CellParser {
 			TemporalAccessor temp = formatter.parse(str);
 			return Values.literal(temp);
 		}
-		return Values.literal(str, getDataType());
+		try {
+			return Values.literal(str, getDataType());
+		} catch (IllegalArgumentException ioe) {
+			throw new IllegalArgumentException(str + " " + getDataType());
+		}
 	}
 }

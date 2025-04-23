@@ -65,7 +65,7 @@ public class CSVWMetadataUtil {
 
 	private static final ParserConfig METADATA_CFG = new ParserConfig().set(JSONLDSettings.WHITELIST,
 			Set.of("http://www.w3.org/ns/csvw", "https://www.w3.org/ns/csvw",
-					"https://www.w3.org/ns/csvw.jsonld", "https://schema.org"));
+					"https://www.w3.org/ns/csvw.jsonld", "https://schema.org", "http://schema.org/"));
 
 	/**
 	 * Get the JSON-LD m as an RDF model

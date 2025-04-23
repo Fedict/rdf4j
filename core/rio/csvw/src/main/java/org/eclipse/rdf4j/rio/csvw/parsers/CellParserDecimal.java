@@ -35,7 +35,11 @@ public class CellParserDecimal extends CellParser {
 			int factor = end.equals("%") ? 100 : 1000;
 			str = String.valueOf(Double.parseDouble(tmp) / factor);
 		}
-		return Values.literal(str, getDataType());
+		try {
+			return Values.literal(str, getDataType());
+		} catch (IllegalArgumentException ioe) {
+			throw new IllegalArgumentException(str + " " + getDataType());
+		}
 	}
 
 }

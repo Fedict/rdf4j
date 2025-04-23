@@ -24,7 +24,11 @@ public class CellParserInteger extends CellParser {
 		if (getGroupChar() != null) {
 			str = str.replace(getGroupChar(), "");
 		}
-		return Values.literal(str, getDataType());
+		try {
+			return Values.literal(str, getDataType());
+		} catch (IllegalArgumentException ioe) {
+			throw new IllegalArgumentException(str + " " + getDataType());
+		}
 	}
 
 }

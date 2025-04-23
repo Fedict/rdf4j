@@ -16,21 +16,17 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.nio.charset.Charset;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 import org.eclipse.rdf4j.model.BNode;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Model;
 import org.eclipse.rdf4j.model.Namespace;
 import org.eclipse.rdf4j.model.Resource;
-import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.base.CoreDatatype.XSD;
 import org.eclipse.rdf4j.model.impl.SimpleNamespace;
@@ -139,11 +135,13 @@ public class CSVWParser extends AbstractRDFParser {
 						throw new RDFParseException("Could not find column definitions in metadata");
 					}
 
-					CellParser[] cellParsers = columns.stream()
-							.map(c -> CSVWUtil.getCellParser(metadata, root, table, tableSchema, c))
-							.collect(Collectors.toList())
-							.toArray(new CellParser[columns.size()]);
+					CellParser[] cellParsers = new CellParser[columns.size()];
+					for (int i = 0; i < columns.size(); i++) {
+						cellParsers[i] = CSVWUtil.getCellParser(metadata, root, table, tableSchema, columns.get(i));
+						cellParsers[i].setColumn(i + 1);
+					}
 					try (InputStream inCsv = csvURI.toURL().openStream()) {
+						LOGGER.info("Reading CSV file {}", csvURI);
 						parseCSV(metadata, rdfHandler, csvFile, inCsv, cellParsers, table, tableNode);
 					}
 				} else {
@@ -292,7 +290,6 @@ public class CSVWParser extends AbstractRDFParser {
 			long rownum) {
 		BNode rownode = Values.bnode();
 		Resource node = (rowSubject != null) ? rowSubject : Values.bnode();
-
 		handler.handleStatement(Statements.statement(tableNode, CSVW.HAS_ROW, rownode, null));
 		handler.handleStatement(Statements.statement(rownode, RDF.TYPE, CSVW.ROW, null));
 		handler.handleStatement(

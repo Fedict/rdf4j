@@ -10,6 +10,10 @@
  *******************************************************************************/
 package org.eclipse.rdf4j.rio.csvw.parsers;
 
+import static org.eclipse.rdf4j.model.base.CoreDatatype.XSD.NON_NEGATIVE_INTEGER;
+import static org.eclipse.rdf4j.model.base.CoreDatatype.XSD.UNSIGNED_BYTE;
+import static org.eclipse.rdf4j.model.base.CoreDatatype.XSD.UNSIGNED_SHORT;
+
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.base.CoreDatatype.XSD;
 
@@ -46,6 +50,13 @@ public class CellParserFactory {
 		case INT:
 		case SHORT:
 		case LONG:
+		case UNSIGNED_BYTE:
+		case UNSIGNED_SHORT:
+		case UNSIGNED_INT:
+		case NEGATIVE_INTEGER:
+		case NON_NEGATIVE_INTEGER:
+		case NON_POSITIVE_INTEGER:
+		case POSITIVE_INTEGER:
 			p = new CellParserInteger();
 			break;
 		case FLOAT:
@@ -56,6 +67,7 @@ public class CellParserFactory {
 		case DATE:
 		case DATETIME:
 		case TIME:
+		case DATETIMESTAMP:
 			p = new CellParserDate();
 			break;
 		default:

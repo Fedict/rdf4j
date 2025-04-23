@@ -57,12 +57,21 @@ public abstract class CellParser {
 		this.namespaces = namespaces;
 	}
 
+	/**
+	 *
+	 * @return
+	 */
 	public int getColumn() {
 		return column;
 	}
 
-	public int setColumn() {
-		return this.column;
+	/**
+	 * Set column number
+	 *
+	 * @param column
+	 */
+	public void setColumn(int column) {
+		this.column = column;
 	}
 
 	/**
@@ -321,7 +330,7 @@ public abstract class CellParser {
 		}
 		if (column > 1) {
 			String colno = String.valueOf(column);
-			str = str.replace("{#_col}", '#' + colno).replace("{_col}", colno);
+			str = str.replace("{#_column}", '#' + colno).replace("{_column}", colno);
 		}
 		return str;
 	}
@@ -408,7 +417,7 @@ public abstract class CellParser {
 			return null;
 		}
 		if (!propertyUrl.startsWith("http") && namespaces != null) {
-			return Values.iri(namespaces, propertyUrl);
+			return Values.iri(namespaces, propertyUrl.startsWith("#") ? ":" + propertyUrl.substring(1) : propertyUrl);
 		}
 		return Values.iri(propertyUrl);
 	}
@@ -479,6 +488,10 @@ public abstract class CellParser {
 		return valuePlaceholders;
 	}
 
+	protected String trim(String str) {
+		return str.trim();
+	}
+
 	/**
 	 * Get the (possibly trimmed) value or default value
 	 *
@@ -491,9 +504,6 @@ public abstract class CellParser {
 		}
 		if (s == null || (nullValue != null && s.equals(nullValue))) {
 			return null;
-		}
-		if (trim) {
-			s = s.trim();
 		}
 		return s.isEmpty() ? null : s;
 	}
@@ -511,7 +521,7 @@ public abstract class CellParser {
 		if (str == null) {
 			return null;
 		}
-		return parseOne(str);
+		return parseOne(trim(str));
 	}
 
 	/**
@@ -528,7 +538,7 @@ public abstract class CellParser {
 		String[] parts = str.split(getSeparator());
 		Value[] values = new Value[parts.length];
 		for (int i = 0; i < parts.length; i++) {
-			values[i] = parseOne(parts[i]);
+			values[i] = parseOne(trim(parts[i]));
 		}
 		return values;
 	}

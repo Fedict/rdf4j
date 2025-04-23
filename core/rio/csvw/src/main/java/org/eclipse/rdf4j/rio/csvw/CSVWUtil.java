@@ -24,6 +24,7 @@ import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.base.CoreDatatype;
 import org.eclipse.rdf4j.model.util.Models;
 import org.eclipse.rdf4j.model.vocabulary.CSVW;
+import org.eclipse.rdf4j.model.vocabulary.RDF;
 import org.eclipse.rdf4j.rio.RDFParseException;
 import org.eclipse.rdf4j.rio.csvw.parsers.CellParser;
 import org.eclipse.rdf4j.rio.csvw.parsers.CellParserFactory;
@@ -113,7 +114,51 @@ public class CSVWUtil {
 		if (datatype.isIRI()) {
 			return (IRI) datatype;
 		}
-		return CoreDatatype.XSD.valueOf(datatype.stringValue().toUpperCase()).getIri();
+		String s = datatype.stringValue().toUpperCase();
+		switch (s) {
+		case "DATETIME":
+			datatype = CoreDatatype.XSD.DATETIME.getIri();
+			break;
+		case "NUMBER":
+			datatype = CoreDatatype.XSD.DOUBLE.getIri();
+			break;
+		case "BINARY":
+			datatype = CoreDatatype.XSD.BASE64BINARY.getIri();
+			break;
+		case "UNSIGNEDBYTE":
+			datatype = CoreDatatype.XSD.UNSIGNED_BYTE.getIri();
+			break;
+		case "UNSIGNEDSHORT":
+			datatype = CoreDatatype.XSD.UNSIGNED_SHORT.getIri();
+			break;
+		case "UNSIGNEDLONG":
+			datatype = CoreDatatype.XSD.UNSIGNED_LONG.getIri();
+			break;
+		case "POSITIVEINTEGER":
+			datatype = CoreDatatype.XSD.POSITIVE_INTEGER.getIri();
+			break;
+		case "NONPOSITIVEINTEGER":
+			datatype = CoreDatatype.XSD.NON_POSITIVE_INTEGER.getIri();
+			break;
+		case "NEGATIVEINTEGER":
+			datatype = CoreDatatype.XSD.NEGATIVE_INTEGER.getIri();
+			break;
+		case "NONNEGATIVEINTEGER":
+			datatype = CoreDatatype.XSD.NON_NEGATIVE_INTEGER.getIri();
+			break;
+		case "ANY":
+			datatype = CoreDatatype.XSD.ANYURI.getIri();
+			break;
+		case "XML":
+			datatype = CoreDatatype.RDF.XMLLITERAL.getIri();
+			break;
+		case "HTML":
+			datatype = CoreDatatype.RDF.HTML.getIri();
+			break;
+		default:
+			datatype = CoreDatatype.XSD.valueOf(s).getIri();
+		}
+		return (IRI) datatype;
 	}
 
 	/**
@@ -161,9 +206,12 @@ public class CSVWUtil {
 				.ifPresent(v -> parser.setVirtual(Boolean.parseBoolean(v)));
 		Models.getPropertyString(metadata, column, CSVW.SUPPRESS_OUTPUT)
 				.ifPresent(v -> parser.setSuppressed(Boolean.parseBoolean(v)));
+		Models.getPropertyString(metadata, column, CSVW.TRIM)
+				.ifPresentOrElse(v -> parser.setTrim(Boolean.parseBoolean(v)), () -> parser.setTrim(true));
 
 		// only useful for numeric
-		Models.getPropertyString(metadata, column, CSVW.DECIMAL_CHAR).ifPresent(v -> parser.setDecimalChar(v));
+		Models.getPropertyString(metadata, column, CSVW.DECIMAL_CHAR)
+				.ifPresentOrElse(v -> parser.setDecimalChar(v), () -> parser.setDecimalChar("."));
 		Models.getPropertyString(metadata, column, CSVW.GROUP_CHAR).ifPresent(v -> parser.setGroupChar(v));
 
 		// mostly for date formats
