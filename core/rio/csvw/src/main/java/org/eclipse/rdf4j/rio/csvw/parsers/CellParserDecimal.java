@@ -29,11 +29,13 @@ public class CellParserDecimal extends CellParser {
 		if (!getDecimalChar().equals(".")) {
 			str = str.replace(getDecimalChar(), ".");
 		}
-		String end = str.substring(str.length() - 2);
-		if (end.equals("%") || end.equals("‰")) {
-			String tmp = str.substring(0, str.length() - 2);
-			int factor = end.equals("%") ? 100 : 1000;
-			str = String.valueOf(Double.parseDouble(tmp) / factor);
+		if (str.length() > 1) {
+			String end = str.substring(str.length() - 1);
+			if (end.equals("%") || end.equals("‰")) {
+				String tmp = str.substring(0, str.length() - 2);
+				int factor = end.equals("%") ? 100 : 1000;
+				str = String.valueOf(Double.parseDouble(tmp) / factor);
+			}
 		}
 		try {
 			return Values.literal(str, getDataType());

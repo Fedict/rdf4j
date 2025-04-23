@@ -14,6 +14,7 @@ import java.io.Reader;
 import java.net.URLEncoder;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 
@@ -28,6 +29,8 @@ import org.eclipse.rdf4j.model.vocabulary.RDF;
 import org.eclipse.rdf4j.rio.RDFParseException;
 import org.eclipse.rdf4j.rio.csvw.parsers.CellParser;
 import org.eclipse.rdf4j.rio.csvw.parsers.CellParserFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.opencsv.CSVParserBuilder;
 import com.opencsv.CSVReader;
@@ -39,6 +42,7 @@ import com.opencsv.CSVReaderBuilder;
  * @author Bart Hanssens
  */
 public class CSVWUtil {
+	private static final Logger LOGGER = LoggerFactory.getLogger(CSVWUtil.class);
 
 	/**
 	 * Return URL encoded string
@@ -74,7 +78,7 @@ public class CSVWUtil {
 	}
 
 	/**
-	 * Get charset of the CSV, by default this should be UTF-8
+	 * Get character set of the CSV file, by default this should be UTF-8
 	 *
 	 * @param metadata
 	 * @param table
@@ -92,7 +96,7 @@ public class CSVWUtil {
 	}
 
 	/**
-	 * Get name of base or derived datatype
+	 * Get the IRI of the datatype, can be a base or derived datatype
 	 *
 	 * @param metadata
 	 * @param column
@@ -110,55 +114,49 @@ public class CSVWUtil {
 		if (!val.isPresent()) {
 			return CoreDatatype.XSD.STRING.getIri();
 		}
-		Value datatype = val.get();
-		if (datatype.isIRI()) {
-			return (IRI) datatype;
+		Value tmp = val.get();
+		if (tmp.isIRI()) {
+			return (IRI) tmp;
 		}
-		String s = datatype.stringValue().toUpperCase();
+
+		IRI datatype = null;
+		// CSVW built-in datatypes
+		String s = tmp.stringValue();
 		switch (s) {
-		case "DATETIME":
+		case "datetime":
 			datatype = CoreDatatype.XSD.DATETIME.getIri();
 			break;
-		case "NUMBER":
+		case "number":
 			datatype = CoreDatatype.XSD.DOUBLE.getIri();
 			break;
-		case "BINARY":
+		case "binary":
 			datatype = CoreDatatype.XSD.BASE64BINARY.getIri();
 			break;
-		case "UNSIGNEDBYTE":
-			datatype = CoreDatatype.XSD.UNSIGNED_BYTE.getIri();
-			break;
-		case "UNSIGNEDSHORT":
-			datatype = CoreDatatype.XSD.UNSIGNED_SHORT.getIri();
-			break;
-		case "UNSIGNEDLONG":
-			datatype = CoreDatatype.XSD.UNSIGNED_LONG.getIri();
-			break;
-		case "POSITIVEINTEGER":
-			datatype = CoreDatatype.XSD.POSITIVE_INTEGER.getIri();
-			break;
-		case "NONPOSITIVEINTEGER":
-			datatype = CoreDatatype.XSD.NON_POSITIVE_INTEGER.getIri();
-			break;
-		case "NEGATIVEINTEGER":
-			datatype = CoreDatatype.XSD.NEGATIVE_INTEGER.getIri();
-			break;
-		case "NONNEGATIVEINTEGER":
-			datatype = CoreDatatype.XSD.NON_NEGATIVE_INTEGER.getIri();
-			break;
-		case "ANY":
+		case "any":
 			datatype = CoreDatatype.XSD.ANYURI.getIri();
 			break;
-		case "XML":
+		case "xml":
 			datatype = CoreDatatype.RDF.XMLLITERAL.getIri();
 			break;
-		case "HTML":
+		case "html":
 			datatype = CoreDatatype.RDF.HTML.getIri();
 			break;
-		default:
-			datatype = CoreDatatype.XSD.valueOf(s).getIri();
 		}
-		return (IRI) datatype;
+		// try XSD datatype
+		if (datatype == null) {
+			s = s.toUpperCase(Locale.ENGLISH)
+					.replace("UNSIGNED", "UNSIGNED_")
+					.replace("NONNEGATIVE", "NON_NEGATIVE")
+					.replace("NEGATIVE", "NEGATIVE_")
+					.replace("NONPOSITIVE", "NON_POSITIVE")
+					.replace("POSITIVE", "POSITIVE_");
+			try {
+				datatype = CoreDatatype.XSD.valueOf(s).getIri();
+			} catch (IllegalArgumentException iae) {
+				LOGGER.warn("Unknown datatype {}", tmp.stringValue());
+			}
+		}
+		return (datatype != null) ? datatype : CoreDatatype.XSD.STRING.getIri();
 	}
 
 	/**
@@ -223,7 +221,6 @@ public class CSVWUtil {
 			if (level == null) {
 				continue;
 			}
-
 			Models.getPropertyString(metadata, level, CSVW.ABOUT_URL).ifPresent(v -> parser.setAboutUrl(v));
 			Models.getPropertyString(metadata, level, CSVW.PROPERTY_URL).ifPresent(v -> parser.setPropertyUrl(v));
 			Models.getPropertyString(metadata, level, CSVW.VALUE_URL).ifPresent(v -> parser.setValueUrl(v));

@@ -33,6 +33,7 @@ import java.util.stream.Collectors;
 
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Model;
+import org.eclipse.rdf4j.model.Namespace;
 import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.Value;
@@ -42,11 +43,14 @@ import org.eclipse.rdf4j.model.util.RDFCollections;
 import org.eclipse.rdf4j.model.util.Statements;
 import org.eclipse.rdf4j.model.util.Values;
 import org.eclipse.rdf4j.model.vocabulary.CSVW;
+import org.eclipse.rdf4j.model.vocabulary.RDF;
 import org.eclipse.rdf4j.rio.ParserConfig;
 import org.eclipse.rdf4j.rio.RDFFormat;
 import org.eclipse.rdf4j.rio.RDFParseException;
+import org.eclipse.rdf4j.rio.RDFParser;
 import org.eclipse.rdf4j.rio.Rio;
 import org.eclipse.rdf4j.rio.helpers.JSONLDSettings;
+import org.eclipse.rdf4j.rio.jsonld.JSONLDParserFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -78,16 +82,9 @@ public class CSVWMetadataUtil {
 		Model m = null;
 
 		InputStream minput = (provider != null) ? provider.getMetadata() : null;
-
 		if (minput != null) {
-			/*
-			 * byte[] bytes = minput.readAllBytes(); String str = new String(bytes, StandardCharsets.UTF_8);
-			 *
-			 * try (InputStream s = new ByteArrayInputStream(str.getBytes(StandardCharsets.UTF_8))) {
-			 */ m = Rio.parse(minput, null, RDFFormat.JSONLD, METADATA_CFG);
-			/* } */
+			m = Rio.parse(minput, null, RDFFormat.JSONLD, METADATA_CFG);
 		}
-
 		return (m != null) ? m : new LinkedHashModel();
 	}
 
@@ -126,7 +123,6 @@ public class CSVWMetadataUtil {
 		if (dialect == null) {
 			dialect = Values.bnode();
 		}
-
 		map.put(CSVW.ENCODING,
 				Models.getPropertyString(m, dialect, CSVW.ENCODING).orElse("utf-8"));
 		map.put(CSVW.HEADER,
@@ -157,20 +153,9 @@ public class CSVWMetadataUtil {
 	 * @param predicate
 	 * @return
 	 */
-	public static Model getExtraMetadata(Model metadata, Resource rootNode, IRI predicate) {
+	public static Model getComments(Model metadata, Resource oldRoot, Resource newRoot) {
 		Model extra = new LinkedHashModel();
-		if (rootNode == null) {
-			return extra;
-		}
-
-		Resource oldRoot = null;
-		if (predicate != null) {
-			Iterable<Statement> roots = metadata.getStatements(null, predicate, null);
-			if (roots.iterator().hasNext()) {
-				oldRoot = roots.iterator().next().getSubject();
-			}
-		}
-		if (oldRoot == null) {
+		if (newRoot == null) {
 			return extra;
 		}
 
@@ -178,24 +163,37 @@ public class CSVWMetadataUtil {
 		Iterable<Statement> statements = metadata.getStatements(oldRoot, null, null);
 		for (Statement s : statements) {
 			IRI p = s.getPredicate();
-			if (!p.getNamespace().equals(CSVW.NAMESPACE) || p.equals(CSVW.NOTE)) {
+			if ((!p.getNamespace().equals(CSVW.NAMESPACE) || p.equals(CSVW.NOTE))
+					&& !p.getNamespace().equals(RDF.NAMESPACE)) {
 				Value obj = s.getObject();
-				extra.add(Statements.statement(rootNode, p, obj, null));
+				extra.add(Statements.statement(newRoot, p, obj, null));
 			}
 		}
 
 		// get metadata regardless how deep the statements are nasted,
 		// but avoid looping forever by keeping track of processed subjects
 		Set<Resource> subjects = new HashSet<>();
+
 		boolean newStatements;
 		do {
 			newStatements = false;
 			Set<Value> values = Set.copyOf(extra.objects());
+
 			for (Value val : values) {
 				if (val instanceof Resource && !subjects.contains((Resource) val)) {
+					Resource res = (Resource) val;
 					newStatements = true;
-					subjects.add((Resource) val);
-					extra.addAll(metadata.filter((Resource) val, null, null));
+					subjects.add(res);
+					statements = metadata.getStatements(res, null, null);
+
+					for (Statement s : statements) {
+						IRI p = s.getPredicate();
+						if ((!p.getNamespace().equals(CSVW.NAMESPACE) || p.equals(CSVW.NOTE))
+								&& !p.getNamespace().equals(RDF.NAMESPACE)) {
+							Value obj = s.getObject();
+							extra.add(Statements.statement(res, p, obj, null));
+						}
+					}
 				}
 			}
 		} while (newStatements);

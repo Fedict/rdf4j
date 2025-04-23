@@ -18,9 +18,18 @@ import java.net.http.HttpClient.Redirect;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.net.http.HttpResponse.BodyHandlers;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
+import org.eclipse.rdf4j.model.Namespace;
+import org.eclipse.rdf4j.model.impl.SimpleNamespace;
+import org.eclipse.rdf4j.model.vocabulary.CSVW;
+import org.eclipse.rdf4j.model.vocabulary.DC;
+import org.eclipse.rdf4j.model.vocabulary.DCTERMS;
+import org.eclipse.rdf4j.model.vocabulary.RDF;
+import org.eclipse.rdf4j.model.vocabulary.RDFS;
+import org.eclipse.rdf4j.model.vocabulary.XSD;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,7 +39,15 @@ import org.slf4j.LoggerFactory;
  * @author Bart Hanssens
  */
 public abstract class CSVWMetadataProvider {
-	private static final Logger LOGGER = LoggerFactory.getLogger(CSVWMetadataProvider.class);
+	/**
+	 * Get namespaces for expanding prefixed literals / URI templates...
+	 *
+	 * @return
+	 */
+	public Set<Namespace> getNamespaces() {
+		return Set.of(CSVW.NS, DC.NS, DCTERMS.NS, RDF.NS, RDFS.NS, new SimpleNamespace("schema", "http://schema.org/"),
+				XSD.NS);
+	}
 
 	/**
 	 * Get the metadata as inputstream
