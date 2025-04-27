@@ -11,16 +11,25 @@
 package org.eclipse.rdf4j.rio.csvw.parsers;
 
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
+import java.time.temporal.ChronoField;
 import java.time.temporal.TemporalAccessor;
+import java.time.temporal.TemporalField;
+import java.util.HashSet;
+import java.util.Set;
 
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.util.Values;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  *
  * @author Bart Hanssens
  */
 public class CellParserDate extends CellParser {
+	private static final Logger LOGGER = LoggerFactory.getLogger(CellParserDate.class);
+
 	private DateTimeFormatter formatter;
 
 	/**
@@ -38,13 +47,19 @@ public class CellParserDate extends CellParser {
 	@Override
 	protected Value parseOne(String str) {
 		if (formatter != null) {
-			TemporalAccessor temp = formatter.parse(str);
-			return Values.literal(temp);
+			try {
+				TemporalAccessor temp = formatter.parse(str);
+				return Values.literal(temp);
+			} catch (DateTimeParseException dtpe) {
+				LOGGER.error("Not a valid value " + str + " " + getDataType());
+				return null;
+			}
 		}
 		try {
 			return Values.literal(str, getDataType());
 		} catch (IllegalArgumentException ioe) {
-			throw new IllegalArgumentException(str + " " + getDataType());
+			LOGGER.error("Not a valid value " + str + " " + getDataType());
+			return null;
 		}
 	}
 }

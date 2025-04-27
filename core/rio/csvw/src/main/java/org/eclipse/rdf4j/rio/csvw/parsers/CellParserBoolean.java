@@ -18,14 +18,14 @@ import org.eclipse.rdf4j.model.util.Values;
  * @author Bart Hanssens
  */
 public class CellParserBoolean extends CellParser {
-	private String valueTrue;
-	private String valueFalse;
+	private String valueTrue = "true";
+	private String valueFalse = "false";
 
 	@Override
 	public void setFormat(String format) {
 		String[] values = format.split("\\|");
-		valueTrue = values[0];
-		valueFalse = values[1];
+		valueTrue = (values[0] != null) ? values[0] : "true";
+		valueFalse = (values[1] != null) ? values[1] : "false";
 	}
 
 	@Override

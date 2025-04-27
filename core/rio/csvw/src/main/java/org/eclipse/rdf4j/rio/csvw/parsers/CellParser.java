@@ -45,13 +45,16 @@ public abstract class CellParser {
 	private String decimalChar = ".";
 	private String groupChar;
 	private String separator;
-	private boolean trim = true;
+	private String trim = "true";
 	private boolean virtual = false;
 	private boolean suppressed = false;
 
 	private String[] aboutPlaceholders = new String[0];
 	private String[] propertyPlaceholders = new String[0];
 	private String[] valuePlaceholders = new String[0];
+
+	private static Pattern LEFT_TRIM = Pattern.compile("^\\s+");
+	private static Pattern RIGHT_TRIM = Pattern.compile("\\s+$");
 
 	public void setNamespaces(Set<Namespace> namespaces) {
 		this.namespaces = namespaces;
@@ -197,7 +200,7 @@ public abstract class CellParser {
 	 *
 	 * @return
 	 */
-	public boolean isTrim() {
+	public String isTrim() {
 		return trim;
 	}
 
@@ -206,7 +209,7 @@ public abstract class CellParser {
 	 *
 	 * @param trim
 	 */
-	public void setTrim(boolean trim) {
+	public void setTrim(String trim) {
 		this.trim = trim;
 	}
 
@@ -488,8 +491,26 @@ public abstract class CellParser {
 		return valuePlaceholders;
 	}
 
+	/**
+	 * Left and/or right trim the string
+	 *
+	 * @param str
+	 * @return
+	 */
 	protected String trim(String str) {
-		return str.trim();
+		if (str == null || str.isEmpty()) {
+			return str;
+		}
+		switch (trim) {
+		case "true":
+			return str.trim();
+		case "left":
+			return LEFT_TRIM.matcher(str).replaceAll("");
+		case "right":
+			return RIGHT_TRIM.matcher(str).replaceAll("");
+		default:
+			return str;
+		}
 	}
 
 	/**

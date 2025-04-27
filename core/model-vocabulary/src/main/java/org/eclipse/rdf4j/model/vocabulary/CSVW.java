@@ -117,6 +117,9 @@ public class CSVW {
 	/** csvw:null */
 	public static final IRI NULL;
 
+	/** csvw:ordered */
+	public static final IRI ORDERED;
+
 	/** csvw:propertyUrl */
 	public static final IRI PROPERTY_URL;
 
@@ -152,6 +155,9 @@ public class CSVW {
 
 	/** csvw:table */
 	public static final IRI HAS_TABLE;
+
+	/** csvw:textDirection */
+	public static final IRI TEXT_DIRECTION;
 
 	/** csvw:title */
 	public static final IRI TITLE;
@@ -196,6 +202,7 @@ public class CSVW {
 		NAME = Vocabularies.createIRI(NAMESPACE, "name");
 		NOTE = Vocabularies.createIRI(NAMESPACE, "note");
 		NULL = Vocabularies.createIRI(NAMESPACE, "null");
+		ORDERED = Vocabularies.createIRI(NAMESPACE, "ordered");
 		PROPERTY_URL = Vocabularies.createIRI(NAMESPACE, "propertyUrl");
 		QUOTE_CHAR = Vocabularies.createIRI(NAMESPACE, "quoteChar");
 		REQUIRED = Vocabularies.createIRI(NAMESPACE, "required");
@@ -208,6 +215,7 @@ public class CSVW {
 		SKIP_ROWS = Vocabularies.createIRI(NAMESPACE, "skipRows");
 		SUPPRESS_OUTPUT = Vocabularies.createIRI(NAMESPACE, "suppressOutput");
 		TABLE_SCHEMA = Vocabularies.createIRI(NAMESPACE, "tableSchema");
+		TEXT_DIRECTION = Vocabularies.createIRI(NAMESPACE, "textDirection");
 		TITLE = Vocabularies.createIRI(NAMESPACE, "title");
 		TRIM = Vocabularies.createIRI(NAMESPACE, "trim");
 		URL = Vocabularies.createIRI(NAMESPACE, "url");

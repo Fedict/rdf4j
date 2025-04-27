@@ -194,6 +194,9 @@ public class CSVWUtil {
 		CellParser parser = CellParserFactory.create(datatype);
 		parser.setNamespaces(metadata.getNamespaces());
 
+		Models.getPropertyString(metadata, root, CSVW.TRIM)
+				.ifPresentOrElse(v -> parser.setTrim(v), () -> parser.setTrim("true"));
+
 		Models.getPropertyString(metadata, column, CSVW.NAME)
 				.ifPresentOrElse(v -> parser.setName(v),
 						() -> Models.getPropertyString(metadata, column, CSVW.TITLE)
@@ -204,8 +207,6 @@ public class CSVWUtil {
 				.ifPresent(v -> parser.setVirtual(Boolean.parseBoolean(v)));
 		Models.getPropertyString(metadata, column, CSVW.SUPPRESS_OUTPUT)
 				.ifPresent(v -> parser.setSuppressed(Boolean.parseBoolean(v)));
-		Models.getPropertyString(metadata, column, CSVW.TRIM)
-				.ifPresentOrElse(v -> parser.setTrim(Boolean.parseBoolean(v)), () -> parser.setTrim(true));
 
 		// only useful for numeric
 		Models.getPropertyString(metadata, column, CSVW.DECIMAL_CHAR)

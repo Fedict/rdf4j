@@ -12,6 +12,7 @@
 package org.eclipse.rdf4j.rio.csvw;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
@@ -49,6 +50,7 @@ import org.eclipse.rdf4j.model.util.Values;
 import org.eclipse.rdf4j.model.vocabulary.RDF;
 import org.eclipse.rdf4j.rio.ParserConfig;
 import org.eclipse.rdf4j.rio.RDFFormat;
+import org.eclipse.rdf4j.rio.RDFParseException;
 import org.eclipse.rdf4j.rio.Rio;
 import org.eclipse.rdf4j.rio.WriterConfig;
 import org.eclipse.rdf4j.rio.csvw.metadata.CSVWMetadataFinder;
@@ -129,21 +131,21 @@ public class W3cComplianceTest {
 		Model expected = testCase.getExpected();
 		Model result = Rio.parse(is, baseURI, RDFFormat.CSVW, cfg, (Resource) null);
 
-		if (testCase.positive) {
-			try {
-				assertTrue(Models.isomorphic(result, expected), testCase.name);
-			} catch (Error e) {
-				StringWriter w = new StringWriter();
-				w.write("\nResult\n");
-				Rio.write(result, w, RDFFormat.TURTLE, ttlcfg);
-				w.write("\nExpected\n");
-				Rio.write(expected, w, RDFFormat.TURTLE, ttlcfg);
-				System.out.println(w.toString());
-				throw (e);
-			}
-		} else {
-			assertFalse(Models.isomorphic(result, expected), testCase.name);
+		// if (testCase.testType.getLocalName().equals("PositiveValidationTest")) {
+		try {
+			assertTrue(Models.isomorphic(result, expected), testCase.name);
+		} catch (Error e) {
+			StringWriter w = new StringWriter();
+			w.write("\nResult\n");
+			Rio.write(result, w, RDFFormat.TURTLE, ttlcfg);
+			w.write("\nExpected\n");
+			Rio.write(expected, w, RDFFormat.TURTLE, ttlcfg);
+			System.out.println(w.toString());
+			throw (e);
 		}
+		// } else {
+//			assertFalse(Models.isomorphic(result, expected), testCase.name);
+//		}
 	}
 
 	private void installWrapper(String header) throws Exception {
@@ -173,6 +175,7 @@ public class W3cComplianceTest {
 			installWrapper(testCase.link);
 		}
 
+		System.err.println("Test " + testCase.name);
 		try {
 			ParserConfig cfg = new ParserConfig();
 			URL csv = testCase.getCSV();
@@ -198,19 +201,22 @@ public class W3cComplianceTest {
 				cfg.set(CSVWParserSettings.MINIMAL_MODE, testCase.isMinimal());
 				// cfg.set(CSVWParserSettings.DATA_URL, testCase.getCSV().toString());
 
-				int pos = csv.getPath().lastIndexOf("/tests/") + 7;
-				String fname = csv.getPath().substring(pos);
-
-				System.err.println("Test " + testCase.name + " (" + fname + ")");
 				try (InputStream is = testCase.getCSV().openStream()) {
 					compareResults(testCase, cfg, testCase.getCSV().toString(), is);
 				}
-				System.err.println("Test is done");
 
 			}
 		} catch (AssertionError e) {
 			fail();
+		} catch (RDFParseException | IOException ex) {
+			System.err.println(testCase.testType.getLocalName());
+			if (testCase.testType.getLocalName().equals("NegativeRdfTest")) {
+				assertNotNull(ex);
+			} else {
+				fail();
+			}
 		}
+		System.err.println("Test is done");
 		if (testCase.link != null) {
 			server.stop();
 			server.setHandler(handlerList);
@@ -283,13 +289,10 @@ public class W3cComplianceTest {
 							Models.getPropertyIRI(model, t, Values.iri(nsMF, "result"), (Resource) null).orElse(null),
 							Models.getPropertyString(model, t, Values.iri(csvtMF, "httpLink"), (Resource) null)
 									.orElse(null),
-							!Models.getPropertyIRI(model, t, RDF.TYPE, (Resource) null)
-									.orElse(null)
-									.equals(Values.iri(csvtMF, "NegativeRdfTest")),
+							Models.getPropertyIRI(model, t, RDF.TYPE, (Resource) null).orElse(null),
 							optionMinimal(model, t),
 							optionMetadata(model, t)
-					)
-					)
+					))
 					.collect(Collectors.toList());
 		}
 		return tests;
@@ -302,7 +305,7 @@ public class W3cComplianceTest {
 		IRI input;
 		IRI result;
 		String link;
-		boolean positive;
+		IRI testType;
 		boolean minimal;
 		String metadata;
 
@@ -358,13 +361,13 @@ public class W3cComplianceTest {
 		}
 
 		public W3CTest(String id, Literal name, IRI input, IRI result, String link,
-				boolean positive, boolean minimal, String metadata) {
+				IRI testType, boolean minimal, String metadata) {
 			this.id = id;
 			this.name = name.stringValue();
 			this.input = input;
 			this.result = result;
 			this.link = link;
-			this.positive = positive;
+			this.testType = testType;
 			this.minimal = minimal;
 			this.metadata = metadata;
 		}

@@ -127,9 +127,8 @@ public class CSVWMetadataUtil {
 				Models.getPropertyString(m, dialect, CSVW.ENCODING).orElse("utf-8"));
 		map.put(CSVW.HEADER,
 				Boolean.valueOf(Models.getPropertyString(m, dialect, CSVW.HEADER).orElse("true")));
-		map.put(CSVW.HEADER_ROW_COUNT, (boolean) map.get(CSVW.HEADER)
-				? Integer.valueOf(Models.getPropertyString(m, dialect, CSVW.HEADER_ROW_COUNT).orElse("1"))
-				: 0);
+		map.put(CSVW.HEADER_ROW_COUNT,
+				Integer.valueOf(Models.getPropertyString(m, dialect, CSVW.HEADER_ROW_COUNT).orElse("1")));
 		map.put(CSVW.SKIP_ROWS,
 				Integer.valueOf(Models.getPropertyString(m, dialect, CSVW.SKIP_ROWS).orElse("0")));
 		map.put(CSVW.DELIMITER,
@@ -139,8 +138,9 @@ public class CSVWMetadataUtil {
 		map.put(CSVW.DOUBLE_QUOTE,
 				Models.getPropertyString(m, dialect, CSVW.DOUBLE_QUOTE).orElse("\\"));
 		map.put(CSVW.TRIM,
-				Boolean.valueOf(Models.getPropertyString(m, dialect, CSVW.TRIM).orElse("true")));
-
+				Models.getPropertyString(m, dialect, CSVW.TRIM).orElse("true"));
+		map.put(CSVW.SKIP_INITIAL_SPACE,
+				Boolean.valueOf(Models.getPropertyString(m, dialect, CSVW.SKIP_INITIAL_SPACE).orElse("true")));
 		return map;
 	}
 
@@ -149,8 +149,8 @@ public class CSVWMetadataUtil {
 	 * license, long descriptions...
 	 *
 	 * @param metadata
-	 * @param rootNode
-	 * @param predicate
+	 * @param oldRoot
+	 * @param newRoot
 	 * @return
 	 */
 	public static Model getComments(Model metadata, Resource oldRoot, Resource newRoot) {
@@ -163,8 +163,7 @@ public class CSVWMetadataUtil {
 		Iterable<Statement> statements = metadata.getStatements(oldRoot, null, null);
 		for (Statement s : statements) {
 			IRI p = s.getPredicate();
-			if ((!p.getNamespace().equals(CSVW.NAMESPACE) || p.equals(CSVW.NOTE))
-					&& !p.getNamespace().equals(RDF.NAMESPACE)) {
+			if (!p.getNamespace().equals(CSVW.NAMESPACE) || p.equals(CSVW.NOTE)) {
 				Value obj = s.getObject();
 				extra.add(Statements.statement(newRoot, p, obj, null));
 			}
@@ -173,6 +172,7 @@ public class CSVWMetadataUtil {
 		// get metadata regardless how deep the statements are nasted,
 		// but avoid looping forever by keeping track of processed subjects
 		Set<Resource> subjects = new HashSet<>();
+		subjects.add(oldRoot);
 
 		boolean newStatements;
 		do {
@@ -188,8 +188,7 @@ public class CSVWMetadataUtil {
 
 					for (Statement s : statements) {
 						IRI p = s.getPredicate();
-						if ((!p.getNamespace().equals(CSVW.NAMESPACE) || p.equals(CSVW.NOTE))
-								&& !p.getNamespace().equals(RDF.NAMESPACE)) {
+						if (!p.getNamespace().equals(CSVW.NAMESPACE) || p.equals(CSVW.NOTE)) {
 							Value obj = s.getObject();
 							extra.add(Statements.statement(res, p, obj, null));
 						}
@@ -199,6 +198,23 @@ public class CSVWMetadataUtil {
 		} while (newStatements);
 
 		return extra;
+	}
+
+	/**
+	 * Get the root subject of the metadata file
+	 *
+	 * @param metadata
+	 * @return
+	 */
+	public static Resource getRoot(Model metadata) {
+		Model m = metadata.filter(null, CSVW.HAS_DIALECT, null);
+		if (m.isEmpty()) {
+			m = metadata.filter(null, CSVW.TABLE_SCHEMA, null);
+		}
+		if (m.isEmpty()) {
+			metadata.filter(null, CSVW.HAS_TABLE, null);
+		}
+		return m.subjects().stream().findFirst().orElse(null);
 	}
 
 	/**
@@ -269,7 +285,7 @@ public class CSVWMetadataUtil {
 		try {
 			HttpResponse<byte[]> response = future.get();
 			if (response.statusCode() == 200) {
-				LOGGER.info("Using metadata found on {}", uri);
+				LOGGER.info("Opened URL on {}", uri);
 				return response.body();
 			} else {
 				LOGGER.debug("Could not open URL {}, received status {}", uri, response.statusCode());

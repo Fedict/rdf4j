@@ -12,12 +12,16 @@ package org.eclipse.rdf4j.rio.csvw.parsers;
 
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.util.Values;
+import org.eclipse.rdf4j.rio.csvw.metadata.CSVWMetadataPath;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  *
  * @author Bart Hanssens
  */
 public class CellParserDecimal extends CellParser {
+	private static final Logger LOGGER = LoggerFactory.getLogger(CellParserDecimal.class);
 
 	@Override
 	protected Value parseOne(String str) {
@@ -40,7 +44,8 @@ public class CellParserDecimal extends CellParser {
 		try {
 			return Values.literal(str, getDataType());
 		} catch (IllegalArgumentException ioe) {
-			throw new IllegalArgumentException(str + " " + getDataType());
+			LOGGER.error("Not a valid value " + str + " " + getDataType());
+			return null;
 		}
 	}
 

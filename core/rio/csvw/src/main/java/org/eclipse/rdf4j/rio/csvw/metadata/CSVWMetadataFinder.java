@@ -227,7 +227,7 @@ public class CSVWMetadataFinder extends CSVWMetadataProvider {
 					break;
 				}
 			} catch (URISyntaxException ex) {
-				LOGGER.error("Invalid URL {}", url, ex);
+				LOGGER.error("Invalid metadata URL {}", url, ex);
 			}
 		}
 
