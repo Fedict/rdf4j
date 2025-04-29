@@ -16,6 +16,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.net.URI;
+import java.net.URL;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.charset.UnsupportedCharsetException;
@@ -104,8 +105,7 @@ public class CSVWParser extends AbstractRDFParser {
 			}
 			for (Resource table : tables) {
 				String csvFile = getCSVFile(metadata, table, rootSubject, baseURI);
-				Resource tableSubject = generateTable(input, metadata, rootSubject, tableGroup, table, baseURI,
-						minimal);
+				Resource tableSubject = generateTable(metadata, rootSubject, tableGroup, table, baseURI, minimal);
 				parseCSV(input, metadata, rdfHandler, csvFile, rootSubject, table, tableSubject);
 			}
 		} else {
@@ -165,13 +165,10 @@ public class CSVWParser extends AbstractRDFParser {
 	 * @param rootSubject
 	 * @param baseURI
 	 */
-	private Resource generateTable(InputStream input, Model metadata, Resource rootSubject, Resource tableGroup,
+	private Resource generateTable(Model metadata, Resource rootSubject, Resource tableGroup,
 			Resource table, String baseURI, boolean minimal) throws IOException {
-		URI csvURI = getURI(metadata, table, rootSubject, baseURI);
-		if (csvURI == null) {
-			throw new RDFParseException("Could not find URL for CSV file");
-		}
-		String csvFile = csvURI.toString();
+		String csvFile = getCSVFile(metadata, table, rootSubject, baseURI);
+
 		// add dummy namespace for resolving unspecified column names / predicates relative to CSV file
 		metadata.getNamespaces().removeIf(ns -> ns.getPrefix().isEmpty());
 		metadata.getNamespaces().add(new SimpleNamespace("", csvFile + "#"));
@@ -509,9 +506,11 @@ public class CSVWParser extends AbstractRDFParser {
 				Resource rowURL = Values.iri(csvFile + "#row=" + (line + headerRows));
 				Resource rowSubject = minimal ? Values.bnode() : generateRow(rdfHandler, tableNode, rowURL, line);
 				Resource rowID = null;
+				System.err.println(rowSubject);
 				Resource describes = Values.bnode();
-				handler.handleStatement(Statements.statement(rowSubject, CSVW.DESCRIBES, describes, null));
-
+				if (!minimal) {
+					handler.handleStatement(Statements.statement(rowSubject, CSVW.DESCRIBES, describes, null));
+				}
 				// csv cells
 				for (int i = 0; i < cells.length; i++) {
 					Value val = cellParsers[i].parse(cells[i]);
@@ -543,6 +542,7 @@ public class CSVWParser extends AbstractRDFParser {
 
 		CellParser[] cellParsers = getCellParsers(metadata, rootSubject, table);
 		if (cellParsers == null) {
+			LOGGER.warn("No table metadata found");
 			parseCSV(metadata, handler, csvFile, input, tableNode);
 			return;
 		}
@@ -560,16 +560,18 @@ public class CSVWParser extends AbstractRDFParser {
 		long line = 1;
 		int col = 0;
 
-		try (BufferedReader reader = new BufferedReader(new InputStreamReader(input, charset));
+		try (BufferedReader reader = new BufferedReader(new InputStreamReader(new URL(csvFile).openStream(), charset));
 				CSVReader csv = CSVWUtil.getCSVReader(dialect, reader)) {
 
 			Map<String, String> replaceValues = new HashMap<>();
 			String[] cells;
 
+			// ignore header, use metadata
 			int headerRows = (int) dialect.get(CSVW.HEADER_ROW_COUNT);
 			getHeader(csv, headerRows);
 
 			while ((cells = csv.readNext()) != null) {
+				System.err.println("line " + line);
 				Resource rowURL = Values.iri(csvFile + "#row=" + (line + headerRows));
 				Resource rowID = getRowAboutURL(cellParsers, cells, aboutURL, aboutIndex, line, placeholder);
 
