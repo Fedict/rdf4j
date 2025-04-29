@@ -206,15 +206,32 @@ public class CSVWMetadataUtil {
 	 * @param metadata
 	 * @return
 	 */
-	public static Resource getRoot(Model metadata) {
+	public static Resource getRootSubject(Model metadata) {
 		Model m = metadata.filter(null, CSVW.HAS_DIALECT, null);
+		if (m.isEmpty()) {
+			m = metadata.filter(null, CSVW.HAS_TABLE, null);
+		}
 		if (m.isEmpty()) {
 			m = metadata.filter(null, CSVW.TABLE_SCHEMA, null);
 		}
-		if (m.isEmpty()) {
-			metadata.filter(null, CSVW.HAS_TABLE, null);
-		}
 		return m.subjects().stream().findFirst().orElse(null);
+	}
+
+	/**
+	 * Get table subject (ID) if it is an URI
+	 *
+	 * @param rootSubject
+	 * @param tableSubject
+	 * @return
+	 */
+	public static Resource getTableSubject(Resource rootSubject, Resource tableSubject) {
+		if (tableSubject != null && tableSubject.isIRI()) {
+			return tableSubject;
+		}
+		if (rootSubject != null && rootSubject.isIRI()) {
+			return rootSubject;
+		}
+		return Values.bnode();
 	}
 
 	/**

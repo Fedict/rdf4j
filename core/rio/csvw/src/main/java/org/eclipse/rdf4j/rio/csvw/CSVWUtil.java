@@ -78,31 +78,13 @@ public class CSVWUtil {
 	}
 
 	/**
-	 * Get character set of the CSV file, by default this should be UTF-8
-	 *
-	 * @param metadata
-	 * @param table
-	 * @return charset
-	 */
-	protected static Charset getEncoding(Model metadata, Resource table) {
-		Optional<Value> dialect = Models.getProperty(metadata, table, CSVW.DIALECT);
-		if (dialect.isPresent()) {
-			Optional<String> encoding = Models.getPropertyString(metadata, (Resource) dialect.get(), CSVW.ENCODING);
-			if (encoding.isPresent()) {
-				return Charset.forName(encoding.get());
-			}
-		}
-		return StandardCharsets.UTF_8;
-	}
-
-	/**
 	 * Get the IRI of the datatype, can be a base or derived datatype
 	 *
 	 * @param metadata
 	 * @param column
 	 * @return
 	 */
-	private static IRI getDatatypeIRI(Model metadata, Resource column) {
+	protected static IRI getDatatypeIRI(Model metadata, Resource column) {
 		Optional<Value> val = Models.getProperty(metadata, column, CSVW.DATATYPE);
 		if (val.isPresent()) {
 			Value datatype = val.get();
@@ -166,7 +148,7 @@ public class CSVWUtil {
 	 * @param column
 	 * @return
 	 */
-	private static Optional<String> getFormat(Model metadata, Resource column) {
+	protected static Optional<String> getFormat(Model metadata, Resource column) {
 		Optional<Value> val = Models.getProperty(metadata, column, CSVW.DATATYPE);
 		if (val.isPresent() && val.get().isBNode()) {
 			val = Models.getProperty(metadata, (Resource) val.get(), CSVW.FORMAT);
@@ -175,71 +157,5 @@ public class CSVWUtil {
 			}
 		}
 		return Optional.empty();
-	}
-
-	/**
-	 * Get parser for specific column
-	 *
-	 * @param metadata
-	 * @param root
-	 * @param table
-	 * @param tableSchema
-	 * @param column
-	 * @return
-	 */
-	protected static CellParser getCellParser(Model metadata, Resource root, Resource table, Resource tableSchema,
-			Resource column) {
-		IRI datatype = getDatatypeIRI(metadata, column);
-
-		CellParser parser = CellParserFactory.create(datatype);
-		parser.setNamespaces(metadata.getNamespaces());
-
-		Models.getPropertyString(metadata, root, CSVW.TRIM)
-				.ifPresentOrElse(v -> parser.setTrim(v), () -> parser.setTrim("true"));
-
-		Models.getPropertyString(metadata, column, CSVW.NAME)
-				.ifPresentOrElse(v -> parser.setName(v),
-						() -> Models.getPropertyString(metadata, column, CSVW.TITLE)
-								.ifPresentOrElse(t -> parser.setName(t),
-										() -> new RDFParseException(
-												"Metadata file does not contain name for column " + column)));
-		Models.getPropertyString(metadata, column, CSVW.VIRTUAL)
-				.ifPresent(v -> parser.setVirtual(Boolean.parseBoolean(v)));
-		Models.getPropertyString(metadata, column, CSVW.SUPPRESS_OUTPUT)
-				.ifPresent(v -> parser.setSuppressed(Boolean.parseBoolean(v)));
-
-		// only useful for numeric
-		Models.getPropertyString(metadata, column, CSVW.DECIMAL_CHAR)
-				.ifPresentOrElse(v -> parser.setDecimalChar(v), () -> parser.setDecimalChar("."));
-		Models.getPropertyString(metadata, column, CSVW.GROUP_CHAR).ifPresent(v -> parser.setGroupChar(v));
-
-		// mostly for date formats
-		getFormat(metadata, column).ifPresent(v -> parser.setFormat(v));
-
-		// check properties that can be inherited
-		Resource[] levels = new Resource[] { root, table, tableSchema, column };
-		for (Resource level : levels) {
-			if (level == null) {
-				continue;
-			}
-			Models.getPropertyString(metadata, level, CSVW.ABOUT_URL).ifPresent(v -> parser.setAboutUrl(v));
-			Models.getPropertyString(metadata, level, CSVW.PROPERTY_URL).ifPresent(v -> parser.setPropertyUrl(v));
-			Models.getPropertyString(metadata, level, CSVW.VALUE_URL).ifPresent(v -> parser.setValueUrl(v));
-
-			Models.getPropertyString(metadata, level, CSVW.DEFAULT).ifPresent(v -> parser.setDefaultValue(v));
-			Models.getPropertyString(metadata, level, CSVW.NULL).ifPresent(v -> parser.setNullValue(v));
-
-			// only useful for strings
-			Models.getPropertyString(metadata, level, CSVW.LANG).ifPresent(v -> parser.setLang(v));
-
-			Models.getPropertyString(metadata, level, CSVW.REQUIRED)
-					.ifPresent(v -> parser.setRequired(Boolean.parseBoolean(v)));
-
-			Models.getPropertyString(metadata, level, CSVW.SEPARATOR).ifPresent(v -> parser.setSeparator(v));
-		}
-		if (parser.getPropertyUrl() == null) {
-			parser.setPropertyUrl(":" + parser.getNameEncoded());
-		}
-		return parser;
 	}
 }

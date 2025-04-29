@@ -12,6 +12,7 @@ package org.eclipse.rdf4j.rio.csvw.parsers;
 
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.util.Values;
+import org.eclipse.rdf4j.model.vocabulary.XSD;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -25,7 +26,7 @@ public class CellParserString extends CellParser {
 	@Override
 	protected Value parseOne(String str) {
 		String lang = getLang();
-		if (lang != null) {
+		if (lang != null && XSD.STRING.equals(getDataType())) {
 			return Values.literal(str, lang);
 		}
 		try {

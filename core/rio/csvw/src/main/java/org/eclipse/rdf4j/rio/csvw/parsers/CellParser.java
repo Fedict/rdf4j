@@ -378,6 +378,10 @@ public abstract class CellParser {
 		return placeholders.toArray(String[]::new);
 	}
 
+	public String getAboutUrl() {
+		return this.aboutUrl;
+	}
+
 	/**
 	 * Get aboutURL with placeholders replaced with values
 	 *
@@ -562,5 +566,17 @@ public abstract class CellParser {
 			values[i] = parseOne(trim(parts[i]));
 		}
 		return values;
+	}
+
+	@Override
+	public String toString() {
+		return "Parser " + encodedName + "\n" +
+				"\ttype       : " + dataType + "\n" +
+				"\tdefault    : " + defaultValue + "\n" +
+				"\tvirtual    : " + virtual + "\n" +
+				"\tsuppressed : " + suppressed + "\n" +
+				"\taboutUrl   : " + aboutUrl + "\n" +
+				"\tpropertyUrl: " + propertyUrl + "\n" +
+				"\tvalueUrl   : " + valueUrl + "\n";
 	}
 }
