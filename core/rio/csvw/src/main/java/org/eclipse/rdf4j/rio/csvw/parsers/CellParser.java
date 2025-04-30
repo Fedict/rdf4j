@@ -572,6 +572,7 @@ public abstract class CellParser {
 	public String toString() {
 		return "Parser " + encodedName + "\n" +
 				"\ttype       : " + dataType + "\n" +
+				"\tnull       : " + nullValue + "\n" +
 				"\tdefault    : " + defaultValue + "\n" +
 				"\tvirtual    : " + virtual + "\n" +
 				"\tsuppressed : " + suppressed + "\n" +

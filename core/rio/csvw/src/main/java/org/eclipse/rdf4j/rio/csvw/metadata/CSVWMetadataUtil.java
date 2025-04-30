@@ -264,7 +264,13 @@ public class CSVWMetadataUtil {
 		}
 		List<Resource> tables = new ArrayList<>();
 		while (it.hasNext()) {
-			tables.add((Resource) it.next().getObject());
+			Resource table = (Resource) it.next().getObject();
+			// check if whole table is to be suppressed
+			Value val = Models.getProperty(metadata, table, CSVW.SUPPRESS_OUTPUT).orElse(Values.literal(false));
+			boolean suppressed = Boolean.parseBoolean(val.stringValue());
+			if (!suppressed) {
+				tables.add(table);
+			}
 		}
 		return tables;
 	}

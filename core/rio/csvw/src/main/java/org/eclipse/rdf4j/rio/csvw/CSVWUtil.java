@@ -12,23 +12,21 @@ package org.eclipse.rdf4j.rio.csvw;
 
 import java.io.Reader;
 import java.net.URLEncoder;
-import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 
 import org.eclipse.rdf4j.model.IRI;
+import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.model.Model;
 import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.base.CoreDatatype;
 import org.eclipse.rdf4j.model.util.Models;
 import org.eclipse.rdf4j.model.vocabulary.CSVW;
-import org.eclipse.rdf4j.model.vocabulary.RDF;
-import org.eclipse.rdf4j.rio.RDFParseException;
-import org.eclipse.rdf4j.rio.csvw.parsers.CellParser;
-import org.eclipse.rdf4j.rio.csvw.parsers.CellParserFactory;
+import org.eclipse.rdf4j.model.vocabulary.XSD;
+import org.eclipse.rdf4j.rio.languages.BCP47LanguageHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -42,6 +40,8 @@ import com.opencsv.CSVReaderBuilder;
  * @author Bart Hanssens
  */
 public class CSVWUtil {
+	private static final BCP47LanguageHandler LANG = new BCP47LanguageHandler();
+
 	private static final Logger LOGGER = LoggerFactory.getLogger(CSVWUtil.class);
 
 	/**
@@ -158,4 +158,30 @@ public class CSVWUtil {
 		}
 		return Optional.empty();
 	}
+
+	protected static Optional<String> getDatatype(Model metadata, Resource subject, IRI predicate, IRI datatype) {
+		Optional<Literal> lit = Models.getPropertyLiteral(metadata, subject, predicate);
+		if (!lit.isPresent()) {
+			return Optional.empty();
+		}
+		if (!lit.get().getDatatype().equals(datatype)) {
+			LOGGER.warn("Invalid data type for value {} (predicate {})", lit.get(), predicate);
+			return Optional.empty();
+		}
+		return lit.map(l -> l.stringValue());
+	}
+
+	protected static Optional<String> getString(Model metadata, Resource subject, IRI predicate) {
+		return getDatatype(metadata, subject, predicate, XSD.STRING);
+	}
+
+	protected static Optional<String> getTemplate(Model metadata, Resource subject, IRI predicate) {
+		return getDatatype(metadata, subject, predicate, CSVW.URI_TEMPLATE);
+	}
+
+	protected static Optional<String> getLanguage(Model metadata, Resource subject, IRI predicate) {
+		Optional<String> str = getString(metadata, subject, predicate);
+		return (str.isPresent() && LANG.isRecognizedLanguage(str.get())) ? str : Optional.empty();
+	}
+
 }

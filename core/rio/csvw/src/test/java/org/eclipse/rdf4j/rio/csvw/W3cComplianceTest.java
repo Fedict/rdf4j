@@ -295,6 +295,7 @@ public class W3cComplianceTest {
 					))
 					.collect(Collectors.toList());
 		}
+		// return tests;
 		return tests;
 	}
 

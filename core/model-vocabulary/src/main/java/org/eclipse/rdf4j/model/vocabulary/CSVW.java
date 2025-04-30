@@ -165,6 +165,9 @@ public class CSVW {
 	/** csvw:trim */
 	public static final IRI TRIM;
 
+	/** csvw:uriTemplate */
+	public static final IRI URI_TEMPLATE;
+
 	/** csvw:url */
 	public static final IRI URL;
 
@@ -218,6 +221,7 @@ public class CSVW {
 		TEXT_DIRECTION = Vocabularies.createIRI(NAMESPACE, "textDirection");
 		TITLE = Vocabularies.createIRI(NAMESPACE, "title");
 		TRIM = Vocabularies.createIRI(NAMESPACE, "trim");
+		URI_TEMPLATE = Vocabularies.createIRI(NAMESPACE, "uriTemplate");
 		URL = Vocabularies.createIRI(NAMESPACE, "url");
 		VALUE_URL = Vocabularies.createIRI(NAMESPACE, "valueUrl");
 		VIRTUAL = Vocabularies.createIRI(NAMESPACE, "virtual");

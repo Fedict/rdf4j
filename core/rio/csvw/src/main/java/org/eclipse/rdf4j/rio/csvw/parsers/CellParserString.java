@@ -36,5 +36,4 @@ public class CellParserString extends CellParser {
 			return null;
 		}
 	}
-
 }

@@ -20,6 +20,7 @@ import java.net.URL;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.charset.UnsupportedCharsetException;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -237,6 +238,7 @@ public class CSVWParser extends AbstractRDFParser {
 			cellParsers[i].setName(header[i]);
 			cellParsers[i].setPropertyUrl(csvFile + "#" + cellParsers[i].getNameEncoded());
 			cellParsers[i].setColumn(i + 1);
+
 		}
 		return cellParsers;
 	}
@@ -261,8 +263,8 @@ public class CSVWParser extends AbstractRDFParser {
 		Models.getPropertyString(metadata, root, CSVW.TRIM)
 				.ifPresentOrElse(v -> parser.setTrim(v), () -> parser.setTrim("true"));
 
-		Models.getPropertyString(metadata, column, CSVW.NAME)
-				.or(() -> Models.getPropertyString(metadata, column, CSVW.TITLE))
+		CSVWUtil.getString(metadata, column, CSVW.NAME)
+				.or(() -> CSVWUtil.getString(metadata, column, CSVW.TITLE))
 				.ifPresentOrElse(v -> parser.setName(v),
 						() -> new RDFParseException("Metadata file does not contain name for column " + column));
 		Models.getPropertyString(metadata, column, CSVW.VIRTUAL)
@@ -271,9 +273,9 @@ public class CSVWParser extends AbstractRDFParser {
 				.ifPresent(v -> parser.setSuppressed(Boolean.parseBoolean(v)));
 
 		// only useful for numeric
-		Models.getPropertyString(metadata, column, CSVW.DECIMAL_CHAR)
+		CSVWUtil.getString(metadata, column, CSVW.DECIMAL_CHAR)
 				.ifPresentOrElse(v -> parser.setDecimalChar(v), () -> parser.setDecimalChar("."));
-		Models.getPropertyString(metadata, column, CSVW.GROUP_CHAR).ifPresent(v -> parser.setGroupChar(v));
+		CSVWUtil.getString(metadata, column, CSVW.GROUP_CHAR).ifPresent(v -> parser.setGroupChar(v));
 
 		// mostly for date formats
 		CSVWUtil.getFormat(metadata, column).ifPresent(v -> parser.setFormat(v));
@@ -284,20 +286,19 @@ public class CSVWParser extends AbstractRDFParser {
 			if (level == null) {
 				continue;
 			}
-			Models.getPropertyString(metadata, level, CSVW.ABOUT_URL).ifPresent(v -> parser.setAboutUrl(v));
-			Models.getPropertyString(metadata, level, CSVW.PROPERTY_URL).ifPresent(v -> parser.setPropertyUrl(v));
-			Models.getPropertyString(metadata, level, CSVW.VALUE_URL).ifPresent(v -> parser.setValueUrl(v));
+			CSVWUtil.getTemplate(metadata, level, CSVW.ABOUT_URL).ifPresent(v -> parser.setAboutUrl(v));
+			CSVWUtil.getTemplate(metadata, level, CSVW.PROPERTY_URL).ifPresent(v -> parser.setPropertyUrl(v));
+			CSVWUtil.getTemplate(metadata, level, CSVW.VALUE_URL).ifPresent(v -> parser.setValueUrl(v));
 
-			Models.getPropertyString(metadata, level, CSVW.DEFAULT).ifPresent(v -> parser.setDefaultValue(v));
-			Models.getPropertyString(metadata, level, CSVW.NULL).ifPresent(v -> parser.setNullValue(v));
+			CSVWUtil.getString(metadata, level, CSVW.DEFAULT).ifPresent(v -> parser.setDefaultValue(v));
+			CSVWUtil.getString(metadata, level, CSVW.NULL).ifPresent(v -> parser.setNullValue(v));
 
 			// only useful for strings
-			Models.getPropertyString(metadata, level, CSVW.LANG).ifPresent(v -> parser.setLang(v));
-
+			CSVWUtil.getLanguage(metadata, level, CSVW.LANG).ifPresent(v -> parser.setLang(v));
 			Models.getPropertyString(metadata, level, CSVW.REQUIRED)
 					.ifPresent(v -> parser.setRequired(Boolean.parseBoolean(v)));
 
-			Models.getPropertyString(metadata, level, CSVW.SEPARATOR).ifPresent(v -> parser.setSeparator(v));
+			CSVWUtil.getString(metadata, level, CSVW.SEPARATOR).ifPresent(v -> parser.setSeparator(v));
 		}
 
 		if (parser.getPropertyUrl() == null) {
@@ -492,7 +493,7 @@ public class CSVWParser extends AbstractRDFParser {
 
 		long line = 1;
 
-		try (BufferedReader reader = new BufferedReader(new InputStreamReader(input, encoding));
+		try (BufferedReader reader = new BufferedReader(new InputStreamReader(new URL(csvFile).openStream(), encoding));
 				CSVReader csv = CSVWUtil.getCSVReader(dialect, reader)) {
 
 			int headerRows = (int) dialect.get(CSVW.HEADER_ROW_COUNT);
@@ -506,7 +507,7 @@ public class CSVWParser extends AbstractRDFParser {
 				Resource rowURL = Values.iri(csvFile + "#row=" + (line + headerRows));
 				Resource rowSubject = minimal ? Values.bnode() : generateRow(rdfHandler, tableNode, rowURL, line);
 				Resource rowID = null;
-				System.err.println(rowSubject);
+
 				Resource describes = Values.bnode();
 				if (!minimal) {
 					handler.handleStatement(Statements.statement(rowSubject, CSVW.DESCRIBES, describes, null));
@@ -566,43 +567,43 @@ public class CSVWParser extends AbstractRDFParser {
 			Map<String, String> replaceValues = new HashMap<>();
 			String[] cells;
 
-			// ignore header, use metadata
+			// skip header rows, use metadata for column names
 			int headerRows = (int) dialect.get(CSVW.HEADER_ROW_COUNT);
 			getHeader(csv, headerRows);
 
 			while ((cells = csv.readNext()) != null) {
-				System.err.println("line " + line);
 				Resource rowURL = Values.iri(csvFile + "#row=" + (line + headerRows));
 				Resource rowID = getRowAboutURL(cellParsers, cells, aboutURL, aboutIndex, line, placeholder);
 
 				Resource rowSubject = minimal ? Values.bnode() : generateRow(rdfHandler, tableNode, rowURL, line);
+				Resource describeSubject = minimal ? Values.bnode() : rowID;
 
 				replaceValues = new HashMap<>(cells.length + 5, 1.0f);
 				replaceValues.put("_row", Long.toString(line));
-
-				Resource describes = (minimal || rowID == null) ? Values.bnode() : rowID;
 
 				// csv cells
 				for (col = 0; col < cells.length; col++) {
 					String encoded = cellParsers[col].getNameEncoded();
 					Value val = cellParsers[col].parse(cells[col]);
 					if (val != null) {
-						replaceValues.put(encoded, cellParsers[col].parse(cells[col]).stringValue());
+						replaceValues.put(encoded, val.stringValue());
 					}
 					IRI about = cellParsers[col].getAboutUrl(replaceValues);
 					if (!minimal) {
-						Resource node = (about != null && about.isIRI()) ? about : describes;
+						Resource node = (about != null && about.isIRI()) ? about : describeSubject;
 						handler.handleStatement(
 								Statements.statement(rowSubject, CSVW.DESCRIBES, node, null));
 					}
 					if (!cellParsers[col].isSuppressed()) {
-						generateStatements(handler, cellParsers[col], cells[col], describes, replaceValues, line, col);
+						generateDescribed(handler, cellParsers[col], cells[col], describeSubject, replaceValues, line,
+								col);
 					}
 				}
 
 				// virtual columns, if any
 				for (col = cells.length; col < cellParsers.length; col++) {
-					generateStatements(handler, cellParsers[col], (String) null, describes, replaceValues, line, col);
+					generateDescribed(handler, cellParsers[col], (String) null, describeSubject, replaceValues, line,
+							col);
 				}
 				line++;
 			}
@@ -622,7 +623,7 @@ public class CSVWParser extends AbstractRDFParser {
 	 * @param aboutSubject
 	 * @param replaceValues
 	 */
-	private void generateStatements(RDFHandler handler, CellParser cellParser, String cell, Resource aboutSubject,
+	private void generateDescribed(RDFHandler handler, CellParser cellParser, String cell, Resource aboutSubject,
 			Map<String, String> replaceValues, long line, int col) {
 		Resource subj = cellParser.getAboutUrl(replaceValues);
 		if (subj == null) {
@@ -683,7 +684,7 @@ public class CSVWParser extends AbstractRDFParser {
 			aboutURL = aboutURL.replace("{#_row}", "#" + line).replace("{_row}", "" + line);
 			return Values.iri(aboutURL);
 		}
-		return null;
+		return Values.bnode();
 	}
 
 	/**
