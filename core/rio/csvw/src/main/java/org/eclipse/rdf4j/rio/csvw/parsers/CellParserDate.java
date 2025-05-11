@@ -10,13 +10,21 @@
  *******************************************************************************/
 package org.eclipse.rdf4j.rio.csvw.parsers;
 
+import static java.time.temporal.ChronoField.DAY_OF_MONTH;
+import static java.time.temporal.ChronoField.HOUR_OF_DAY;
+import static java.time.temporal.ChronoField.MINUTE_OF_HOUR;
+import static java.time.temporal.ChronoField.MONTH_OF_YEAR;
+import static java.time.temporal.ChronoField.NANO_OF_SECOND;
+import static java.time.temporal.ChronoField.SECOND_OF_MINUTE;
+import static java.time.temporal.ChronoField.YEAR;
+
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeFormatterBuilder;
 import java.time.format.DateTimeParseException;
-import java.time.format.ResolverStyle;
+import java.time.format.SignStyle;
 import java.time.temporal.ChronoField;
 import java.time.temporal.TemporalAccessor;
 import java.time.temporal.TemporalField;
-import java.util.HashSet;
 import java.util.Set;
 
 import org.eclipse.rdf4j.model.Value;
@@ -28,7 +36,7 @@ import org.slf4j.LoggerFactory;
  *
  * @author Bart Hanssens
  */
-public class CellParserDate extends CellParser {
+public class CellParserDate extends CellParser<TemporalAccessor> {
 	private static final Logger LOGGER = LoggerFactory.getLogger(CellParserDate.class);
 
 	private DateTimeFormatter formatter;
@@ -49,9 +57,14 @@ public class CellParserDate extends CellParser {
 	protected Value parseOne(String str) {
 		if (formatter != null) {
 			try {
+
 				TemporalAccessor temp = formatter.parse(str);
 				return Values.literal(temp);
-			} catch (DateTimeParseException dtpe) {
+				/*
+				 * return (formatter.getResolverFields() == null) ? Values.literal(temp) : Values.literal(temp,
+				 * getDataType());
+				 */
+			} catch (DateTimeParseException | IllegalArgumentException dtpe) {
 				LOGGER.error("Not a valid value " + str + " " + getDataType());
 				return null;
 			}

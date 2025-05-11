@@ -12,7 +12,6 @@ package org.eclipse.rdf4j.rio.csvw.parsers;
 
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.util.Values;
-import org.eclipse.rdf4j.rio.csvw.metadata.CSVWMetadataPath;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -20,7 +19,7 @@ import org.slf4j.LoggerFactory;
  *
  * @author Bart Hanssens
  */
-public class CellParserDecimal extends CellParser {
+public class CellParserDecimal extends CellParser<Double> {
 	private static final Logger LOGGER = LoggerFactory.getLogger(CellParserDecimal.class);
 
 	@Override

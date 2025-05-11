@@ -25,6 +25,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 import org.eclipse.rdf4j.model.BNode;
 import org.eclipse.rdf4j.model.IRI;
@@ -96,8 +97,8 @@ public class CSVWParser extends AbstractRDFParser {
 		Resource tableGroup = generateTablegroup(minimal, rdfHandler);
 
 		Resource rootSubject = CSVWMetadataUtil.getRootSubject(metadata);
-		// Model comments = CSVWMetadataUtil.getComments(metadata, rootSubject, tableGroup);
-//		comments.forEach(s -> rdfHandler.handleStatement(s));
+
+		Model rootComments = CSVWMetadataUtil.getComments(metadata, rootSubject, tableGroup);
 
 		if (!metadata.isEmpty()) {
 			List<Resource> tables = CSVWMetadataUtil.getTables(metadata);
@@ -346,16 +347,17 @@ public class CSVWParser extends AbstractRDFParser {
 	 * @return aboutURL or null
 	 */
 	private String getAboutURL(Model metadata, Resource table) {
-		Optional<String> url = Models.getPropertyString(metadata, table, CSVW.ABOUT_URL);
+		Optional<String> url = CSVWUtil.getTemplate(metadata, table, CSVW.ABOUT_URL);
 		if (!url.isPresent()) {
 			Resource tableSchema = CSVWMetadataUtil.getTableSchema(metadata, table);
 			if (tableSchema != null) {
-				url = Models.getPropertyString(metadata, tableSchema, CSVW.ABOUT_URL);
+				url = CSVWUtil.getTemplate(metadata, tableSchema, CSVW.ABOUT_URL);
 			}
 		}
 		if (!url.isPresent()) {
 			return null;
 		}
+
 		String str = url.get();
 		if (str.startsWith("#")) {
 			Optional<Namespace> localNs = metadata.getNamespace("");
@@ -567,11 +569,18 @@ public class CSVWParser extends AbstractRDFParser {
 			Map<String, String> replaceValues = new HashMap<>();
 			String[] cells;
 
+			//
+			boolean skipBlank = (boolean) dialect.get(CSVW.SKIP_BLANK_ROWS);
+
 			// skip header rows, use metadata for column names
 			int headerRows = (int) dialect.get(CSVW.HEADER_ROW_COUNT);
 			getHeader(csv, headerRows);
 
 			while ((cells = csv.readNext()) != null) {
+				if (skipBlank && Stream.of(cells).allMatch(c -> c.isBlank())) {
+					line++;
+					continue;
+				}
 				Resource rowURL = Values.iri(csvFile + "#row=" + (line + headerRows));
 				Resource rowID = getRowAboutURL(cellParsers, cells, aboutURL, aboutIndex, line, placeholder);
 

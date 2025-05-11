@@ -159,29 +159,40 @@ public class CSVWUtil {
 		return Optional.empty();
 	}
 
-	protected static Optional<String> getDatatype(Model metadata, Resource subject, IRI predicate, IRI datatype) {
+	/**
+	 * Get property and check if datatype of that property matches the expected datatype
+	 *
+	 * @param metadata
+	 * @param subject
+	 * @param predicate
+	 * @param datatype
+	 * @return
+	 */
+	protected static Optional<String> getCheckedProperty(Model metadata, Resource subject, IRI predicate,
+			IRI datatype) {
 		Optional<Literal> lit = Models.getPropertyLiteral(metadata, subject, predicate);
 		if (!lit.isPresent()) {
 			return Optional.empty();
 		}
-		if (!lit.get().getDatatype().equals(datatype)) {
-			LOGGER.warn("Invalid data type for value {} (predicate {})", lit.get(), predicate);
+		Literal value = lit.get();
+		if (!value.getDatatype().equals(datatype)) {
+			LOGGER.warn("Invalid data type {} for value {}, expected {} (predicate {})", value.getDatatype(),
+					value.getLabel(), datatype, predicate);
 			return Optional.empty();
 		}
 		return lit.map(l -> l.stringValue());
 	}
 
 	protected static Optional<String> getString(Model metadata, Resource subject, IRI predicate) {
-		return getDatatype(metadata, subject, predicate, XSD.STRING);
+		return getCheckedProperty(metadata, subject, predicate, XSD.STRING);
 	}
 
 	protected static Optional<String> getTemplate(Model metadata, Resource subject, IRI predicate) {
-		return getDatatype(metadata, subject, predicate, CSVW.URI_TEMPLATE);
+		return getCheckedProperty(metadata, subject, predicate, CSVW.URI_TEMPLATE);
 	}
 
 	protected static Optional<String> getLanguage(Model metadata, Resource subject, IRI predicate) {
 		Optional<String> str = getString(metadata, subject, predicate);
 		return (str.isPresent() && LANG.isRecognizedLanguage(str.get())) ? str : Optional.empty();
 	}
-
 }

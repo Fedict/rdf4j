@@ -136,9 +136,9 @@ public class W3cComplianceTest {
 			assertTrue(Models.isomorphic(result, expected), testCase.name);
 		} catch (Error e) {
 			StringWriter w = new StringWriter();
-			w.write("\nResult\n");
+			w.write("\nResult:\n");
 			Rio.write(result, w, RDFFormat.TURTLE, ttlcfg);
-			w.write("\nExpected\n");
+			w.write("\nExpected:\n");
 			Rio.write(expected, w, RDFFormat.TURTLE, ttlcfg);
 			System.out.println(w.toString());
 			throw (e);
@@ -175,7 +175,6 @@ public class W3cComplianceTest {
 			installWrapper(testCase.link);
 		}
 
-		System.err.println("Test " + testCase.name);
 		try {
 			ParserConfig cfg = new ParserConfig();
 			URL csv = testCase.getCSV();
@@ -193,7 +192,7 @@ public class W3cComplianceTest {
 				}
 			} else {
 				CSVWMetadataProvider meta = (testCase.metadata == null)
-						? new CSVWMetadataFinder(testCase.getCSV())
+						? new CSVWMetadataFinder(csv)
 						: new CSVWMetadataLocation(new URL(testCase.metadata));
 				// basic tests, possibly without metadata file
 				cfg.set(CSVWParserSettings.METADATA_INPUT_MODE, false);
@@ -201,8 +200,9 @@ public class W3cComplianceTest {
 				cfg.set(CSVWParserSettings.MINIMAL_MODE, testCase.isMinimal());
 				// cfg.set(CSVWParserSettings.DATA_URL, testCase.getCSV().toString());
 
-				try (InputStream is = testCase.getCSV().openStream()) {
-					compareResults(testCase, cfg, testCase.getCSV().toString(), is);
+				System.err.println(csv);
+				try (InputStream is = csv.openStream()) {
+					compareResults(testCase, cfg, csv.toString(), is);
 				}
 
 			}
@@ -213,10 +213,9 @@ public class W3cComplianceTest {
 			if (testCase.testType.getLocalName().equals("NegativeRdfTest")) {
 				assertNotNull(ex);
 			} else {
-				fail();
+				throw (ex);
 			}
 		}
-		System.err.println("Test is done");
 		if (testCase.link != null) {
 			server.stop();
 			server.setHandler(handlerList);
@@ -295,8 +294,13 @@ public class W3cComplianceTest {
 					))
 					.collect(Collectors.toList());
 		}
-		// return tests;
 		return tests;
+
+		// return tests.stream() .filter(t -> t.testType.equals(Values.iri(csvtMF, "ToRdfTest")))
+		// collect(Collectors.toList())
+
+		// return tests.subList(21, 23);
+
 	}
 
 	/* Test Object */

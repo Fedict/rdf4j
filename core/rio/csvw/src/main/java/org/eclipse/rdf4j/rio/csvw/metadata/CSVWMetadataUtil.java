@@ -10,7 +10,6 @@
  *******************************************************************************/
 package org.eclipse.rdf4j.rio.csvw.metadata;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.ProxySelector;
@@ -18,7 +17,6 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -32,25 +30,26 @@ import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
 import org.eclipse.rdf4j.model.IRI;
+import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.model.Model;
-import org.eclipse.rdf4j.model.Namespace;
 import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.Value;
 import org.eclipse.rdf4j.model.impl.LinkedHashModel;
+import org.eclipse.rdf4j.model.impl.ValidatingValueFactory;
 import org.eclipse.rdf4j.model.util.Models;
 import org.eclipse.rdf4j.model.util.RDFCollections;
 import org.eclipse.rdf4j.model.util.Statements;
 import org.eclipse.rdf4j.model.util.Values;
 import org.eclipse.rdf4j.model.vocabulary.CSVW;
-import org.eclipse.rdf4j.model.vocabulary.RDF;
+import org.eclipse.rdf4j.model.vocabulary.XSD;
 import org.eclipse.rdf4j.rio.ParserConfig;
 import org.eclipse.rdf4j.rio.RDFFormat;
 import org.eclipse.rdf4j.rio.RDFParseException;
 import org.eclipse.rdf4j.rio.RDFParser;
 import org.eclipse.rdf4j.rio.Rio;
+import org.eclipse.rdf4j.rio.helpers.BasicParserSettings;
 import org.eclipse.rdf4j.rio.helpers.JSONLDSettings;
-import org.eclipse.rdf4j.rio.jsonld.JSONLDParserFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -67,9 +66,12 @@ public class CSVWMetadataUtil {
 			.proxy(ProxySelector.getDefault())
 			.build();
 
-	private static final ParserConfig METADATA_CFG = new ParserConfig().set(JSONLDSettings.WHITELIST,
-			Set.of("http://www.w3.org/ns/csvw", "https://www.w3.org/ns/csvw",
-					"https://www.w3.org/ns/csvw.jsonld", "https://schema.org", "http://schema.org/"));
+	private static final ParserConfig METADATA_CFG = new ParserConfig()
+			.set(JSONLDSettings.WHITELIST, Set.of("http://www.w3.org/ns/csvw", "https://www.w3.org/ns/csvw",
+					"https://www.w3.org/ns/csvw.jsonld", "https://schema.org", "http://schema.org/"))
+			.set(BasicParserSettings.VERIFY_DATATYPE_VALUES, true)
+			.set(JSONLDSettings.USE_NATIVE_TYPES, true)
+			.set(JSONLDSettings.EXCEPTION_ON_WARNING, false);
 
 	/**
 	 * Get the JSON-LD m as an RDF model
@@ -83,6 +85,7 @@ public class CSVWMetadataUtil {
 
 		InputStream minput = (provider != null) ? provider.getMetadata() : null;
 		if (minput != null) {
+			RDFParser createParser = Rio.createParser(RDFFormat.JSONLD);
 			m = Rio.parse(minput, null, RDFFormat.JSONLD, METADATA_CFG);
 		}
 		return (m != null) ? m : new LinkedHashModel();
@@ -124,7 +127,7 @@ public class CSVWMetadataUtil {
 			dialect = Values.bnode();
 		}
 		map.put(CSVW.ENCODING,
-				Models.getPropertyString(m, dialect, CSVW.ENCODING).orElse("utf-8"));
+				getString(m, dialect, CSVW.ENCODING).orElse("utf-8"));
 		map.put(CSVW.HEADER,
 				Boolean.valueOf(Models.getPropertyString(m, dialect, CSVW.HEADER).orElse("true")));
 		map.put(CSVW.HEADER_ROW_COUNT,
@@ -132,13 +135,15 @@ public class CSVWMetadataUtil {
 		map.put(CSVW.SKIP_ROWS,
 				Integer.valueOf(Models.getPropertyString(m, dialect, CSVW.SKIP_ROWS).orElse("0")));
 		map.put(CSVW.DELIMITER,
-				Models.getPropertyString(m, dialect, CSVW.DELIMITER).orElse(","));
+				getString(m, dialect, CSVW.DELIMITER).orElse(","));
 		map.put(CSVW.QUOTE_CHAR,
-				Models.getPropertyString(m, dialect, CSVW.QUOTE_CHAR).orElse("\""));
+				getString(m, dialect, CSVW.QUOTE_CHAR).orElse("\""));
 		map.put(CSVW.DOUBLE_QUOTE,
-				Models.getPropertyString(m, dialect, CSVW.DOUBLE_QUOTE).orElse("\\"));
+				getString(m, dialect, CSVW.DOUBLE_QUOTE).orElse("\\"));
 		map.put(CSVW.TRIM,
 				Models.getPropertyString(m, dialect, CSVW.TRIM).orElse("true"));
+		map.put(CSVW.SKIP_BLANK_ROWS,
+				Boolean.valueOf(Models.getPropertyString(m, dialect, CSVW.SKIP_BLANK_ROWS).orElse("false")));
 		map.put(CSVW.SKIP_INITIAL_SPACE,
 				Boolean.valueOf(Models.getPropertyString(m, dialect, CSVW.SKIP_INITIAL_SPACE).orElse("true")));
 		return map;
@@ -319,6 +324,26 @@ public class CSVWMetadataUtil {
 			Thread.currentThread().interrupt();
 		}
 		return null;
+	}
+
+	protected static Optional<String> getDatatype(Model metadata, Resource subject, IRI predicate, IRI datatype) {
+		Optional<Literal> lit = Models.getPropertyLiteral(metadata, subject, predicate);
+		if (!lit.isPresent()) {
+			return Optional.empty();
+		}
+		if (!lit.get().getDatatype().equals(datatype)) {
+			LOGGER.warn("Invalid data type for value {} (predicate {})", lit.get(), predicate);
+			return Optional.empty();
+		}
+		return lit.map(l -> l.stringValue());
+	}
+
+	protected static Optional<String> getString(Model metadata, Resource subject, IRI predicate) {
+		return getDatatype(metadata, subject, predicate, XSD.STRING);
+	}
+
+	protected static Optional<String> getTemplate(Model metadata, Resource subject, IRI predicate) {
+		return getDatatype(metadata, subject, predicate, CSVW.URI_TEMPLATE);
 	}
 
 }

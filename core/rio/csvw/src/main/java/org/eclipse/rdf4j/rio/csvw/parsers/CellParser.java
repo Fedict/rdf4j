@@ -26,7 +26,7 @@ import org.eclipse.rdf4j.rio.csvw.CSVWUtil;
  *
  * @author Bart Hanssens
  */
-public abstract class CellParser {
+public abstract class CellParser<T> {
 	private static final Pattern PLACEHOLDERS = Pattern.compile("\\{#?(_?[^\\}]+)\\}");
 
 	private Set<Namespace> namespaces;
@@ -42,6 +42,13 @@ public abstract class CellParser {
 	private String propertyUrl;
 	private String valueUrl;
 	private String format;
+	private String length;
+	private String minLength;
+	private String maxLength;
+	private Object minVal;
+	private Object minExclVal;
+	private Object maxVal;
+	private Object maxExclVal;
 	private String decimalChar = ".";
 	private String groupChar;
 	private String separator;
@@ -139,6 +146,104 @@ public abstract class CellParser {
 	 */
 	public void setFormat(String format) {
 		this.format = format;
+	}
+
+	/**
+	 * @return the length
+	 */
+	public String getLength() {
+		return length;
+	}
+
+	/**
+	 * @param length the length to set
+	 */
+	public void setLength(String length) {
+		this.length = length;
+	}
+
+	/**
+	 * @return the minLength
+	 */
+	public String getMinLength() {
+		return minLength;
+	}
+
+	/**
+	 * @param minLength the minLength to set
+	 */
+	public void setMinLength(String minLength) {
+		this.minLength = minLength;
+	}
+
+	/**
+	 * @return the maxLength
+	 */
+	public String getMaxLength() {
+		return maxLength;
+	}
+
+	/**
+	 * @param maxLength the maxLength to set
+	 */
+	public void setMaxLength(String maxLength) {
+		this.maxLength = maxLength;
+	}
+
+	/**
+	 * @return the minVal
+	 */
+	public Object getMinVal() {
+		return minVal;
+	}
+
+	/**
+	 * @param minVal the minVal to set
+	 */
+	public void setMinVal(Object minVal) {
+		this.minVal = minVal;
+	}
+
+	/**
+	 * @return the minExclVal
+	 */
+	public Object getMinExclVal() {
+		return minExclVal;
+	}
+
+	/**
+	 * @param minExclVal the minExclVal to set
+	 */
+	public void setMinExclVal(Object minExclVal) {
+		this.minExclVal = minExclVal;
+	}
+
+	/**
+	 * @return the maxVal
+	 */
+	public Object getMaxVal() {
+		return maxVal;
+	}
+
+	/**
+	 * @param maxVal the maxVal to set
+	 */
+	public void setMaxVal(Object maxVal) {
+		this.maxVal = maxVal;
+	}
+
+	/**
+	 * @return the maxExclVal
+	 */
+	public Object getMaxExclVal() {
+		return maxExclVal;
+	}
+
+	/**
+	 * @param maxExclVal the maxExclVal to set
+	 */
+	public void setMaxExclVal(Object maxExclVal) {
+		this.maxExclVal = maxExclVal;
 	}
 
 	/**
@@ -401,8 +506,8 @@ public abstract class CellParser {
 	 * @param aboutUrl
 	 */
 	public void setAboutUrl(String aboutUrl) {
-		this.aboutUrl = replacePlaceholders(aboutUrl);
-		aboutPlaceholders = getPlaceholders(aboutUrl);
+		this.aboutUrl = (aboutUrl != null) ? replacePlaceholders(aboutUrl) : null;
+		aboutPlaceholders = (aboutUrl != null) ? getPlaceholders(aboutUrl) : null;
 	}
 
 	/**
@@ -566,6 +671,11 @@ public abstract class CellParser {
 			values[i] = parseOne(trim(parts[i]));
 		}
 		return values;
+	}
+
+	// FIXME
+	public boolean isValid() {
+		return true;
 	}
 
 	@Override

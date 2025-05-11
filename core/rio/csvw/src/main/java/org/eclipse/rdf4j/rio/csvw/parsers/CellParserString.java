@@ -20,7 +20,7 @@ import org.slf4j.LoggerFactory;
  *
  * @author Bart Hanssens
  */
-public class CellParserString extends CellParser {
+public class CellParserString extends CellParser<String> {
 	private static final Logger LOGGER = LoggerFactory.getLogger(CellParserString.class);
 
 	@Override
