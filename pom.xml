@@ -3,7 +3,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>org.eclipse.rdf4j</groupId>
 	<artifactId>rdf4j</artifactId>
-	<version>5.1.0-SNAPSHOT</version>
+	<version>5.2.3-SNAPSHOT</version>
 	<packaging>pom</packaging>
 	<name>Eclipse RDF4J</name>
 	<description>An extensible Java framework for RDF and SPARQL</description>
@@ -265,6 +265,32 @@
 			</build>
 		</profile>
 		<profile>
+			<id>jacoco</id>
+			<build>
+				<plugins>
+					<plugin>
+						<groupId>org.jacoco</groupId>
+						<artifactId>jacoco-maven-plugin</artifactId>
+						<version>0.8.13</version>
+						<executions>
+							<execution>
+								<goals>
+									<goal>prepare-agent</goal>
+								</goals>
+							</execution>
+							<execution>
+								<id>report</id>
+								<phase>verify</phase>
+								<goals>
+									<goal>report</goal>
+								</goals>
+							</execution>
+						</executions>
+					</plugin>
+				</plugins>
+			</build>
+		</profile>
+		<profile>
 			<id>formatting</id>
 			<activation>
 				<!-- active on all Java 11 and higher builds by default -->
@@ -378,6 +404,7 @@
 		<junit.version>5.9.3</junit.version>
 		<jetty.version>9.4.54.v20240208</jetty.version>
 		<netty.version>4.1.111.Final</netty.version>
+		<argLine/>
 	</properties>
 	<dependencyManagement>
 		<dependencies>
@@ -447,7 +474,7 @@
 			<dependency>
 				<groupId>org.apache.commons</groupId>
 				<artifactId>commons-lang3</artifactId>
-				<version>3.12.0</version>
+				<version>3.18.0</version>
 			</dependency>
 			<dependency>
 				<groupId>org.apache.httpcomponents</groupId>
@@ -629,7 +656,7 @@
 			<dependency>
 				<groupId>no.hasmac</groupId>
 				<artifactId>hasmac-json-ld</artifactId>
-				<version>0.9.0</version>
+				<version>0.10.2</version>
 			</dependency>
 			<!-- kerby is used by solr-->
 			<dependency>
@@ -812,19 +839,21 @@
 				<plugin>
 					<groupId>org.apache.maven.plugins</groupId>
 					<artifactId>maven-surefire-plugin</artifactId>
-					<version>3.2.5</version>
+					<version>3.5.4</version>
 					<configuration>
-						<argLine>-Xmx2048M</argLine>
+						<!-- Prepend JaCoCo agent args when profile 'jacoco' sets @{argLine} -->
+						<argLine>@{argLine} -Xmx2G</argLine>
 					</configuration>
 				</plugin>
 				<plugin>
 					<groupId>org.apache.maven.plugins</groupId>
 					<artifactId>maven-failsafe-plugin</artifactId>
-					<version>3.2.5</version>
+					<version>3.5.4</version>
 					<configuration>
 						<forkCount>1</forkCount>
 						<reuseForks>false</reuseForks>
-						<argLine>-Xmx1G</argLine>
+						<!-- Prepend JaCoCo agent args when profile 'jacoco' sets @{argLine} -->
+						<argLine>@{argLine} -Xmx2G</argLine>
 						<includes>
 							<include>**/*IT.java</include>
 						</includes>
