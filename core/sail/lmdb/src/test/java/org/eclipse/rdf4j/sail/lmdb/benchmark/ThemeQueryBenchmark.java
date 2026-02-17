@@ -15,19 +15,26 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.io.FileUtils;
 import org.assertj.core.util.Files;
+import org.eclipse.rdf4j.benchmark.common.BenchmarkQuery;
 import org.eclipse.rdf4j.benchmark.common.ThemeQueryCatalog;
+import org.eclipse.rdf4j.benchmark.common.plan.FeatureFlagCollector;
+import org.eclipse.rdf4j.benchmark.common.plan.QueryPlanCapture;
+import org.eclipse.rdf4j.benchmark.common.plan.QueryPlanCaptureContext;
 import org.eclipse.rdf4j.benchmark.rio.util.ThemeDataSetGenerator;
 import org.eclipse.rdf4j.benchmark.rio.util.ThemeDataSetGenerator.Theme;
 import org.eclipse.rdf4j.common.transaction.IsolationLevels;
 import org.eclipse.rdf4j.query.explanation.Explanation;
+import org.eclipse.rdf4j.queryrender.sparql.TupleExprIRRenderer;
 import org.eclipse.rdf4j.repository.sail.SailRepository;
 import org.eclipse.rdf4j.repository.sail.SailRepositoryConnection;
 import org.eclipse.rdf4j.repository.util.RDFInserter;
 import org.eclipse.rdf4j.sail.lmdb.LmdbStore;
+import org.eclipse.rdf4j.sail.lmdb.config.LmdbStoreConfig;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openjdk.jmh.annotations.Benchmark;
@@ -56,6 +63,8 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 public class ThemeQueryBenchmark {
 
+	private static final String STORE_NAME = "lmdb";
+
 	@Param({ "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10" })
 	public int z_queryIndex;
 
@@ -73,6 +82,8 @@ public class ThemeQueryBenchmark {
 
 	private File dataDir;
 	private SailRepository repository;
+	private LmdbStore store;
+	private LmdbStoreConfig storeConfig;
 	private Theme theme;
 	private String query;
 	private long expected;
@@ -91,8 +102,13 @@ public class ThemeQueryBenchmark {
 		query = ThemeQueryCatalog.queryFor(theme, z_queryIndex);
 		expected = ThemeQueryCatalog.expectedCountFor(theme, z_queryIndex);
 		dataDir = Files.newTemporaryFolder();
-		repository = new SailRepository(new LmdbStore(dataDir, ConfigUtil.createConfig()));
+		storeConfig = ConfigUtil.createConfig();
+		store = new LmdbStore(dataDir, storeConfig);
+		repository = new SailRepository(store);
 		loadData();
+		if (QueryPlanCapture.isCaptureEnabled()) {
+			captureQueryPlanSnapshot();
+		}
 	}
 
 	private void loadData() throws IOException {
@@ -102,6 +118,47 @@ public class ThemeQueryBenchmark {
 			ThemeDataSetGenerator.generate(theme, inserter);
 			connection.commit();
 		}
+	}
+
+	private void captureQueryPlanSnapshot() throws IOException {
+		BenchmarkQuery benchmarkQuery = ThemeQueryCatalog.benchmarkQueryFor(theme, z_queryIndex);
+		FeatureFlagCollector featureFlags = new FeatureFlagCollector()
+				.addValue("themeBenchmark.themeName", () -> themeName)
+				.addValue("themeBenchmark.queryIndex", () -> z_queryIndex)
+				.addReflectiveGetter("lmdbStore.writable", store, "isWritable")
+				.addReflectiveGetter("lmdbConfig.tripleIndexes", storeConfig, "getTripleIndexes")
+				.addReflectiveGetter("lmdbConfig.forceSync", storeConfig, "getForceSync")
+				.addReflectiveField("lmdbConfig.autoGrow", storeConfig, "autoGrow")
+				.addReflectiveGetter("lmdbConfig.valueDbSize", storeConfig, "getValueDBSize")
+				.addReflectiveGetter("lmdbConfig.tripleDbSize", storeConfig, "getTripleDBSize");
+		QueryPlanCapture.registerConfiguredFeatureFlags(featureFlags);
+
+		QueryPlanCaptureContext context = QueryPlanCaptureContext.builder()
+				.outputDirectory(QueryPlanCapture.resolveOutputDirectory().resolve(STORE_NAME))
+				.queryId(STORE_NAME + "-" + themeName + "-q" + z_queryIndex)
+				.queryString(query)
+				.benchmark("ThemeQueryBenchmark")
+				.addMetadata("store", STORE_NAME)
+				.addMetadata("theme", themeName)
+				.addMetadata("queryIndex", Integer.toString(z_queryIndex))
+				.addMetadata("queryName", benchmarkQuery.getName())
+				.addMetadata("expectedCount", Long.toString(expected))
+				.addMetadata(QueryPlanCapture.metadataFromSystemProperties())
+				.featureFlagCollector(featureFlags)
+				.tupleExprRenderer(this::renderTupleExprWithIr)
+				.build();
+
+		try (SailRepositoryConnection connection = repository.getConnection()) {
+			Path snapshotPath = new QueryPlanCapture()
+					.captureAndWrite(context, () -> connection.prepareTupleQuery(query));
+			System.out.println("Query plan snapshot written to: " + snapshotPath);
+		}
+	}
+
+	private String renderTupleExprWithIr(org.eclipse.rdf4j.query.algebra.TupleExpr tupleExpr) {
+		TupleExprIRRenderer.Config config = new TupleExprIRRenderer.Config();
+		config.verifyRoundTrip = false;
+		return new TupleExprIRRenderer(config).render(tupleExpr);
 	}
 
 	@TearDown(Level.Trial)
