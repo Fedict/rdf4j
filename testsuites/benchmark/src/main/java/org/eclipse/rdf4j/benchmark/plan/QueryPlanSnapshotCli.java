@@ -35,6 +35,7 @@ import org.eclipse.rdf4j.benchmark.common.plan.QueryPlanExplanation;
 import org.eclipse.rdf4j.benchmark.common.plan.QueryPlanSnapshot;
 import org.eclipse.rdf4j.benchmark.rio.util.ThemeDataSetGenerator.Theme;
 import org.eclipse.rdf4j.common.annotation.Experimental;
+import org.eclipse.rdf4j.query.QueryInterruptedException;
 import org.eclipse.rdf4j.query.TupleQuery;
 import org.eclipse.rdf4j.queryrender.sparql.TupleExprIRRenderer;
 import org.eclipse.rdf4j.repository.sail.SailRepositoryConnection;
@@ -1016,10 +1017,17 @@ public final class QueryPlanSnapshotCli {
 			}
 
 			long startedAt = System.nanoTime();
-			long currentResultCount = prepareTupleQuery(connection, queryText, queryTimeoutSeconds)
-					.evaluate()
-					.stream()
-					.count();
+			long currentResultCount;
+			try {
+				currentResultCount = prepareTupleQuery(connection, queryText, queryTimeoutSeconds)
+						.evaluate()
+						.stream()
+						.count();
+			}catch (QueryInterruptedException interrupted) {
+				softLimitReached = true;
+				break;
+			}
+
 			long runNanos = Math.max(1L, System.nanoTime() - startedAt);
 			elapsedNanos += runNanos;
 			runs++;
