@@ -171,9 +171,9 @@ public final class QueryPlanSnapshotCli {
 
 	private void runSingleQueryCapture(QueryPlanSnapshotCliOptions options,
 			QueryPlanSnapshotStoreSupport.StoreRuntime storeRuntime) throws Exception {
-		for (Theme theme : Theme.values()) {
-			QueryPlanSnapshotStoreSupport.loadThemeData(storeRuntime.repository, theme);
-		}
+		QueryPlanSnapshotStoreSupport.ThemeDataLoadStatus themeDataLoadStatus = QueryPlanSnapshotStoreSupport
+				.ensureThemeDataLoaded(storeRuntime);
+		printThemeDataLoadStatus(themeDataLoadStatus);
 		BenchmarkQuery benchmarkQuery = resolveBenchmarkQuery(options);
 		String queryText = resolveQueryText(options, benchmarkQuery);
 		String querySource = benchmarkQuery == null ? "direct" : "theme-index";
@@ -182,7 +182,8 @@ public final class QueryPlanSnapshotCli {
 				? options.outputDirectory
 				: defaultOutputDirectory(options.store);
 
-		FeatureFlagCollector featureFlags = createFeatureFlagCollector(options, storeRuntime, querySource);
+		FeatureFlagCollector featureFlags = createFeatureFlagCollector(options, storeRuntime, querySource,
+				themeDataLoadStatus);
 		QueryPlanCaptureContext context = createContext(options, benchmarkQuery, queryText, querySource, queryId,
 				outputDirectory, featureFlags);
 		QueryPlanCapture capture = new QueryPlanCapture();
@@ -218,14 +219,13 @@ public final class QueryPlanSnapshotCli {
 		Path outputDirectory = options.outputDirectory != null
 				? options.outputDirectory
 				: defaultOutputDirectory(options.store);
+		QueryPlanSnapshotStoreSupport.ThemeDataLoadStatus themeDataLoadStatus = QueryPlanSnapshotStoreSupport
+				.ensureThemeDataLoaded(storeRuntime);
+		printThemeDataLoadStatus(themeDataLoadStatus);
 		QueryPlanCapture capture = new QueryPlanCapture();
 		Theme[] allThemes = Theme.values();
 		int total = allThemes.length * ThemeQueryCatalog.QUERY_COUNT;
 		int current = 0;
-
-		for (Theme theme : allThemes) {
-			QueryPlanSnapshotStoreSupport.loadThemeData(storeRuntime.repository, theme);
-		}
 
 		for (Theme theme : allThemes) {
 			for (int queryIndex = 0; queryIndex < ThemeQueryCatalog.QUERY_COUNT; queryIndex++) {
@@ -239,7 +239,7 @@ public final class QueryPlanSnapshotCli {
 				String queryId = defaultQueryId(perQueryOptions, benchmarkQuery);
 
 				FeatureFlagCollector featureFlags = createFeatureFlagCollector(perQueryOptions, storeRuntime,
-						querySource);
+						querySource, themeDataLoadStatus);
 				QueryPlanCaptureContext context = createContext(perQueryOptions, benchmarkQuery, queryText, querySource,
 						queryId, outputDirectory, featureFlags);
 
@@ -883,6 +883,19 @@ public final class QueryPlanSnapshotCli {
 		}
 	}
 
+	private void printThemeDataLoadStatus(QueryPlanSnapshotStoreSupport.ThemeDataLoadStatus themeDataLoadStatus) {
+		if (themeDataLoadStatus.lmdbFullyLoadedSizeBytes == null) {
+			return;
+		}
+		if (themeDataLoadStatus.reusedLmdbData) {
+			output.println("LMDB data already fully loaded (" + themeDataLoadStatus.lmdbFullyLoadedSizeBytes
+					+ " bytes). Skipping reload.");
+			return;
+		}
+		output.println("LMDB data loaded. Recorded fully-loaded size=" + themeDataLoadStatus.lmdbFullyLoadedSizeBytes
+				+ " bytes.");
+	}
+
 	private static QueryPlanCaptureContext createContext(QueryPlanSnapshotCliOptions options,
 			BenchmarkQuery benchmarkQuery,
 			String queryText, String querySource, String queryId, Path outputDirectory,
@@ -916,7 +929,8 @@ public final class QueryPlanSnapshotCli {
 	}
 
 	private static FeatureFlagCollector createFeatureFlagCollector(QueryPlanSnapshotCliOptions options,
-			QueryPlanSnapshotStoreSupport.StoreRuntime storeRuntime, String querySource) {
+			QueryPlanSnapshotStoreSupport.StoreRuntime storeRuntime, String querySource,
+			QueryPlanSnapshotStoreSupport.ThemeDataLoadStatus themeDataLoadStatus) {
 		FeatureFlagCollector featureFlags = new FeatureFlagCollector()
 				.addValue("cli.store", options.store.id)
 				.addValue("cli.theme", options.theme.name())
@@ -944,6 +958,11 @@ public final class QueryPlanSnapshotCli {
 					.addReflectiveField("lmdbConfig.autoGrow", storeRuntime.lmdbStoreConfig, "autoGrow")
 					.addReflectiveGetter("lmdbConfig.valueDbSize", storeRuntime.lmdbStoreConfig, "getValueDBSize")
 					.addReflectiveGetter("lmdbConfig.tripleDbSize", storeRuntime.lmdbStoreConfig, "getTripleDBSize");
+			if (themeDataLoadStatus.lmdbFullyLoadedSizeBytes != null) {
+				featureFlags.addValue("lmdbData.fullyLoadedSizeBytes",
+						themeDataLoadStatus.lmdbFullyLoadedSizeBytes.toString());
+			}
+			featureFlags.addValue("lmdbData.reusedWithoutReload", Boolean.toString(themeDataLoadStatus.reusedLmdbData));
 		}
 
 		QueryPlanCapture.registerConfiguredFeatureFlags(featureFlags);

@@ -261,6 +261,33 @@ class QueryPlanSnapshotCliTest {
 	}
 
 	@Test
+	void lmdbRunRecordsLoadedSizeAndSkipsReloadWhenSizeMatches() throws Exception {
+		Path lmdbDataDirectory = Files.createTempDirectory("rdf4j-cli-lmdb-reuse-");
+		QueryPlanSnapshotCliOptions options = QueryPlanSnapshotCli.parseArgs(new String[] {
+				"--no-interactive",
+				"--store", "lmdb",
+				"--lmdb-data-dir", lmdbDataDirectory.toString(),
+				"--theme", "MEDICAL_RECORDS",
+				"--query-index", "0",
+				"--persist", "false"
+		});
+
+		ByteArrayOutputStream firstRunOutput = new ByteArrayOutputStream();
+		QueryPlanSnapshotCli firstRunCli = new QueryPlanSnapshotCli(new BufferedReader(new StringReader("")),
+				new PrintStream(firstRunOutput, true, StandardCharsets.UTF_8.name()));
+		firstRunCli.run(options);
+
+		ByteArrayOutputStream secondRunOutput = new ByteArrayOutputStream();
+		QueryPlanSnapshotCli secondRunCli = new QueryPlanSnapshotCli(new BufferedReader(new StringReader("")),
+				new PrintStream(secondRunOutput, true, StandardCharsets.UTF_8.name()));
+		secondRunCli.run(options);
+
+		String secondRunPrinted = secondRunOutput.toString(StandardCharsets.UTF_8);
+		assertTrue(secondRunPrinted.contains("LMDB data already fully loaded"),
+				"Expected second run to skip reloading LMDB data when byte size matches: " + secondRunPrinted);
+	}
+
+	@Test
 	void runModePrintsConfiguredQueryTimeoutInResultsSection() throws Exception {
 		ByteArrayOutputStream outputBuffer = new ByteArrayOutputStream();
 		QueryPlanSnapshotCli cli = new QueryPlanSnapshotCli(new BufferedReader(new StringReader("")),

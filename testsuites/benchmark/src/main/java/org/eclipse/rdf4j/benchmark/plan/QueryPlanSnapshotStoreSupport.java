@@ -13,8 +13,10 @@ package org.eclipse.rdf4j.benchmark.plan;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.util.Comparator;
 import java.util.stream.Stream;
 
@@ -30,6 +32,9 @@ import org.eclipse.rdf4j.sail.memory.MemoryStore;
 
 final class QueryPlanSnapshotStoreSupport {
 
+	private static final String LMDB_FULLY_LOADED_SIZE_FILE = ".rdf4j-query-plan-cli-fully-loaded-size-bytes";
+	private static final long LMDB_SIZE_MATCH_TOLERANCE_BYTES = 1_048_576L;
+
 	private QueryPlanSnapshotStoreSupport() {
 	}
 
@@ -39,6 +44,26 @@ final class QueryPlanSnapshotStoreSupport {
 			ThemeDataSetGenerator.generate(theme, new RDFInserter(connection));
 			connection.commit();
 		}
+	}
+
+	static ThemeDataLoadStatus ensureThemeDataLoaded(StoreRuntime storeRuntime) throws IOException {
+		if (storeRuntime.lmdbStore == null) {
+			loadAllThemes(storeRuntime.repository);
+			return ThemeDataLoadStatus.memoryStore();
+		}
+
+		Path dataDirectory = storeRuntime.dataDirectory;
+		Long recordedSize = readRecordedFullyLoadedSize(dataDirectory);
+		long currentSize = computeLmdbDataSizeBytes(dataDirectory);
+		if (recordedSize != null && recordedSize.longValue() > 0
+				&& currentSize + LMDB_SIZE_MATCH_TOLERANCE_BYTES >= recordedSize.longValue()) {
+			return ThemeDataLoadStatus.lmdbReused(recordedSize.longValue());
+		}
+
+		loadAllThemes(storeRuntime.repository);
+		long fullyLoadedSize = computeLmdbDataSizeBytes(dataDirectory);
+		recordFullyLoadedSize(dataDirectory, fullyLoadedSize);
+		return ThemeDataLoadStatus.lmdbLoaded(fullyLoadedSize);
 	}
 
 	static StoreRuntime createStoreRuntime(QueryPlanSnapshotCliOptions options) throws IOException {
@@ -58,6 +83,68 @@ final class QueryPlanSnapshotStoreSupport {
 		LmdbStore lmdbStore = new LmdbStore(dataDirectory.toFile(), config);
 		SailRepository repository = new SailRepository(lmdbStore);
 		return new StoreRuntime(repository, null, lmdbStore, config, dataDirectory, deleteDataDirectory);
+	}
+
+	private static void loadAllThemes(SailRepository repository) throws IOException {
+		for (Theme theme : Theme.values()) {
+			loadThemeData(repository, theme);
+		}
+	}
+
+	private static long computeLmdbDataSizeBytes(Path dataDirectory) throws IOException {
+		if (dataDirectory == null || !Files.exists(dataDirectory)) {
+			return 0L;
+		}
+
+		Path marker = fullyLoadedSizeMarker(dataDirectory);
+		try (Stream<Path> walk = Files.walk(dataDirectory)) {
+			return walk
+					.filter(Files::isRegularFile)
+					.filter(path -> !path.equals(marker))
+					.mapToLong(path -> {
+						try {
+							return Files.size(path);
+						} catch (IOException e) {
+							throw new UncheckedIOException(e);
+						}
+					})
+					.sum();
+		} catch (UncheckedIOException e) {
+			throw e.getCause();
+		}
+	}
+
+	private static Long readRecordedFullyLoadedSize(Path dataDirectory) throws IOException {
+		if (dataDirectory == null) {
+			return null;
+		}
+		Path marker = fullyLoadedSizeMarker(dataDirectory);
+		if (!Files.isRegularFile(marker)) {
+			return null;
+		}
+		String raw = Files.readString(marker, StandardCharsets.UTF_8).trim();
+		if (raw.isEmpty()) {
+			return null;
+		}
+		try {
+			long parsed = Long.parseLong(raw);
+			return parsed >= 0 ? parsed : null;
+		} catch (NumberFormatException ignored) {
+			return null;
+		}
+	}
+
+	private static void recordFullyLoadedSize(Path dataDirectory, long fullyLoadedSizeBytes) throws IOException {
+		if (dataDirectory == null) {
+			return;
+		}
+		Path marker = fullyLoadedSizeMarker(dataDirectory);
+		Files.writeString(marker, Long.toString(fullyLoadedSizeBytes), StandardCharsets.UTF_8,
+				StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE);
+	}
+
+	private static Path fullyLoadedSizeMarker(Path dataDirectory) {
+		return dataDirectory.resolve(LMDB_FULLY_LOADED_SIZE_FILE);
 	}
 
 	private static void deleteDirectory(Path directory) throws IOException {
@@ -105,6 +192,28 @@ final class QueryPlanSnapshotStoreSupport {
 					deleteDirectory(dataDirectory);
 				}
 			}
+		}
+	}
+
+	static final class ThemeDataLoadStatus {
+		final boolean reusedLmdbData;
+		final Long lmdbFullyLoadedSizeBytes;
+
+		private ThemeDataLoadStatus(boolean reusedLmdbData, Long lmdbFullyLoadedSizeBytes) {
+			this.reusedLmdbData = reusedLmdbData;
+			this.lmdbFullyLoadedSizeBytes = lmdbFullyLoadedSizeBytes;
+		}
+
+		static ThemeDataLoadStatus memoryStore() {
+			return new ThemeDataLoadStatus(false, null);
+		}
+
+		static ThemeDataLoadStatus lmdbLoaded(long lmdbFullyLoadedSizeBytes) {
+			return new ThemeDataLoadStatus(false, lmdbFullyLoadedSizeBytes);
+		}
+
+		static ThemeDataLoadStatus lmdbReused(long lmdbFullyLoadedSizeBytes) {
+			return new ThemeDataLoadStatus(true, lmdbFullyLoadedSizeBytes);
 		}
 	}
 }
