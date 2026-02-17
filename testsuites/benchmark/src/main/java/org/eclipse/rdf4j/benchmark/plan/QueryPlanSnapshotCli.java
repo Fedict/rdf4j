@@ -1023,7 +1023,7 @@ public final class QueryPlanSnapshotCli {
 						.evaluate()
 						.stream()
 						.count();
-			}catch (QueryInterruptedException interrupted) {
+			} catch (QueryInterruptedException interrupted) {
 				softLimitReached = true;
 				break;
 			}

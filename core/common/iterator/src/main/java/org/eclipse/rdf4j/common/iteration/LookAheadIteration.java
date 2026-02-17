@@ -54,7 +54,7 @@ public abstract class LookAheadIteration<E> extends AbstractCloseableIteration<E
 			return false;
 		}
 
-		if(Thread.currentThread().isInterrupted()) {
+		if (Thread.currentThread().isInterrupted()) {
 			log.debug("Thread {} is interrupted, closing iteration", Thread.currentThread().getName());
 			close();
 			return false;
