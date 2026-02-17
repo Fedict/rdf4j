@@ -169,6 +169,14 @@ Every CLI run also prints:
 - `softLimitMillis` (currently `60000`)
 - whether stopping hit the soft-limit projection or max repeat-run cap
 
+### 8) Configure query timeout
+
+Set a per-query timeout in seconds (`0` disables timeout):
+
+```bash
+... -Dexec.args="--store memory --theme MEDICAL_RECORDS --query-index 0 --query-timeout-seconds 30"
+```
+
 ### 7) Run all themed queries across all themes for one store
 
 Memory store:

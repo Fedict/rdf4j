@@ -47,6 +47,7 @@ final class QueryPlanSnapshotCliOptions {
 	Path outputDirectory;
 	String queryId;
 	Path lmdbDataDirectory;
+	Integer queryTimeoutSeconds;
 	final LinkedHashMap<String, String> systemProperties = new LinkedHashMap<>();
 	final LinkedHashMap<String, String> metadata = new LinkedHashMap<>();
 
@@ -75,6 +76,7 @@ final class QueryPlanSnapshotCliOptions {
 		copy.outputDirectory = outputDirectory;
 		copy.queryId = queryId;
 		copy.lmdbDataDirectory = lmdbDataDirectory;
+		copy.queryTimeoutSeconds = queryTimeoutSeconds;
 		copy.systemProperties.putAll(systemProperties);
 		copy.metadata.putAll(metadata);
 		return copy;
@@ -171,6 +173,9 @@ final class QueryPlanSnapshotCliOptions {
 				break;
 			case "--lmdb-data-dir":
 				options.lmdbDataDirectory = Path.of(requireValue(args, ++i, arg));
+				break;
+			case "--query-timeout-seconds":
+				options.queryTimeoutSeconds = parseNonNegativeInteger(requireValue(args, ++i, arg), arg);
 				break;
 			case "--property": {
 				Assignment assignment = parseAssignment(requireValue(args, ++i, arg), arg);
@@ -336,6 +341,20 @@ final class QueryPlanSnapshotCliOptions {
 		throw new IllegalArgumentException("Invalid " + optionName + " value '" + value + "'. Use true or false.");
 	}
 
+	static int parseNonNegativeInteger(String value, String optionName) {
+		int parsed;
+		try {
+			parsed = Integer.parseInt(value.trim());
+		} catch (NumberFormatException e) {
+			throw new IllegalArgumentException("Invalid " + optionName + " value '" + value + "'. Use a whole number.",
+					e);
+		}
+		if (parsed < 0) {
+			throw new IllegalArgumentException("Invalid " + optionName + " value '" + value + "'. Must be >= 0.");
+		}
+		return parsed;
+	}
+
 	private static DiffMode parseDiffMode(String value, String optionName) {
 		String normalized = value.trim().toLowerCase(Locale.ROOT);
 		for (DiffMode mode : DiffMode.values()) {
@@ -421,6 +440,7 @@ final class QueryPlanSnapshotCliOptions {
 		output.println("  --all-theme-queries                  run all themed queries across all themes");
 		output.println("  --query <SPARQL>                     direct query text");
 		output.println("  --query-file <path>                  load query text from file");
+		output.println("  --query-timeout-seconds <int>=0      per-query max execution time (0 disables timeout)");
 		output.println("  --persist <true|false> | --no-persist");
 		output.println("  --compare-latest                     compare current run with latest prior run");
 		output.println();

@@ -35,6 +35,7 @@ import org.eclipse.rdf4j.benchmark.common.plan.QueryPlanExplanation;
 import org.eclipse.rdf4j.benchmark.common.plan.QueryPlanSnapshot;
 import org.eclipse.rdf4j.benchmark.rio.util.ThemeDataSetGenerator.Theme;
 import org.eclipse.rdf4j.common.annotation.Experimental;
+import org.eclipse.rdf4j.query.TupleQuery;
 import org.eclipse.rdf4j.queryrender.sparql.TupleExprIRRenderer;
 import org.eclipse.rdf4j.repository.sail.SailRepositoryConnection;
 
@@ -171,14 +172,16 @@ public final class QueryPlanSnapshotCli {
 		QueryExecutionVerification executionVerification;
 		try (SailRepositoryConnection connection = storeRuntime.repository.getConnection()) {
 			if (options.persist) {
-				snapshotPath = capture.captureAndWrite(context, () -> connection.prepareTupleQuery(queryText));
+				snapshotPath = capture.captureAndWrite(context,
+						() -> prepareTupleQuery(connection, queryText, options.queryTimeoutSeconds));
 				currentSnapshot = capture.readSnapshot(snapshotPath);
 				output.println("Snapshot written: " + snapshotPath.toAbsolutePath());
 			} else {
-				currentSnapshot = capture.capture(context, () -> connection.prepareTupleQuery(queryText));
+				currentSnapshot = capture.capture(context,
+						() -> prepareTupleQuery(connection, queryText, options.queryTimeoutSeconds));
 				output.println("Snapshot captured in-memory only (--persist=false).");
 			}
-			executionVerification = verifyRepeatedExecution(connection, queryText);
+			executionVerification = verifyRepeatedExecution(connection, queryText, options.queryTimeoutSeconds);
 		}
 
 		printResultsSection(options, queryId, queryText);
@@ -222,14 +225,17 @@ public final class QueryPlanSnapshotCli {
 				QueryExecutionVerification executionVerification;
 				try (SailRepositoryConnection connection = storeRuntime.repository.getConnection()) {
 					if (options.persist) {
-						snapshotPath = capture.captureAndWrite(context, () -> connection.prepareTupleQuery(queryText));
+						snapshotPath = capture.captureAndWrite(context,
+								() -> prepareTupleQuery(connection, queryText, perQueryOptions.queryTimeoutSeconds));
 						currentSnapshot = capture.readSnapshot(snapshotPath);
 						output.println("Snapshot written: " + snapshotPath.toAbsolutePath());
 					} else {
-						currentSnapshot = capture.capture(context, () -> connection.prepareTupleQuery(queryText));
+						currentSnapshot = capture.capture(context,
+								() -> prepareTupleQuery(connection, queryText, perQueryOptions.queryTimeoutSeconds));
 						output.println("Snapshot captured in-memory only (--persist=false).");
 					}
-					executionVerification = verifyRepeatedExecution(connection, queryText);
+					executionVerification = verifyRepeatedExecution(connection, queryText,
+							perQueryOptions.queryTimeoutSeconds);
 				}
 
 				output.println();
@@ -589,6 +595,9 @@ public final class QueryPlanSnapshotCli {
 			options.diffMode = promptDiffMode(options.diffMode);
 		}
 		options.queryId = promptOptionalValue("Query id (blank keeps default/auto)", options.queryId);
+		options.queryTimeoutSeconds = promptOptionalNonNegativeInteger(
+				"Query timeout seconds (blank keeps current, 0 disables timeout)",
+				options.queryTimeoutSeconds);
 		if (options.outputDirectory == null) {
 			options.outputDirectory = promptOptionalPath("Output directory (blank uses default)");
 		}
@@ -639,6 +648,20 @@ public final class QueryPlanSnapshotCli {
 			return null;
 		}
 		return Path.of(raw.trim());
+	}
+
+	private Integer promptOptionalNonNegativeInteger(String message, Integer currentValue) throws IOException {
+		while (true) {
+			String raw = prompt(message);
+			if (raw.isBlank()) {
+				return currentValue;
+			}
+			try {
+				return QueryPlanSnapshotCliOptions.parseNonNegativeInteger(raw, message);
+			} catch (IllegalArgumentException e) {
+				output.println(e.getMessage());
+			}
+		}
 	}
 
 	private void promptForAssignments(String heading, Map<String, String> target) throws IOException {
@@ -807,6 +830,9 @@ public final class QueryPlanSnapshotCli {
 				.addMetadata(QueryPlanCapture.metadataFromSystemProperties())
 				.featureFlagCollector(featureFlags)
 				.tupleExprRenderer(QueryPlanSnapshotCli::renderTupleExprWithIr);
+		if (options.queryTimeoutSeconds != null) {
+			contextBuilder.addMetadata("queryTimeoutSeconds", options.queryTimeoutSeconds.toString());
+		}
 
 		if (options.queryIndex != null && benchmarkQuery != null) {
 			contextBuilder.addMetadata("queryIndex", Integer.toString(options.queryIndex))
@@ -823,7 +849,8 @@ public final class QueryPlanSnapshotCli {
 				.addValue("cli.store", options.store.id)
 				.addValue("cli.theme", options.theme.name())
 				.addValue("cli.querySource", querySource)
-				.addValue("cli.persist", Boolean.toString(options.persist));
+				.addValue("cli.persist", Boolean.toString(options.persist))
+				.addValue("cli.queryTimeoutSeconds", formatQueryTimeoutSeconds(options.queryTimeoutSeconds));
 		if (options.queryIndex != null) {
 			featureFlags.addValue("cli.queryIndex", options.queryIndex.toString());
 		}
@@ -903,6 +930,22 @@ public final class QueryPlanSnapshotCli {
 		return normalized.isEmpty() ? null : normalized;
 	}
 
+	private static String formatQueryTimeoutSeconds(Integer queryTimeoutSeconds) {
+		if (queryTimeoutSeconds == null || queryTimeoutSeconds == 0) {
+			return "<none>";
+		}
+		return queryTimeoutSeconds.toString();
+	}
+
+	private static TupleQuery prepareTupleQuery(SailRepositoryConnection connection, String queryText,
+			Integer queryTimeoutSeconds) {
+		TupleQuery tupleQuery = connection.prepareTupleQuery(queryText);
+		if (queryTimeoutSeconds != null && queryTimeoutSeconds > 0) {
+			tupleQuery.setMaxExecutionTime(queryTimeoutSeconds);
+		}
+		return tupleQuery;
+	}
+
 	private void printPrettyExplanations(QueryPlanSnapshot snapshot) {
 		Map<String, QueryPlanExplanation> explanations = snapshot.getExplanations();
 		if (explanations == null || explanations.isEmpty()) {
@@ -925,7 +968,8 @@ public final class QueryPlanSnapshotCli {
 		output.println("=== Results ===");
 		output.println("Original query:");
 		output.println(queryText.trim());
-		output.println("Store=" + options.store.id + ", Theme=" + options.theme + ", QueryId=" + queryId);
+		output.println("Store=" + options.store.id + ", Theme=" + options.theme + ", QueryId=" + queryId
+				+ ", QueryTimeoutSeconds=" + formatQueryTimeoutSeconds(options.queryTimeoutSeconds));
 	}
 
 	private void printExplanation(String levelKey, QueryPlanExplanation explanation) {
@@ -952,7 +996,8 @@ public final class QueryPlanSnapshotCli {
 		}
 	}
 
-	private QueryExecutionVerification verifyRepeatedExecution(SailRepositoryConnection connection, String queryText) {
+	private QueryExecutionVerification verifyRepeatedExecution(SailRepositoryConnection connection, String queryText,
+			Integer queryTimeoutSeconds) {
 		long elapsedNanos = 0;
 		long stableResultCount = Long.MIN_VALUE;
 		int runs = 0;
@@ -971,7 +1016,10 @@ public final class QueryPlanSnapshotCli {
 			}
 
 			long startedAt = System.nanoTime();
-			long currentResultCount = connection.prepareTupleQuery(queryText).evaluate().stream().count();
+			long currentResultCount = prepareTupleQuery(connection, queryText, queryTimeoutSeconds)
+					.evaluate()
+					.stream()
+					.count();
 			long runNanos = Math.max(1L, System.nanoTime() - startedAt);
 			elapsedNanos += runNanos;
 			runs++;
