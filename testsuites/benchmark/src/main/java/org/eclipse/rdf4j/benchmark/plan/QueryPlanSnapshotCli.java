@@ -171,7 +171,9 @@ public final class QueryPlanSnapshotCli {
 
 	private void runSingleQueryCapture(QueryPlanSnapshotCliOptions options,
 			QueryPlanSnapshotStoreSupport.StoreRuntime storeRuntime) throws Exception {
-		QueryPlanSnapshotStoreSupport.loadThemeData(storeRuntime.repository, options.theme);
+		for (Theme theme : Theme.values()) {
+			QueryPlanSnapshotStoreSupport.loadThemeData(storeRuntime.repository, theme);
+		}
 		BenchmarkQuery benchmarkQuery = resolveBenchmarkQuery(options);
 		String queryText = resolveQueryText(options, benchmarkQuery);
 		String querySource = benchmarkQuery == null ? "direct" : "theme-index";
@@ -223,6 +225,9 @@ public final class QueryPlanSnapshotCli {
 
 		for (Theme theme : allThemes) {
 			QueryPlanSnapshotStoreSupport.loadThemeData(storeRuntime.repository, theme);
+		}
+
+		for (Theme theme : allThemes) {
 			for (int queryIndex = 0; queryIndex < ThemeQueryCatalog.QUERY_COUNT; queryIndex++) {
 				current++;
 				BenchmarkQuery benchmarkQuery = ThemeQueryCatalog.benchmarkQueryFor(theme, queryIndex);
