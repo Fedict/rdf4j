@@ -195,6 +195,27 @@ class QueryPlanSnapshotCliTest {
 	}
 
 	@Test
+	void runModePrintsExecutionVerificationSummary() throws Exception {
+		ByteArrayOutputStream outputBuffer = new ByteArrayOutputStream();
+		QueryPlanSnapshotCli cli = new QueryPlanSnapshotCli(new BufferedReader(new StringReader("")),
+				new PrintStream(outputBuffer, true, StandardCharsets.UTF_8.name()));
+
+		QueryPlanSnapshotCliOptions options = QueryPlanSnapshotCli.parseArgs(new String[] {
+				"--no-interactive",
+				"--store", "memory",
+				"--theme", "MEDICAL_RECORDS",
+				"--query-index", "0",
+				"--persist", "false"
+		});
+
+		cli.run(options);
+
+		String printed = outputBuffer.toString(StandardCharsets.UTF_8);
+		assertTrue(printed.contains("=== Execution Verification ==="), printed);
+		assertTrue(printed.contains("runs="), printed);
+	}
+
+	@Test
 	void runModePrintsOriginalQueryAtStartOfResultsSection() throws Exception {
 		String query = "SELECT * WHERE { ?s ?p ?o } LIMIT 5";
 		ByteArrayOutputStream outputBuffer = new ByteArrayOutputStream();
@@ -242,7 +263,7 @@ class QueryPlanSnapshotCliTest {
 
 		String printed = outputBuffer.toString(StandardCharsets.UTF_8);
 		int storeIndex = printed.indexOf("Store [memory|lmdb]");
-		int querySourceIndex = printed.indexOf("Query source [themed|manual|file]");
+		int querySourceIndex = printed.indexOf("Query source [themed|manual|file|all-themed]");
 		int themeIndex = printed.indexOf("Theme");
 		assertTrue(storeIndex >= 0);
 		assertTrue(querySourceIndex > storeIndex);

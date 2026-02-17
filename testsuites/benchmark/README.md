@@ -10,6 +10,9 @@ Scope:
 - Metadata + feature-flag state for reproducibility.
 - Smart semantic diff modes.
 
+Status:
+- Experimental CLI and capture APIs (`@Experimental`).
+
 ## What You Get
 
 Each snapshot stores:
@@ -24,6 +27,9 @@ Each snapshot stores:
   - IR-rendered query (optimized/executed by default)
 - Metadata (git commit, benchmark/store/theme context, custom keys).
 - Feature flags (system properties, direct values, reflection probes).
+- Execution verification summary printed by CLI:
+  - repeated query executions
+  - dynamic run count with a soft 60-second cap per query
 
 ## Where Things Live
 
@@ -59,7 +65,7 @@ Interactive menu behavior:
   - `list themes`
   - `list queries`
   - `help`
-- Run mode prompt order starts with: `store` -> `query source` (`themed`, `manual`, or `file`) -> remaining fields.
+- Run mode prompt order starts with: `store` -> `query source` (`themed`, `manual`, `file`, or `all-themed`) -> remaining fields.
 - No-argument run wizard also prompts optional CLI flags: persist, compare-latest, diff-mode, query-id, output-dir, lmdb-data-dir (for LMDB).
 
 Show help:
@@ -115,7 +121,7 @@ Interactive selection (browse/view/compare):
 ```
 
 Interactive run browser actions:
-- `view run`: pick a run and print full details (captured time, query id/fingerprint, metadata, feature flags, per-level explanation availability).
+- `view run`: pick a run and print full details, original query, and full per-level explanation blocks (including IR-rendered query text when present).
 - `compare runs`: pick left/right runs and print semantic diff.
 - `quit`: exit browser.
 
@@ -155,6 +161,44 @@ Useful for ad-hoc compare-only checks:
 ```bash
 ... -Dexec.args="--store memory --theme MEDICAL_RECORDS --query-index 0 --no-persist --compare-latest"
 ```
+
+Every CLI run also prints:
+
+- `=== Execution Verification ===`
+- `runs`, `totalMillis`, `averageMillis`, `resultCount`
+- `softLimitMillis` (currently `60000`)
+- whether stopping hit the soft-limit projection or max repeat-run cap
+
+### 7) Run all themed queries across all themes for one store
+
+Memory store:
+
+```bash
+... -Dexec.args="--store memory --all-theme-queries"
+```
+
+LMDB store:
+
+```bash
+... -Dexec.args="--store lmdb --all-theme-queries"
+```
+
+With in-memory-only capture:
+
+```bash
+... -Dexec.args="--store memory --all-theme-queries --no-persist"
+```
+
+With compare-latest per query run:
+
+```bash
+... -Dexec.args="--store lmdb --all-theme-queries --compare-latest --diff-mode structure+estimates"
+```
+
+Notes:
+- `--all-theme-queries` is run mode only (not compare mode).
+- Do not combine `--all-theme-queries` with single-query selectors (`--theme`, `--theme-query`, `--query-index`, `--query`, `--query-file`).
+- In interactive mode this is available via query source `all-themed`.
 
 ## Smart Diff Modes
 
@@ -347,6 +391,7 @@ This path stores themed benchmark artifacts without CLI wrapper.
 - `--no-persist`
 - `--compare-latest`
 - `--compare-existing`
+- `--all-theme-queries`
 - `--query-id <id>`
 - `--fingerprint <hash>`
 - `--compare-indices <i,j>`

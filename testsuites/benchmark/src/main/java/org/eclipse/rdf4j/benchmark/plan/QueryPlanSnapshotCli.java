@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.TimeUnit;
 
 import org.eclipse.rdf4j.benchmark.common.BenchmarkQuery;
 import org.eclipse.rdf4j.benchmark.common.ThemeQueryCatalog;
@@ -56,6 +57,9 @@ public final class QueryPlanSnapshotCli {
 			"optimized",
 			"executed");
 	private static final String MANUAL_QUERY_ID_ENTRY = "<manual entry>";
+	private static final long EXECUTION_REPEAT_SOFT_LIMIT_NANOS = TimeUnit.SECONDS.toNanos(60);
+	private static final int EXECUTION_REPEAT_MIN_RUNS = 2;
+	private static final int EXECUTION_REPEAT_MAX_RUNS = 128;
 
 	public static void main(String[] args) throws Exception {
 		QueryPlanSnapshotCliOptions options = parseArgs(args);
@@ -164,6 +168,7 @@ public final class QueryPlanSnapshotCli {
 
 		QueryPlanSnapshot currentSnapshot;
 		Path snapshotPath = null;
+		QueryExecutionVerification executionVerification;
 		try (SailRepositoryConnection connection = storeRuntime.repository.getConnection()) {
 			if (options.persist) {
 				snapshotPath = capture.captureAndWrite(context, () -> connection.prepareTupleQuery(queryText));
@@ -173,10 +178,12 @@ public final class QueryPlanSnapshotCli {
 				currentSnapshot = capture.capture(context, () -> connection.prepareTupleQuery(queryText));
 				output.println("Snapshot captured in-memory only (--persist=false).");
 			}
+			executionVerification = verifyRepeatedExecution(connection, queryText);
 		}
 
 		printResultsSection(options, queryId, queryText);
 		printPrettyExplanations(currentSnapshot);
+		printExecutionVerification(executionVerification);
 
 		if (options.compareLatest) {
 			compareWithLatest(outputDirectory, queryId, currentSnapshot, snapshotPath, capture, options.diffMode);
@@ -212,6 +219,7 @@ public final class QueryPlanSnapshotCli {
 
 				QueryPlanSnapshot currentSnapshot;
 				Path snapshotPath = null;
+				QueryExecutionVerification executionVerification;
 				try (SailRepositoryConnection connection = storeRuntime.repository.getConnection()) {
 					if (options.persist) {
 						snapshotPath = capture.captureAndWrite(context, () -> connection.prepareTupleQuery(queryText));
@@ -221,6 +229,7 @@ public final class QueryPlanSnapshotCli {
 						currentSnapshot = capture.capture(context, () -> connection.prepareTupleQuery(queryText));
 						output.println("Snapshot captured in-memory only (--persist=false).");
 					}
+					executionVerification = verifyRepeatedExecution(connection, queryText);
 				}
 
 				output.println();
@@ -229,6 +238,7 @@ public final class QueryPlanSnapshotCli {
 						"Theme=" + theme + ", QueryIndex=" + queryIndex + ", QueryName=" + benchmarkQuery.getName());
 				printResultsSection(perQueryOptions, queryId, queryText);
 				printPrettyExplanations(currentSnapshot);
+				printExecutionVerification(executionVerification);
 
 				if (options.compareLatest) {
 					compareWithLatest(outputDirectory, queryId, currentSnapshot, snapshotPath, capture,
@@ -939,6 +949,84 @@ public final class QueryPlanSnapshotCli {
 		if (renderedQuery != null && !renderedQuery.isBlank()) {
 			output.println("--- IR Rendered Query ---");
 			output.println(renderedQuery.trim());
+		}
+	}
+
+	private QueryExecutionVerification verifyRepeatedExecution(SailRepositoryConnection connection, String queryText) {
+		long elapsedNanos = 0;
+		long stableResultCount = Long.MIN_VALUE;
+		int runs = 0;
+		boolean softLimitReached = false;
+
+		while (runs < EXECUTION_REPEAT_MAX_RUNS) {
+			if (runs >= EXECUTION_REPEAT_MIN_RUNS) {
+				long averageNanos = Math.max(1L, elapsedNanos / runs);
+				if (elapsedNanos + averageNanos > EXECUTION_REPEAT_SOFT_LIMIT_NANOS) {
+					softLimitReached = true;
+					break;
+				}
+			} else if (elapsedNanos >= EXECUTION_REPEAT_SOFT_LIMIT_NANOS) {
+				softLimitReached = true;
+				break;
+			}
+
+			long startedAt = System.nanoTime();
+			long currentResultCount = connection.prepareTupleQuery(queryText).evaluate().stream().count();
+			long runNanos = Math.max(1L, System.nanoTime() - startedAt);
+			elapsedNanos += runNanos;
+			runs++;
+
+			if (stableResultCount == Long.MIN_VALUE) {
+				stableResultCount = currentResultCount;
+			} else if (stableResultCount != currentResultCount) {
+				throw new IllegalStateException("Result count changed between repeated runs: expected "
+						+ stableResultCount + " but got " + currentResultCount + " on run " + runs);
+			}
+		}
+
+		boolean maxRunsReached = runs >= EXECUTION_REPEAT_MAX_RUNS;
+		if (runs == 0) {
+			return new QueryExecutionVerification(0, 0, 0, softLimitReached, maxRunsReached);
+		}
+
+		return new QueryExecutionVerification(runs, elapsedNanos, stableResultCount, softLimitReached,
+				maxRunsReached);
+	}
+
+	private void printExecutionVerification(QueryExecutionVerification executionVerification) {
+		output.println();
+		output.println("=== Execution Verification ===");
+		if (executionVerification.runs == 0) {
+			output.println("No repeated runs executed.");
+			return;
+		}
+
+		long totalMillis = TimeUnit.NANOSECONDS.toMillis(executionVerification.elapsedNanos);
+		long averageMillis = TimeUnit.NANOSECONDS.toMillis(
+				executionVerification.elapsedNanos / executionVerification.runs);
+		output.println("runs=" + executionVerification.runs
+				+ ", totalMillis=" + totalMillis
+				+ ", averageMillis=" + averageMillis
+				+ ", resultCount=" + executionVerification.resultCount
+				+ ", softLimitMillis=" + TimeUnit.NANOSECONDS.toMillis(EXECUTION_REPEAT_SOFT_LIMIT_NANOS)
+				+ ", softLimitReached=" + executionVerification.softLimitReached
+				+ ", maxRunsReached=" + executionVerification.maxRunsReached);
+	}
+
+	private static final class QueryExecutionVerification {
+		private final int runs;
+		private final long elapsedNanos;
+		private final long resultCount;
+		private final boolean softLimitReached;
+		private final boolean maxRunsReached;
+
+		private QueryExecutionVerification(int runs, long elapsedNanos, long resultCount, boolean softLimitReached,
+				boolean maxRunsReached) {
+			this.runs = runs;
+			this.elapsedNanos = elapsedNanos;
+			this.resultCount = resultCount;
+			this.softLimitReached = softLimitReached;
+			this.maxRunsReached = maxRunsReached;
 		}
 	}
 

@@ -18,7 +18,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.TreeSet;
@@ -98,35 +100,61 @@ final class QueryPlanSnapshotComparator {
 		out.println("  capturedAt: " + normalize(snapshot.getCapturedAt()));
 		out.println("  queryId: " + normalize(snapshot.getQueryId()));
 		out.println("  unoptimizedFingerprint: " + normalize(snapshot.getUnoptimizedFingerprint()));
-		out.println("  queryString:");
-		printTextBlock(out, snapshot.getQueryString(), "    ");
 		if (run.path != null) {
 			out.println("  path: " + run.path.toAbsolutePath());
 		}
-
 		printStringMap(out, "metadata", snapshot.getMetadata());
 		printStringMap(out, "featureFlags", snapshot.getFeatureFlags());
 
-		Map<String, QueryPlanExplanation> explanations = snapshot.getExplanations();
-		out.println("  explanations:");
+		out.println();
+		out.println("=== Results ===");
+		out.println("Original query:");
+		printTextBlock(out, snapshot.getQueryString(), "");
+		printFullExplanations(out, snapshot.getExplanations());
+	}
+
+	private static void printFullExplanations(PrintStream out, Map<String, QueryPlanExplanation> explanations) {
 		if (explanations == null || explanations.isEmpty()) {
-			out.println("    <none>");
+			out.println();
+			out.println("No query explanations captured.");
 			return;
 		}
 
-		for (Map.Entry<String, QueryPlanExplanation> entry : explanations.entrySet()) {
-			QueryPlanExplanation explanation = entry.getValue();
-			out.println("    " + entry.getKey() + ":");
+		LinkedHashSet<String> orderedLevels = new LinkedHashSet<>(List.of("unoptimized", "optimized", "executed"));
+		orderedLevels.addAll(explanations.keySet());
+		for (String levelKey : orderedLevels) {
+			QueryPlanExplanation explanation = explanations.get(levelKey);
 			if (explanation == null) {
-				out.println("      <null>");
 				continue;
 			}
-			out.println("      tupleExprJson: " + (isPresent(explanation.getTupleExprJson()) ? "present" : "missing"));
-			out.println(
-					"      irRenderedQuery: " + (isPresent(explanation.getIrRenderedQuery()) ? "present" : "missing"));
-			out.println("      explanationText:");
-			printTextBlock(out, explanation.getExplanationText(), "        ");
+
+			out.println();
+			out.println("=== " + displayLevelName(levelKey, explanation.getLevel()) + " Explanation ===");
+			String explanationText = explanation.getExplanationText();
+			if (isPresent(explanationText)) {
+				printTextBlock(out, explanationText, "");
+			} else {
+				out.println("(no explanation text)");
+			}
+
+			if (isPresent(explanation.getIrRenderedQuery())) {
+				out.println("--- IR Rendered Query ---");
+				printTextBlock(out, explanation.getIrRenderedQuery(), "");
+			}
+			if (isPresent(explanation.getIrRenderingError())) {
+				out.println("--- IR Rendering Error ---");
+				printTextBlock(out, explanation.getIrRenderingError(), "");
+			}
 		}
+	}
+
+	private static String displayLevelName(String levelKey, String levelValue) {
+		String base = isPresent(levelValue) ? levelValue : levelKey;
+		if (!isPresent(base)) {
+			return "Unknown";
+		}
+		String lower = base.toLowerCase(Locale.ROOT);
+		return lower.substring(0, 1).toUpperCase(Locale.ROOT) + lower.substring(1);
 	}
 
 	static void printComparison(PrintStream out, SnapshotRun left, SnapshotRun right) {
