@@ -57,13 +57,14 @@ final class QueryPlanSnapshotComparator {
 		return runs;
 	}
 
-	static List<SnapshotRun> filterRuns(List<SnapshotRun> runs, String queryId, String fingerprint) {
+	static List<SnapshotRun> filterRuns(List<SnapshotRun> runs, String queryId, String fingerprint, String runName) {
 		List<SnapshotRun> filtered = new ArrayList<>();
 		for (SnapshotRun run : runs) {
 			boolean matchesQueryId = queryId == null || queryId.equals(run.snapshot.getQueryId());
 			boolean matchesFingerprint = fingerprint == null
 					|| fingerprint.equals(run.snapshot.getUnoptimizedFingerprint());
-			if (matchesQueryId && matchesFingerprint) {
+			boolean matchesRunName = runName == null || runName.equals(resolveRunName(run.snapshot));
+			if (matchesQueryId && matchesFingerprint && matchesRunName) {
 				filtered.add(run);
 			}
 		}
@@ -83,8 +84,9 @@ final class QueryPlanSnapshotComparator {
 		out.println("Matching runs:");
 		for (int i = 0; i < runs.size(); i++) {
 			SnapshotRun run = runs.get(i);
+			String runName = normalize(resolveRunName(run.snapshot));
 			out.println("  [" + i + "] " + run.snapshot.getCapturedAt() + "  queryId=" + run.snapshot.getQueryId()
-					+ "  fingerprint=" + run.snapshot.getUnoptimizedFingerprint());
+					+ "  runName=" + runName + "  fingerprint=" + run.snapshot.getUnoptimizedFingerprint());
 			if (run.path != null) {
 				out.println("       " + run.path.toAbsolutePath());
 			}
@@ -257,6 +259,13 @@ final class QueryPlanSnapshotComparator {
 
 	private static String normalize(String value) {
 		return value == null ? "<null>" : value;
+	}
+
+	private static String resolveRunName(QueryPlanSnapshot snapshot) {
+		if (snapshot == null || snapshot.getMetadata() == null) {
+			return null;
+		}
+		return snapshot.getMetadata().get("runName");
 	}
 
 	private static void printStringMap(PrintStream out, String label, Map<String, String> values) {

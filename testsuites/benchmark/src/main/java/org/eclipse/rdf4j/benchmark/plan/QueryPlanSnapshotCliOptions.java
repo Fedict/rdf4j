@@ -46,6 +46,7 @@ final class QueryPlanSnapshotCliOptions {
 	Path queryFile;
 	Path outputDirectory;
 	String queryId;
+	String runName;
 	Path lmdbDataDirectory;
 	Integer queryTimeoutSeconds;
 	final LinkedHashMap<String, String> systemProperties = new LinkedHashMap<>();
@@ -75,6 +76,7 @@ final class QueryPlanSnapshotCliOptions {
 		copy.queryFile = queryFile;
 		copy.outputDirectory = outputDirectory;
 		copy.queryId = queryId;
+		copy.runName = runName;
 		copy.lmdbDataDirectory = lmdbDataDirectory;
 		copy.queryTimeoutSeconds = queryTimeoutSeconds;
 		copy.systemProperties.putAll(systemProperties);
@@ -88,7 +90,8 @@ final class QueryPlanSnapshotCliOptions {
 
 	boolean hasComparisonFilter() {
 		return (queryId != null && !queryId.isBlank())
-				|| (comparisonFingerprint != null && !comparisonFingerprint.isBlank());
+				|| (comparisonFingerprint != null && !comparisonFingerprint.isBlank())
+				|| (runName != null && !runName.isBlank());
 	}
 
 	boolean isRunMode() {
@@ -171,6 +174,9 @@ final class QueryPlanSnapshotCliOptions {
 			case "--query-id":
 				options.queryId = requireValue(args, ++i, arg);
 				break;
+			case "--run-name":
+				options.runName = requireValue(args, ++i, arg);
+				break;
 			case "--lmdb-data-dir":
 				options.lmdbDataDirectory = Path.of(requireValue(args, ++i, arg));
 				break;
@@ -215,7 +221,7 @@ final class QueryPlanSnapshotCliOptions {
 			}
 			if (options.noInteractive && !options.hasComparisonFilter()) {
 				throw new IllegalArgumentException(
-						"--compare-existing with --no-interactive requires --query-id or --fingerprint.");
+						"--compare-existing with --no-interactive requires --query-id, --run-name, or --fingerprint.");
 			}
 			return;
 		}
@@ -446,7 +452,7 @@ final class QueryPlanSnapshotCliOptions {
 		output.println();
 		output.println("Compare-existing mode:");
 		output.println("  --compare-existing");
-		output.println("  --query-id <id> or --fingerprint <hash>");
+		output.println("  --query-id <id> or --run-name <name> or --fingerprint <hash>");
 		output.println("  --compare-indices <i,j>              optional, else interactive/latest-two");
 		output.println("  --diff-mode <structure|structure+estimates>");
 		output.println("  interactive UI supports run browsing/view and comparison");
@@ -457,6 +463,7 @@ final class QueryPlanSnapshotCliOptions {
 		output.println(
 				"  --output-dir <path>                  default: testsuites/benchmark/src/main/resources/plan[/cli/<store>]");
 		output.println("  --query-id <id>                      custom query id in run mode / compare filter");
+		output.println("  --run-name <name>                    label a run / compare filter by run label");
 		output.println("  --lmdb-data-dir <path>               optional persistent LMDB directory");
 		output.println("  --list-themes                        list available themes");
 		output.println("  --list-queries <THEME>               list query index/name for a theme");

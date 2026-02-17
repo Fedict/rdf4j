@@ -68,6 +68,16 @@ class QueryPlanSnapshotCliTest {
 	}
 
 	@Test
+	void acceptsRunNameArgumentInRunMode() {
+		assertDoesNotThrow(() -> QueryPlanSnapshotCli.parseArgs(new String[] {
+				"--store", "memory",
+				"--theme", "MEDICAL_RECORDS",
+				"--query-index", "0",
+				"--run-name", "baseline"
+		}));
+	}
+
+	@Test
 	void parsesRunAllThemeQueriesModeWithStore() {
 		QueryPlanSnapshotCliOptions options = QueryPlanSnapshotCli.parseArgs(new String[] {
 				"--store", "memory",
@@ -116,6 +126,15 @@ class QueryPlanSnapshotCliTest {
 		assertTrue(options.compareExisting);
 		assertEquals(1, options.compareIndices.leftIndex);
 		assertEquals(3, options.compareIndices.rightIndex);
+	}
+
+	@Test
+	void compareExistingNoInteractiveAcceptsRunNameFilter() {
+		assertDoesNotThrow(() -> QueryPlanSnapshotCli.parseArgs(new String[] {
+				"--compare-existing",
+				"--no-interactive",
+				"--run-name", "candidate"
+		}));
 	}
 
 	@Test
@@ -260,6 +279,37 @@ class QueryPlanSnapshotCliTest {
 
 		String printed = outputBuffer.toString(StandardCharsets.UTF_8);
 		assertTrue(printed.contains("QueryTimeoutSeconds=15"), printed);
+	}
+
+	@Test
+	void runModePersistsRunNameAsMetadataAndPrintsIt() throws Exception {
+		Path outputDirectory = Files.createTempDirectory("rdf4j-cli-run-name-");
+		ByteArrayOutputStream outputBuffer = new ByteArrayOutputStream();
+		QueryPlanSnapshotCli cli = new QueryPlanSnapshotCli(new BufferedReader(new StringReader("")),
+				new PrintStream(outputBuffer, true, StandardCharsets.UTF_8.name()));
+
+		QueryPlanSnapshotCliOptions options = QueryPlanSnapshotCli.parseArgs(new String[] {
+				"--no-interactive",
+				"--store", "memory",
+				"--theme", "MEDICAL_RECORDS",
+				"--query-index", "0",
+				"--output-dir", outputDirectory.toString(),
+				"--run-name", "baseline-01"
+		});
+
+		cli.run(options);
+
+		Path snapshotPath;
+		try (java.util.stream.Stream<Path> snapshots = Files.list(outputDirectory)) {
+			snapshotPath = snapshots
+					.filter(path -> path.getFileName().toString().endsWith(".json"))
+					.findFirst()
+					.orElseThrow();
+		}
+
+		QueryPlanSnapshot snapshot = new QueryPlanCapture().readSnapshot(snapshotPath);
+		assertEquals("baseline-01", snapshot.getMetadata().get("runName"));
+		assertTrue(outputBuffer.toString(StandardCharsets.UTF_8).contains("RunName=baseline-01"));
 	}
 
 	@Test
@@ -485,6 +535,31 @@ class QueryPlanSnapshotCliTest {
 		assertFalse(printed.contains("[1] [0]"), printed);
 	}
 
+	@Test
+	void compareExistingCanFilterByRunName() throws Exception {
+		Path outputDir = Files.createTempDirectory("rdf4j-cli-run-name-filter-");
+		writeSnapshot(outputDir, "q-alpha", "fingerprint-a", "2026-02-17T10:00:00Z",
+				Map.of("store", "memory", "runName", "baseline"));
+		writeSnapshot(outputDir, "q-beta", "fingerprint-b", "2026-02-17T10:05:00Z",
+				Map.of("store", "memory", "runName", "candidate"));
+
+		ByteArrayOutputStream outputBuffer = new ByteArrayOutputStream();
+		QueryPlanSnapshotCli cli = new QueryPlanSnapshotCli(new BufferedReader(new StringReader("")),
+				new PrintStream(outputBuffer, true, StandardCharsets.UTF_8.name()));
+		QueryPlanSnapshotCliOptions options = QueryPlanSnapshotCli.parseArgs(new String[] {
+				"--compare-existing",
+				"--no-interactive",
+				"--output-dir", outputDir.toString(),
+				"--run-name", "candidate"
+		});
+
+		cli.run(options);
+
+		String printed = outputBuffer.toString(StandardCharsets.UTF_8);
+		assertTrue(printed.contains("queryId=q-beta"), printed);
+		assertFalse(printed.contains("queryId=q-alpha"), printed);
+	}
+
 	private static int countOccurrences(String value, String token) {
 		int count = 0;
 		int fromIndex = 0;
@@ -500,6 +575,11 @@ class QueryPlanSnapshotCliTest {
 
 	private static void writeSnapshot(Path outputDir, String queryId, String fingerprint, String capturedAt)
 			throws Exception {
+		writeSnapshot(outputDir, queryId, fingerprint, capturedAt, Map.of("store", "memory"));
+	}
+
+	private static void writeSnapshot(Path outputDir, String queryId, String fingerprint, String capturedAt,
+			Map<String, String> metadata) throws Exception {
 		QueryPlanCapture capture = new QueryPlanCapture();
 		QueryPlanSnapshot snapshot = new QueryPlanSnapshot();
 		snapshot.setFormatVersion("1");
@@ -507,7 +587,7 @@ class QueryPlanSnapshotCliTest {
 		snapshot.setQueryId(queryId);
 		snapshot.setQueryString("SELECT * WHERE { ?s ?p ?o }");
 		snapshot.setUnoptimizedFingerprint(fingerprint);
-		snapshot.setMetadata(Map.of("store", "memory"));
+		snapshot.setMetadata(metadata);
 		snapshot.setFeatureFlags(Map.of("flagA", "true"));
 		QueryPlanExplanation explanation = new QueryPlanExplanation();
 		explanation.setLevel("UNOPTIMIZED");

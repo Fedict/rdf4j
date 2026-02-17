@@ -12,6 +12,8 @@
 package org.eclipse.rdf4j.benchmark.common.plan;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
@@ -22,6 +24,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
@@ -181,7 +184,7 @@ public final class QueryPlanCapture {
 	}
 
 	private QueryPlanExplanation captureLevel(Explanation.Level level, Explanation explanation,
-			java.util.Set<Explanation.Level> irRenderedLevels, Function<TupleExpr, String> tupleExprRenderer) {
+			Set<Explanation.Level> irRenderedLevels, Function<TupleExpr, String> tupleExprRenderer) {
 		QueryPlanExplanation captured = new QueryPlanExplanation();
 		captured.setLevel(level.name());
 		captured.setExplanationText(explanation.toString());
@@ -257,9 +260,11 @@ public final class QueryPlanCapture {
 			if (!finished || process.exitValue() != 0) {
 				return "unknown";
 			}
-			String output = new String(process.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8)
-					.trim();
-			return output.isEmpty() ? "unknown" : output;
+			try (InputStream stream = process.getInputStream()) {
+				String output = new String(stream.readAllBytes(), StandardCharsets.UTF_8)
+						.trim();
+				return output.isEmpty() ? "unknown" : output;
+			}
 		} catch (Exception ignored) {
 			return "unknown";
 		} finally {

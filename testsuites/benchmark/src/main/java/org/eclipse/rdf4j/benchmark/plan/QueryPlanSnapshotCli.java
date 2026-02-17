@@ -37,6 +37,7 @@ import org.eclipse.rdf4j.benchmark.rio.util.ThemeDataSetGenerator.Theme;
 import org.eclipse.rdf4j.common.annotation.Experimental;
 import org.eclipse.rdf4j.query.QueryInterruptedException;
 import org.eclipse.rdf4j.query.TupleQuery;
+import org.eclipse.rdf4j.query.TupleQueryResult;
 import org.eclipse.rdf4j.queryrender.sparql.TupleExprIRRenderer;
 import org.eclipse.rdf4j.repository.sail.SailRepositoryConnection;
 
@@ -59,6 +60,7 @@ public final class QueryPlanSnapshotCli {
 			"optimized",
 			"executed");
 	private static final String MANUAL_QUERY_ID_ENTRY = "<manual entry>";
+	private static final String MANUAL_RUN_NAME_ENTRY = "<manual entry>";
 	private static final long EXECUTION_REPEAT_SOFT_LIMIT_NANOS = TimeUnit.SECONDS.toNanos(60);
 	private static final int EXECUTION_REPEAT_MIN_RUNS = 2;
 	private static final int EXECUTION_REPEAT_MAX_RUNS = 128;
@@ -85,25 +87,40 @@ public final class QueryPlanSnapshotCli {
 	}
 
 	void run(QueryPlanSnapshotCliOptions options) throws Exception {
-		Objects.requireNonNull(options, "options");
-		QueryPlanSnapshotCliOptions resolved = resolveInteractiveTopLevelAction(options);
-		if (resolved.help) {
-			QueryPlanSnapshotCliOptions.printUsage(output);
+		try {
+			Objects.requireNonNull(options, "options");
+			QueryPlanSnapshotCliOptions resolved = resolveInteractiveTopLevelAction(options);
+			if (resolved.help) {
+				QueryPlanSnapshotCliOptions.printUsage(output);
+				return;
+			}
+			if (resolved.listThemes) {
+				printThemes();
+				return;
+			}
+			if (resolved.listQueriesTheme != null) {
+				printThemeQueries(resolved.listQueriesTheme);
+				return;
+			}
+			if (resolved.compareExisting) {
+				runCompareExisting(resolved);
+				return;
+			}
+			runCaptureMode(resolved);
+		} finally {
+			closeChoiceMenu();
+		}
+	}
+
+	private void closeChoiceMenu() {
+		if (jLineChoiceMenu == null) {
 			return;
 		}
-		if (resolved.listThemes) {
-			printThemes();
-			return;
+		try {
+			jLineChoiceMenu.close();
+		} catch (IOException ignored) {
+			// No recovery required during CLI shutdown.
 		}
-		if (resolved.listQueriesTheme != null) {
-			printThemeQueries(resolved.listQueriesTheme);
-			return;
-		}
-		if (resolved.compareExisting) {
-			runCompareExisting(resolved);
-			return;
-		}
-		runCaptureMode(resolved);
 	}
 
 	private QueryPlanSnapshotCliOptions resolveInteractiveTopLevelAction(QueryPlanSnapshotCliOptions options)
@@ -269,7 +286,7 @@ public final class QueryPlanSnapshotCli {
 				.loadRuns(outputDirectory, capture);
 		java.util.List<QueryPlanSnapshotComparator.SnapshotRun> matchingRuns = QueryPlanSnapshotComparator
 				.filterRuns(allRuns, normalizedOrNull(resolved.queryId),
-						normalizedOrNull(resolved.comparisonFingerprint));
+						normalizedOrNull(resolved.comparisonFingerprint), normalizedOrNull(resolved.runName));
 
 		if (matchingRuns.isEmpty()) {
 			output.println("No matching runs found in " + outputDirectory.toAbsolutePath());
@@ -335,9 +352,9 @@ public final class QueryPlanSnapshotCli {
 		java.util.List<QueryPlanSnapshotComparator.SnapshotRun> allRuns = QueryPlanSnapshotComparator
 				.loadRuns(outputDirectory, capture);
 		java.util.List<QueryPlanSnapshotComparator.SnapshotRun> matchingRuns = QueryPlanSnapshotComparator
-				.filterRuns(allRuns, null, currentSnapshot.getUnoptimizedFingerprint());
+				.filterRuns(allRuns, null, currentSnapshot.getUnoptimizedFingerprint(), null);
 		if (matchingRuns.isEmpty()) {
-			matchingRuns = QueryPlanSnapshotComparator.filterRuns(allRuns, normalizedOrNull(queryId), null);
+			matchingRuns = QueryPlanSnapshotComparator.filterRuns(allRuns, normalizedOrNull(queryId), null, null);
 		}
 		QueryPlanSnapshotComparator.SnapshotRun previousRun = QueryPlanSnapshotComparator
 				.latestExcludingPath(matchingRuns, currentSnapshotPath);
@@ -375,7 +392,7 @@ public final class QueryPlanSnapshotCli {
 		}
 		if (!resolved.hasComparisonFilter()) {
 			throw new IllegalArgumentException(
-					"Compare mode requires --query-id or --fingerprint (or interactive input).");
+					"Compare mode requires --query-id, --run-name, or --fingerprint (or interactive input).");
 		}
 		return resolved;
 	}
@@ -415,7 +432,7 @@ public final class QueryPlanSnapshotCli {
 	private void fillMissingCompareOptions(QueryPlanSnapshotCliOptions options) throws IOException {
 		boolean outputDirectoryPrompted = false;
 		if (!options.hasComparisonFilter()) {
-			String mode = promptChoice("Compare filter", List.of("query-id", "fingerprint"));
+			String mode = promptChoice("Compare filter", List.of("query-id", "run-name", "fingerprint"));
 			if ("query-id".equals(mode)) {
 				if (options.outputDirectory == null) {
 					options.outputDirectory = promptOptionalPath("Output directory (blank uses default)");
@@ -432,6 +449,23 @@ public final class QueryPlanSnapshotCli {
 					choices.add(MANUAL_QUERY_ID_ENTRY);
 					String selected = promptChoice("Query id", choices);
 					options.queryId = MANUAL_QUERY_ID_ENTRY.equals(selected) ? prompt("query-id") : selected;
+				}
+			} else if ("run-name".equals(mode)) {
+				if (options.outputDirectory == null) {
+					options.outputDirectory = promptOptionalPath("Output directory (blank uses default)");
+					outputDirectoryPrompted = true;
+				}
+				Path outputDirectory = options.outputDirectory != null
+						? options.outputDirectory
+						: QueryPlanCapture.resolveOutputDirectory();
+				List<String> availableRunNames = loadAvailableRunNames(outputDirectory);
+				if (availableRunNames.isEmpty()) {
+					options.runName = prompt("run-name");
+				} else {
+					List<String> choices = new ArrayList<>(availableRunNames);
+					choices.add(MANUAL_RUN_NAME_ENTRY);
+					String selected = promptChoice("Run name", choices);
+					options.runName = MANUAL_RUN_NAME_ENTRY.equals(selected) ? prompt("run-name") : selected;
 				}
 			} else {
 				options.comparisonFingerprint = prompt("fingerprint");
@@ -469,6 +503,32 @@ public final class QueryPlanSnapshotCli {
 		queryRunCounts.forEach((queryId, count) -> output
 				.println("  - " + queryId + " (" + count + " run" + (count == 1 ? "" : "s") + ")"));
 		return new ArrayList<>(queryRunCounts.keySet());
+	}
+
+	private List<String> loadAvailableRunNames(Path outputDirectory) throws IOException {
+		QueryPlanCapture capture = new QueryPlanCapture();
+		List<QueryPlanSnapshotComparator.SnapshotRun> runs = QueryPlanSnapshotComparator.loadRuns(outputDirectory,
+				capture);
+		Map<String, Integer> runNameCounts = new java.util.LinkedHashMap<>();
+		for (QueryPlanSnapshotComparator.SnapshotRun run : runs) {
+			Map<String, String> metadata = run.snapshot().getMetadata();
+			if (metadata == null) {
+				continue;
+			}
+			String runName = normalizedOrNull(metadata.get("runName"));
+			if (runName == null) {
+				continue;
+			}
+			runNameCounts.merge(runName, 1, Integer::sum);
+		}
+		if (runNameCounts.isEmpty()) {
+			return List.of();
+		}
+
+		output.println("Available run names:");
+		runNameCounts.forEach((runName, count) -> output
+				.println("  - " + runName + " (" + count + " run" + (count == 1 ? "" : "s") + ")"));
+		return new ArrayList<>(runNameCounts.keySet());
 	}
 
 	private QueryPlanSnapshotCliOptions.ComparisonPair resolveComparisonPair(QueryPlanSnapshotCliOptions options,
@@ -596,6 +656,7 @@ public final class QueryPlanSnapshotCli {
 			options.diffMode = promptDiffMode(options.diffMode);
 		}
 		options.queryId = promptOptionalValue("Query id (blank keeps default/auto)", options.queryId);
+		options.runName = promptOptionalValue("Run name (blank keeps current)", options.runName);
 		options.queryTimeoutSeconds = promptOptionalNonNegativeInteger(
 				"Query timeout seconds (blank keeps current, 0 disables timeout)",
 				options.queryTimeoutSeconds);
@@ -794,8 +855,10 @@ public final class QueryPlanSnapshotCli {
 			QueryPlanSnapshot snapshot = run.snapshot();
 			String capturedAt = snapshot.getCapturedAt();
 			String queryId = snapshot.getQueryId();
+			String runName = snapshot.getMetadata() == null ? null : snapshot.getMetadata().get("runName");
 			String fingerprint = snapshot.getUnoptimizedFingerprint();
-			choices.add(capturedAt + " queryId=" + queryId + " fingerprint=" + fingerprint);
+			choices.add(capturedAt + " queryId=" + queryId + " runName=" + formatRunName(runName)
+					+ " fingerprint=" + fingerprint);
 		}
 		return promptChoiceIndex(message, choices);
 	}
@@ -831,6 +894,9 @@ public final class QueryPlanSnapshotCli {
 				.addMetadata(QueryPlanCapture.metadataFromSystemProperties())
 				.featureFlagCollector(featureFlags)
 				.tupleExprRenderer(QueryPlanSnapshotCli::renderTupleExprWithIr);
+		if (options.runName != null && !options.runName.isBlank()) {
+			contextBuilder.addMetadata("runName", options.runName);
+		}
 		if (options.queryTimeoutSeconds != null) {
 			contextBuilder.addMetadata("queryTimeoutSeconds", options.queryTimeoutSeconds.toString());
 		}
@@ -851,6 +917,8 @@ public final class QueryPlanSnapshotCli {
 				.addValue("cli.theme", options.theme.name())
 				.addValue("cli.querySource", querySource)
 				.addValue("cli.persist", Boolean.toString(options.persist))
+				.addValue("cli.runName",
+						options.runName == null || options.runName.isBlank() ? "<none>" : options.runName)
 				.addValue("cli.queryTimeoutSeconds", formatQueryTimeoutSeconds(options.queryTimeoutSeconds));
 		if (options.queryIndex != null) {
 			featureFlags.addValue("cli.queryIndex", options.queryIndex.toString());
@@ -970,7 +1038,15 @@ public final class QueryPlanSnapshotCli {
 		output.println("Original query:");
 		output.println(queryText.trim());
 		output.println("Store=" + options.store.id + ", Theme=" + options.theme + ", QueryId=" + queryId
+				+ ", RunName=" + formatRunName(options.runName)
 				+ ", QueryTimeoutSeconds=" + formatQueryTimeoutSeconds(options.queryTimeoutSeconds));
+	}
+
+	private static String formatRunName(String runName) {
+		if (runName == null || runName.isBlank()) {
+			return "<none>";
+		}
+		return runName;
 	}
 
 	private void printExplanation(String levelKey, QueryPlanExplanation explanation) {
@@ -1019,10 +1095,10 @@ public final class QueryPlanSnapshotCli {
 			long startedAt = System.nanoTime();
 			long currentResultCount;
 			try {
-				currentResultCount = prepareTupleQuery(connection, queryText, queryTimeoutSeconds)
-						.evaluate()
-						.stream()
-						.count();
+				try (TupleQueryResult result = prepareTupleQuery(connection, queryText, queryTimeoutSeconds)
+						.evaluate()) {
+					currentResultCount = result.stream().count();
+				}
 			} catch (QueryInterruptedException interrupted) {
 				softLimitReached = true;
 				break;

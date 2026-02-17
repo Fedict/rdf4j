@@ -20,6 +20,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
@@ -51,7 +52,7 @@ public final class FeatureFlagCollector {
 				.stringPropertyNames()
 				.stream()
 				.filter(name -> name.startsWith(propertyPrefix))
-				.collect(Collectors.toCollection(java.util.TreeSet::new));
+				.collect(Collectors.toCollection(TreeSet::new));
 		keys.forEach(this::addSystemProperty);
 		return this;
 	}
