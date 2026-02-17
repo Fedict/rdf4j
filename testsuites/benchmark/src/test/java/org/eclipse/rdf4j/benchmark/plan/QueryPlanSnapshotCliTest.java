@@ -411,6 +411,9 @@ class QueryPlanSnapshotCliTest {
 
 		String printed = outputBuffer.toString(StandardCharsets.UTF_8);
 		assertTrue(printed.contains("Run details:"), printed);
+		assertTrue(printed.contains("Original query:"), printed);
+		assertTrue(printed.contains("=== Unoptimized Explanation ==="), printed);
+		assertTrue(printed.contains("Plan text"), printed);
 		assertFalse(printed.contains("[1] [0]"), printed);
 	}
 
