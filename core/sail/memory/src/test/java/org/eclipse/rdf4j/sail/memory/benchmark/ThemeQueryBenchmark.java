@@ -12,6 +12,7 @@
 package org.eclipse.rdf4j.sail.memory.benchmark;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -107,7 +108,9 @@ public class ThemeQueryBenchmark {
 		try (SailRepositoryConnection connection = repository.getConnection()) {
 			connection.begin(IsolationLevels.NONE);
 			RDFInserter inserter = new RDFInserter(connection);
-			ThemeDataSetGenerator.generate(theme, inserter);
+			for (Theme themeDataset : Theme.values()) {
+				ThemeDataSetGenerator.generate(themeDataset, inserter);
+			}
 			connection.commit();
 		}
 	}
@@ -194,6 +197,26 @@ public class ThemeQueryBenchmark {
 					tearDown();
 				}
 			}
+		}
+	}
+
+	@Test
+	public void setupLoadsAllThemesIntoRepository() throws IOException {
+		themeName = "MEDICAL_RECORDS";
+		z_queryIndex = 0;
+		setup();
+		try (SailRepositoryConnection connection = repository.getConnection()) {
+			boolean hasMedicalPatients = connection.prepareBooleanQuery(
+					"PREFIX med: <http://example.com/theme/medical/> ASK { ?s a med:Patient . }")
+					.evaluate();
+			boolean hasSocialUsers = connection.prepareBooleanQuery(
+					"PREFIX social: <http://example.com/theme/social/> ASK { ?s a social:User . }")
+					.evaluate();
+
+			assertTrue(hasMedicalPatients, "Expected medical theme data to be present");
+			assertTrue(hasSocialUsers, "Expected social theme data to be present");
+		} finally {
+			tearDown();
 		}
 	}
 
