@@ -18,16 +18,19 @@ import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.io.FileUtils;
-import org.assertj.core.util.Files;
 import org.eclipse.rdf4j.benchmark.common.ThemeQueryCatalog;
+import org.eclipse.rdf4j.benchmark.common.plan.FeatureFlagCollector;
+import org.eclipse.rdf4j.benchmark.common.plan.QueryPlanCapture;
+import org.eclipse.rdf4j.benchmark.common.plan.QueryPlanCaptureContext;
 import org.eclipse.rdf4j.benchmark.rio.util.ThemeDataSetGenerator;
 import org.eclipse.rdf4j.benchmark.rio.util.ThemeDataSetGenerator.Theme;
 import org.eclipse.rdf4j.common.transaction.IsolationLevels;
 import org.eclipse.rdf4j.query.explanation.Explanation;
+import org.eclipse.rdf4j.queryrender.sparql.TupleExprIRRenderer;
 import org.eclipse.rdf4j.repository.sail.SailRepository;
-import org.eclipse.rdf4j.repository.sail.SailRepositoryConnection;
 import org.eclipse.rdf4j.repository.util.RDFInserter;
 import org.eclipse.rdf4j.sail.lmdb.LmdbStore;
+import org.eclipse.rdf4j.sail.lmdb.config.LmdbStoreConfig;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openjdk.jmh.annotations.Benchmark;
@@ -45,16 +48,22 @@ import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Warmup;
 import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.RunnerException;
-import org.openjdk.jmh.runner.options.Options;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 
 @State(Scope.Benchmark)
-@Warmup(iterations = 2, batchSize = 1, timeUnit = TimeUnit.SECONDS, time = 3)
+@Warmup(iterations = 1, batchSize = 1, timeUnit = TimeUnit.SECONDS, time = 30)
 @BenchmarkMode({ Mode.AverageTime })
 @Fork(value = 1, jvmArgs = { "-Xms32G", "-Xmx32G" })
-@Measurement(iterations = 2, batchSize = 1, timeUnit = TimeUnit.MILLISECONDS, time = 100)
+@Measurement(iterations = 1, batchSize = 1, timeUnit = TimeUnit.SECONDS, time = 10)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 public class ThemeQueryBenchmark {
+
+	private static final String STORE_NAME = "lmdb";
+	private static final File STORE_DIRECTORY = new File("target", "lmdb-theme-query-benchmark");
+	private static final String TRIPLES_DATA_FILE = "triples/data.mdb";
+	private static final String VALUES_DATA_FILE = "values/data.mdb";
+	private static final long EXPECTED_TRIPLES_DATA_SIZE_BYTES = 1500921856L;
+	private static final long EXPECTED_VALUES_DATA_SIZE_BYTES = 713687040L;
 
 	@Param({ "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10" })
 	public int z_queryIndex;
@@ -71,14 +80,15 @@ public class ThemeQueryBenchmark {
 	})
 	public String themeName;
 
-	private File dataDir;
 	private SailRepository repository;
+	private LmdbStore store;
+	private LmdbStoreConfig storeConfig;
 	private Theme theme;
 	private String query;
 	private long expected;
 
 	public static void main(String[] args) throws RunnerException {
-		Options opt = new OptionsBuilder()
+		var opt = new OptionsBuilder()
 				.include("ThemeQueryBenchmark")
 				.forks(1)
 				.build();
@@ -90,34 +100,128 @@ public class ThemeQueryBenchmark {
 		theme = Theme.valueOf(themeName);
 		query = ThemeQueryCatalog.queryFor(theme, z_queryIndex);
 		expected = ThemeQueryCatalog.expectedCountFor(theme, z_queryIndex);
-		dataDir = Files.newTemporaryFolder();
-		repository = new SailRepository(new LmdbStore(dataDir, ConfigUtil.createConfig()));
+		if (!STORE_DIRECTORY.exists() && !STORE_DIRECTORY.mkdirs()) {
+			throw new IOException("Unable to create fixed LMDB benchmark directory: " + STORE_DIRECTORY);
+		}
+		storeConfig = ConfigUtil.createConfig();
+		store = new LmdbStore(STORE_DIRECTORY, storeConfig);
+		repository = new SailRepository(store);
+		ensureDataLoadedAndValidated();
+		if (QueryPlanCapture.isCaptureEnabled()) {
+			captureQueryPlanSnapshot();
+		}
+	}
+
+	private void ensureDataLoadedAndValidated() throws IOException {
+		if (!hasExpectedDbFileSizes()) {
+			rebuildStoreFromScratch();
+		}
+
+		if (!hasExpectedDbFileSizes()) {
+			throw new IllegalStateException("Unexpected LMDB db file sizes in fixed benchmark store. Expected "
+					+ TRIPLES_DATA_FILE + "=" + EXPECTED_TRIPLES_DATA_SIZE_BYTES + " and "
+					+ VALUES_DATA_FILE + "=" + EXPECTED_VALUES_DATA_SIZE_BYTES + " but got "
+					+ TRIPLES_DATA_FILE + "=" + dbFileSize(TRIPLES_DATA_FILE) + " and "
+					+ VALUES_DATA_FILE + "=" + dbFileSize(VALUES_DATA_FILE));
+		}
+	}
+
+	private void rebuildStoreFromScratch() throws IOException {
+		if (repository != null) {
+			repository.shutDown();
+		}
+
+		FileUtils.deleteDirectory(STORE_DIRECTORY);
+		if (!STORE_DIRECTORY.exists() && !STORE_DIRECTORY.mkdirs()) {
+			throw new IOException("Unable to recreate fixed LMDB benchmark directory: " + STORE_DIRECTORY);
+		}
+
+		storeConfig = ConfigUtil.createConfig();
+		store = new LmdbStore(STORE_DIRECTORY, storeConfig);
+		repository = new SailRepository(store);
 		loadData();
 	}
 
+	private boolean hasExpectedDbFileSizes() {
+		return dbFileSize(TRIPLES_DATA_FILE) == EXPECTED_TRIPLES_DATA_SIZE_BYTES
+				&& dbFileSize(VALUES_DATA_FILE) == EXPECTED_VALUES_DATA_SIZE_BYTES;
+	}
+
+	private long dbFileSize(String relativePath) {
+		return new File(STORE_DIRECTORY, relativePath).length();
+	}
+
 	private void loadData() throws IOException {
-		try (SailRepositoryConnection connection = repository.getConnection()) {
+		try (var connection = repository.getConnection()) {
 			connection.begin(IsolationLevels.NONE);
-			RDFInserter inserter = new RDFInserter(connection);
-			ThemeDataSetGenerator.generate(theme, inserter);
+			var inserter = new RDFInserter(connection);
+			for (var themeDataset : Theme.values()) {
+				ThemeDataSetGenerator.generate(themeDataset, inserter);
+			}
 			connection.commit();
 		}
 	}
 
+	private void captureQueryPlanSnapshot() throws IOException {
+		var benchmarkQuery = ThemeQueryCatalog.benchmarkQueryFor(theme, z_queryIndex);
+		var featureFlags = new FeatureFlagCollector()
+				.addValue("themeBenchmark.themeName", () -> themeName)
+				.addValue("themeBenchmark.queryIndex", () -> z_queryIndex)
+				.addReflectiveGetter("lmdbStore.writable", store, "isWritable")
+				.addReflectiveGetter("lmdbConfig.tripleIndexes", storeConfig, "getTripleIndexes")
+				.addReflectiveGetter("lmdbConfig.forceSync", storeConfig, "getForceSync")
+				.addReflectiveField("lmdbConfig.autoGrow", storeConfig, "autoGrow")
+				.addReflectiveGetter("lmdbConfig.valueDbSize", storeConfig, "getValueDBSize")
+				.addReflectiveGetter("lmdbConfig.tripleDbSize", storeConfig, "getTripleDBSize");
+		QueryPlanCapture.registerConfiguredFeatureFlags(featureFlags);
+
+		var context = QueryPlanCaptureContext.builder()
+				.outputDirectory(QueryPlanCapture.resolveOutputDirectory().resolve(STORE_NAME))
+				.queryId(STORE_NAME + "-" + themeName + "-q" + z_queryIndex)
+				.queryString(query)
+				.benchmark("ThemeQueryBenchmark")
+				.addMetadata("store", STORE_NAME)
+				.addMetadata("theme", themeName)
+				.addMetadata("queryIndex", Integer.toString(z_queryIndex))
+				.addMetadata("queryName", benchmarkQuery.getName())
+				.addMetadata("expectedCount", Long.toString(expected))
+				.addMetadata(QueryPlanCapture.metadataFromSystemProperties())
+				.featureFlagCollector(featureFlags)
+				.tupleExprRenderer(this::renderTupleExprWithIr)
+				.build();
+
+		try (var connection = repository.getConnection()) {
+			var snapshotPath = new QueryPlanCapture()
+					.captureAndWrite(context, () -> connection.prepareTupleQuery(query));
+			System.out.println("Query plan snapshot written to: " + snapshotPath);
+		}
+	}
+
+	private String renderTupleExprWithIr(org.eclipse.rdf4j.query.algebra.TupleExpr tupleExpr) {
+		var config = new TupleExprIRRenderer.Config();
+		config.verifyRoundTrip = false;
+		return new TupleExprIRRenderer(config).render(tupleExpr);
+	}
+
 	@TearDown(Level.Trial)
-	public void tearDown() throws IOException {
-		repository.shutDown();
-		FileUtils.deleteDirectory(dataDir);
+	public void tearDown() {
+		if (repository != null) {
+			repository.shutDown();
+			repository = null;
+		}
+		store = null;
+		storeConfig = null;
 	}
 
 	@Benchmark
 	public long executeQuery() {
-		try (SailRepositoryConnection connection = repository.getConnection()) {
-			long count = connection
-					.prepareTupleQuery(query)
-					.evaluate()
-					.stream()
-					.count();
+		try (var connection = repository.getConnection()) {
+			long count;
+			try (var evaluate = connection.prepareTupleQuery(query).evaluate()) {
+				count = evaluate
+						.stream()
+						.count();
+			}
 
 			if (count != expected) {
 				throw new IllegalStateException("Unexpected count: expected " + expected + " but got " + count);
@@ -130,16 +234,16 @@ public class ThemeQueryBenchmark {
 	@Test
 	@Disabled
 	public void testQueryCounts() throws IOException {
-		String[] queryIndexes = paramValues("z_queryIndex");
-		String[] themeNames = paramValues("themeName");
-		for (String themeNameValue : themeNames) {
-			for (String queryIndexValue : queryIndexes) {
+		var queryIndexes = paramValues("z_queryIndex");
+		var themeNames = paramValues("themeName");
+		for (var themeNameValue : themeNames) {
+			for (var queryIndexValue : queryIndexes) {
 				themeName = themeNameValue;
 				z_queryIndex = Integer.parseInt(queryIndexValue);
 				setup();
 				try {
-					long actual = executeQuery();
-					long expected = ThemeQueryCatalog.expectedCountFor(theme, z_queryIndex);
+					var actual = executeQuery();
+					var expected = ThemeQueryCatalog.expectedCountFor(theme, z_queryIndex);
 					System.out.println("For theme " + themeName + " and query index " + z_queryIndex
 							+ ", expected count is " + expected + " and actual count is " + actual);
 					assertEquals(expected, actual,
@@ -152,16 +256,31 @@ public class ThemeQueryBenchmark {
 	}
 
 	@Test
+	public void setupVerifiesExpectedDbFileSizesInFixedStore() throws IOException {
+		themeName = "MEDICAL_RECORDS";
+		z_queryIndex = 0;
+		setup();
+		try {
+			assertEquals(EXPECTED_TRIPLES_DATA_SIZE_BYTES, dbFileSize(TRIPLES_DATA_FILE),
+					"Unexpected byte size for " + TRIPLES_DATA_FILE);
+			assertEquals(EXPECTED_VALUES_DATA_SIZE_BYTES, dbFileSize(VALUES_DATA_FILE),
+					"Unexpected byte size for " + VALUES_DATA_FILE);
+		} finally {
+			tearDown();
+		}
+	}
+
+	@Test
 	public void testQueryExplanation() throws IOException {
-		String[] queryIndexes = paramValues("z_queryIndex");
-		String[] themeNames = paramValues("themeName");
-		for (String themeNameValue : themeNames) {
-			for (String queryIndexValue : queryIndexes) {
+		var queryIndexes = paramValues("z_queryIndex");
+		var themeNames = paramValues("themeName");
+		for (var themeNameValue : themeNames) {
+			for (var queryIndexValue : queryIndexes) {
 				themeName = themeNameValue;
 				z_queryIndex = Integer.parseInt(queryIndexValue);
 				setup();
-				try (SailRepositoryConnection connection = repository.getConnection()) {
-					String explanation = connection
+				try (var connection = repository.getConnection()) {
+					var explanation = connection
 							.prepareTupleQuery(query)
 							.explain(Explanation.Level.Executed)
 							.toString();
@@ -176,7 +295,7 @@ public class ThemeQueryBenchmark {
 
 	private static String[] paramValues(String fieldName) {
 		try {
-			Param param = ThemeQueryBenchmark.class.getField(fieldName).getAnnotation(Param.class);
+			var param = ThemeQueryBenchmark.class.getField(fieldName).getAnnotation(Param.class);
 			if (param == null) {
 				throw new IllegalStateException("Missing @Param annotation for field " + fieldName);
 			}
@@ -185,4 +304,5 @@ public class ThemeQueryBenchmark {
 			throw new IllegalStateException("Missing field " + fieldName, e);
 		}
 	}
+
 }
