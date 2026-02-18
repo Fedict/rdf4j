@@ -53,6 +53,7 @@ public final class QueryPlanCapture {
 	public static final String FEATURE_PROPERTIES_PROPERTY = "rdf4j.query.plan.capture.featureProperties";
 	public static final String FEATURE_PROPERTY_PREFIX_PROPERTY = "rdf4j.query.plan.capture.featurePropertyPrefix";
 	public static final String GIT_COMMIT_PROPERTY = "rdf4j.query.plan.capture.gitCommit";
+	public static final String GIT_BRANCH_PROPERTY = "rdf4j.query.plan.capture.gitBranch";
 
 	private static final DateTimeFormatter FILE_TIMESTAMP_FORMATTER = DateTimeFormatter
 			.ofPattern("yyyyMMdd-HHmmssSSS")
@@ -115,6 +116,7 @@ public final class QueryPlanCapture {
 			metadata.putIfAbsent("benchmark", context.getBenchmark());
 		}
 		metadata.putIfAbsent("gitCommit", resolveGitCommit());
+		metadata.putIfAbsent("gitBranch", resolveGitBranch());
 		metadata.putIfAbsent("javaVersion", System.getProperty("java.version", FeatureFlagCollector.NULL_VALUE));
 
 		FeatureFlagCollector collector = context.getFeatureFlagCollector();
@@ -241,28 +243,46 @@ public final class QueryPlanCapture {
 	}
 
 	private static String resolveGitCommit() {
-		String configured = System.getProperty(GIT_COMMIT_PROPERTY);
+		String configured = resolveConfiguredValue(GIT_COMMIT_PROPERTY, "GIT_COMMIT");
+		if (configured != null) {
+			return configured;
+		}
+		return runGitCommand("rev-parse", "--verify", "HEAD");
+	}
+
+	private static String resolveGitBranch() {
+		String configured = resolveConfiguredValue(GIT_BRANCH_PROPERTY, "GIT_BRANCH");
+		if (configured != null) {
+			return configured;
+		}
+		return runGitCommand("rev-parse", "--abbrev-ref", "HEAD");
+	}
+
+	private static String resolveConfiguredValue(String systemPropertyName, String environmentVariableName) {
+		String configured = System.getProperty(systemPropertyName);
 		if (configured != null && !configured.isBlank()) {
 			return configured.trim();
 		}
-
-		String fromEnvironment = System.getenv("GIT_COMMIT");
+		String fromEnvironment = System.getenv(environmentVariableName);
 		if (fromEnvironment != null && !fromEnvironment.isBlank()) {
 			return fromEnvironment.trim();
 		}
+		return null;
+	}
 
+	private static String runGitCommand(String... args) {
 		Process process = null;
 		try {
-			process = new ProcessBuilder("git", "rev-parse", "--verify", "HEAD")
-					.redirectErrorStream(true)
-					.start();
+			String[] command = new String[args.length + 1];
+			command[0] = "git";
+			System.arraycopy(args, 0, command, 1, args.length);
+			process = new ProcessBuilder(command).redirectErrorStream(true).start();
 			boolean finished = process.waitFor(2, TimeUnit.SECONDS);
 			if (!finished || process.exitValue() != 0) {
 				return "unknown";
 			}
 			try (InputStream stream = process.getInputStream()) {
-				String output = new String(stream.readAllBytes(), StandardCharsets.UTF_8)
-						.trim();
+				String output = new String(stream.readAllBytes(), StandardCharsets.UTF_8).trim();
 				return output.isEmpty() ? "unknown" : output;
 			}
 		} catch (Exception ignored) {

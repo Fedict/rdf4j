@@ -469,6 +469,55 @@ class QueryPlanSnapshotCliTest {
 	}
 
 	@Test
+	void interactiveNoArgsCanRenameAllRunsForSelectedCommit() throws Exception {
+		Path outputDir = Files.createTempDirectory("rdf4j-cli-rename-commit-");
+		writeSnapshot(outputDir, "q-alpha-1", "fingerprint-a1", "2026-02-17T12:05:00Z",
+				Map.of("store", "memory", "gitCommit", "commit-a", "gitBranch", "feature/a", "runName", "old-a"));
+		writeSnapshot(outputDir, "q-alpha-2", "fingerprint-a2", "2026-02-17T12:00:00Z",
+				Map.of("store", "memory", "gitCommit", "commit-a", "gitBranch", "feature/a", "runName", "old-a"));
+		writeSnapshot(outputDir, "q-beta", "fingerprint-b", "2026-02-17T10:00:00Z",
+				Map.of("store", "memory", "gitCommit", "commit-b", "gitBranch", "main", "runName", "old-b"));
+
+		String interactiveInput = String.join("\n",
+				"rename runs by commit",
+				outputDir.toString(),
+				"1",
+				"release-candidate")
+				+ "\n";
+		ByteArrayOutputStream outputBuffer = new ByteArrayOutputStream();
+		QueryPlanSnapshotCli cli = new QueryPlanSnapshotCli(new BufferedReader(new StringReader(interactiveInput)),
+				new PrintStream(outputBuffer, true, StandardCharsets.UTF_8.name()));
+
+		QueryPlanSnapshotCliOptions options = QueryPlanSnapshotCli.parseArgs(new String[] {});
+		cli.run(options);
+
+		QueryPlanCapture capture = new QueryPlanCapture();
+		try (java.util.stream.Stream<Path> snapshots = Files.list(outputDir)) {
+			snapshots
+					.filter(path -> path.getFileName().toString().endsWith(".json"))
+					.forEach(path -> {
+						try {
+							QueryPlanSnapshot snapshot = capture.readSnapshot(path);
+							String commit = snapshot.getMetadata().get("gitCommit");
+							String runName = snapshot.getMetadata().get("runName");
+							if ("commit-a".equals(commit)) {
+								assertEquals("release-candidate", runName);
+							} else if ("commit-b".equals(commit)) {
+								assertEquals("old-b", runName);
+							}
+						} catch (Exception e) {
+							throw new RuntimeException(e);
+						}
+					});
+		}
+
+		String printed = outputBuffer.toString(StandardCharsets.UTF_8);
+		assertTrue(printed.contains("commit-a"), printed);
+		assertTrue(printed.contains("feature/a"), printed);
+		assertTrue(printed.contains("localTime="), printed);
+	}
+
+	@Test
 	void interactiveCompareExistingListsAllAvailableQueryIds() throws Exception {
 		Path outputDir = Files.createTempDirectory("rdf4j-cli-query-list-");
 		writeSnapshot(outputDir, "q-alpha", "fingerprint-alpha", "2026-02-17T10:00:00Z");

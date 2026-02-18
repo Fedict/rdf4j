@@ -116,6 +116,32 @@ class QueryPlanCaptureTest {
 		assertEquals(outputFile.getFileName(), byFingerprint.get().getFileName());
 	}
 
+	@Test
+	void capturesGitBranchMetadataWhenConfigured() {
+		String propertyKey = "rdf4j.query.plan.capture.gitBranch";
+		String previousProperty = System.getProperty(propertyKey);
+		try {
+			System.setProperty(propertyKey, "feature/query-plan-cli");
+			QueryPlanCapture capture = new QueryPlanCapture();
+			String query = "SELECT ?s WHERE { ?s ?p ?o }";
+			QueryPlanCaptureContext context = QueryPlanCaptureContext.builder()
+					.outputDirectory(tempDir)
+					.queryId("branch-capture")
+					.queryString(query)
+					.benchmark("QueryPlanCaptureTest")
+					.build();
+
+			QueryPlanSnapshot snapshot = capture.capture(context, () -> stubTupleQueryFor(query));
+			assertEquals("feature/query-plan-cli", snapshot.getMetadata().get("gitBranch"));
+		} finally {
+			if (previousProperty == null) {
+				System.clearProperty(propertyKey);
+			} else {
+				System.setProperty(propertyKey, previousProperty);
+			}
+		}
+	}
+
 	private static TupleQuery stubTupleQueryFor(String query) {
 		EnumMap<Explanation.Level, Explanation> explanations = new EnumMap<>(Explanation.Level.class);
 		for (Explanation.Level level : Explanation.Level.values()) {

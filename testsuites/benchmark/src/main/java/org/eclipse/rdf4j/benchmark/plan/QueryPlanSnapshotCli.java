@@ -18,6 +18,9 @@ import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -52,6 +55,7 @@ public final class QueryPlanSnapshotCli {
 	private static final List<String> INTERACTIVE_ACTIONS = List.of(
 			"run query",
 			"compare existing runs",
+			"rename runs by commit",
 			"list themes",
 			"list queries",
 			"help");
@@ -61,6 +65,10 @@ public final class QueryPlanSnapshotCli {
 			"executed");
 	private static final String MANUAL_QUERY_ID_ENTRY = "<manual entry>";
 	private static final String MANUAL_RUN_NAME_ENTRY = "<manual entry>";
+	private static final String UNKNOWN_VALUE = "<unknown>";
+	private static final ZoneId LOCAL_ZONE = ZoneId.systemDefault();
+	private static final DateTimeFormatter LOCAL_TIME_FORMATTER = DateTimeFormatter
+			.ofPattern("yyyy-MM-dd HH:mm:ss z");
 	private static final long EXECUTION_REPEAT_SOFT_LIMIT_NANOS = TimeUnit.SECONDS.toNanos(60);
 	private static final int EXECUTION_REPEAT_MIN_RUNS = 2;
 	private static final int EXECUTION_REPEAT_MAX_RUNS = 128;
@@ -102,6 +110,10 @@ public final class QueryPlanSnapshotCli {
 				printThemeQueries(resolved.listQueriesTheme);
 				return;
 			}
+			if (resolved.renameRunsByCommit) {
+				runRenameRunsByCommit(resolved);
+				return;
+			}
 			if (resolved.compareExisting) {
 				runCompareExisting(resolved);
 				return;
@@ -127,7 +139,7 @@ public final class QueryPlanSnapshotCli {
 			throws IOException {
 		QueryPlanSnapshotCliOptions resolved = options.copy();
 		if (resolved.argumentCount != 0 || resolved.noInteractive || resolved.help || resolved.listThemes
-				|| resolved.listQueriesTheme != null || resolved.compareExisting) {
+				|| resolved.listQueriesTheme != null || resolved.compareExisting || resolved.renameRunsByCommit) {
 			return resolved;
 		}
 
@@ -137,6 +149,10 @@ public final class QueryPlanSnapshotCli {
 		}
 		if ("compare existing runs".equals(action)) {
 			resolved.compareExisting = true;
+			return resolved;
+		}
+		if ("rename runs by commit".equals(action)) {
+			resolved.renameRunsByCommit = true;
 			return resolved;
 		}
 		if ("list themes".equals(action)) {
@@ -314,6 +330,90 @@ public final class QueryPlanSnapshotCli {
 		}
 
 		runInteractiveRunBrowser(matchingRuns, resolved.diffMode);
+	}
+
+	private void runRenameRunsByCommit(QueryPlanSnapshotCliOptions options) throws Exception {
+		Path outputDirectory = resolveRenameOutputDirectory(options);
+		QueryPlanCapture capture = new QueryPlanCapture();
+		List<QueryPlanSnapshotComparator.SnapshotRun> allRuns = QueryPlanSnapshotComparator.loadRuns(outputDirectory,
+				capture);
+		List<CommitRunGroup> groups = groupRunsByCommit(allRuns);
+		if (groups.isEmpty()) {
+			output.println("No runs with gitCommit metadata found in " + outputDirectory.toAbsolutePath());
+			return;
+		}
+
+		int selectedIndex = promptChoiceIndex("Select commit", toCommitChoices(groups));
+		CommitRunGroup selectedGroup = groups.get(selectedIndex);
+		String newRunName = promptRequiredValue("New run name");
+		int updatedRuns = renameRunsForCommit(allRuns, selectedGroup.commit(), newRunName, capture);
+		output.println("Renamed " + updatedRuns + " run(s) for commit " + selectedGroup.commit()
+				+ " to runName=" + newRunName);
+	}
+
+	private Path resolveRenameOutputDirectory(QueryPlanSnapshotCliOptions options) throws IOException {
+		if (options.outputDirectory != null) {
+			return options.outputDirectory;
+		}
+		Path prompted = promptOptionalPath("Output directory (blank uses default)");
+		return prompted != null ? prompted : QueryPlanCapture.resolveOutputDirectory();
+	}
+
+	private List<CommitRunGroup> groupRunsByCommit(List<QueryPlanSnapshotComparator.SnapshotRun> runs) {
+		Map<String, CommitRunGroup> byCommit = new java.util.LinkedHashMap<>();
+		for (QueryPlanSnapshotComparator.SnapshotRun run : runs) {
+			Map<String, String> metadata = run.snapshot().getMetadata();
+			if (metadata == null) {
+				continue;
+			}
+			String commit = normalizedOrNull(metadata.get("gitCommit"));
+			if (commit == null) {
+				continue;
+			}
+			String branch = normalizedOrNull(metadata.get("gitBranch"));
+			byCommit.computeIfAbsent(commit, CommitRunGroup::new).recordRun(run, branch);
+		}
+
+		List<CommitRunGroup> groups = new ArrayList<>(byCommit.values());
+		groups.sort((left, right) -> {
+			int byTime = Long.compare(right.latestEpochMillis(), left.latestEpochMillis());
+			return byTime != 0 ? byTime : left.commit().compareTo(right.commit());
+		});
+		return groups;
+	}
+
+	private List<String> toCommitChoices(List<CommitRunGroup> groups) {
+		List<String> choices = new ArrayList<>(groups.size());
+		for (CommitRunGroup group : groups) {
+			choices.add("commit=" + group.commit()
+					+ " branch=" + group.branchSummary()
+					+ " localTime=" + formatLocalTime(group.latestCapturedAt())
+					+ " runs=" + group.runCount());
+		}
+		return choices;
+	}
+
+	private int renameRunsForCommit(List<QueryPlanSnapshotComparator.SnapshotRun> runs, String commit,
+			String newRunName, QueryPlanCapture capture) throws IOException {
+		int updatedRuns = 0;
+		for (QueryPlanSnapshotComparator.SnapshotRun run : runs) {
+			Map<String, String> metadata = run.snapshot().getMetadata();
+			if (metadata == null || !commit.equals(normalizedOrNull(metadata.get("gitCommit")))) {
+				continue;
+			}
+			Path snapshotPath = run.path();
+			if (snapshotPath == null) {
+				continue;
+			}
+
+			QueryPlanSnapshot snapshot = run.snapshot();
+			java.util.LinkedHashMap<String, String> updatedMetadata = new java.util.LinkedHashMap<>(metadata);
+			updatedMetadata.put("runName", newRunName);
+			snapshot.setMetadata(updatedMetadata);
+			capture.writeSnapshot(snapshotPath, snapshot);
+			updatedRuns++;
+		}
+		return updatedRuns;
 	}
 
 	private void runInteractiveRunBrowser(List<QueryPlanSnapshotComparator.SnapshotRun> runs,
@@ -560,6 +660,16 @@ public final class QueryPlanSnapshotCli {
 			} catch (IllegalArgumentException e) {
 				output.println(e.getMessage());
 			}
+		}
+	}
+
+	private String promptRequiredValue(String message) throws IOException {
+		while (true) {
+			String value = prompt(message);
+			if (!value.isBlank()) {
+				return value;
+			}
+			output.println(message + " cannot be blank.");
 		}
 	}
 
@@ -1023,6 +1133,28 @@ public final class QueryPlanSnapshotCli {
 		return normalized.isEmpty() ? null : normalized;
 	}
 
+	private static String formatLocalTime(String capturedAt) {
+		if (capturedAt == null || capturedAt.isBlank()) {
+			return UNKNOWN_VALUE;
+		}
+		try {
+			return LOCAL_TIME_FORMATTER.format(Instant.parse(capturedAt).atZone(LOCAL_ZONE));
+		} catch (Exception ignored) {
+			return capturedAt;
+		}
+	}
+
+	private static long toEpochMillis(String capturedAt) {
+		if (capturedAt == null || capturedAt.isBlank()) {
+			return Long.MIN_VALUE;
+		}
+		try {
+			return Instant.parse(capturedAt).toEpochMilli();
+		} catch (Exception ignored) {
+			return Long.MIN_VALUE;
+		}
+	}
+
 	private static String formatQueryTimeoutSeconds(Integer queryTimeoutSeconds) {
 		if (queryTimeoutSeconds == null || queryTimeoutSeconds == 0) {
 			return "<none>";
@@ -1183,6 +1315,49 @@ public final class QueryPlanSnapshotCli {
 			this.resultCount = resultCount;
 			this.softLimitReached = softLimitReached;
 			this.maxRunsReached = maxRunsReached;
+		}
+	}
+
+	private static final class CommitRunGroup {
+		private final String commit;
+		private final LinkedHashSet<String> branches = new LinkedHashSet<>();
+		private long latestEpochMillis = Long.MIN_VALUE;
+		private String latestCapturedAt;
+		private int runCount;
+
+		private CommitRunGroup(String commit) {
+			this.commit = commit;
+		}
+
+		private void recordRun(QueryPlanSnapshotComparator.SnapshotRun run, String branch) {
+			runCount++;
+			branches.add(branch == null ? UNKNOWN_VALUE : branch);
+			String capturedAt = run.snapshot().getCapturedAt();
+			long epochMillis = toEpochMillis(capturedAt);
+			if (epochMillis >= latestEpochMillis) {
+				latestEpochMillis = epochMillis;
+				latestCapturedAt = capturedAt;
+			}
+		}
+
+		private String commit() {
+			return commit;
+		}
+
+		private String branchSummary() {
+			return String.join(",", branches);
+		}
+
+		private long latestEpochMillis() {
+			return latestEpochMillis;
+		}
+
+		private String latestCapturedAt() {
+			return latestCapturedAt;
+		}
+
+		private int runCount() {
+			return runCount;
 		}
 	}
 

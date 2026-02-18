@@ -32,6 +32,7 @@ final class QueryPlanSnapshotCliOptions {
 	boolean listThemes;
 	Theme listQueriesTheme;
 	boolean compareExisting;
+	boolean renameRunsByCommit;
 	boolean compareLatest;
 	boolean runAllThemeQueries;
 	boolean persist = true;
@@ -62,6 +63,7 @@ final class QueryPlanSnapshotCliOptions {
 		copy.listThemes = listThemes;
 		copy.listQueriesTheme = listQueriesTheme;
 		copy.compareExisting = compareExisting;
+		copy.renameRunsByCommit = renameRunsByCommit;
 		copy.compareLatest = compareLatest;
 		copy.runAllThemeQueries = runAllThemeQueries;
 		copy.persist = persist;
@@ -95,7 +97,7 @@ final class QueryPlanSnapshotCliOptions {
 	}
 
 	boolean isRunMode() {
-		return !compareExisting;
+		return !compareExisting && !renameRunsByCommit;
 	}
 
 	static boolean requiresInteractiveInput(QueryPlanSnapshotCliOptions options) {

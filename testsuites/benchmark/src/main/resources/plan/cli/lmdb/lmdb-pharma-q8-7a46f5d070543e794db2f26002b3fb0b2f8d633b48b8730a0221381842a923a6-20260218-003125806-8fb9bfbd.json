@@ -13,7 +13,8 @@
     "expectedCount" : "1635",
     "benchmark" : "QueryPlanSnapshotCli",
     "gitCommit" : "bfa2aecf22fe98823de3cb7aafd7184928fe4a5f",
-    "javaVersion" : "25.0.1"
+    "javaVersion" : "25.0.1",
+    "runName" : "main-2026-02-18"
   },
   "featureFlags" : {
     "cli.store" : "lmdb",
