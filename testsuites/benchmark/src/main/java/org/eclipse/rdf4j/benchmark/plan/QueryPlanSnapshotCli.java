@@ -69,9 +69,9 @@ public final class QueryPlanSnapshotCli {
 	private static final ZoneId LOCAL_ZONE = ZoneId.systemDefault();
 	private static final DateTimeFormatter LOCAL_TIME_FORMATTER = DateTimeFormatter
 			.ofPattern("yyyy-MM-dd HH:mm:ss z");
-	private static final long EXECUTION_REPEAT_SOFT_LIMIT_NANOS = TimeUnit.SECONDS.toNanos(60);
-	private static final int EXECUTION_REPEAT_MIN_RUNS = 2;
-	private static final int EXECUTION_REPEAT_MAX_RUNS = 128;
+	private static final long DEFAULT_EXECUTION_REPEAT_SOFT_LIMIT_NANOS = TimeUnit.SECONDS.toNanos(60);
+	private static final int DEFAULT_EXECUTION_REPEAT_MIN_RUNS = 2;
+	private static final int DEFAULT_EXECUTION_REPEAT_MAX_RUNS = 128;
 
 	public static void main(String[] args) throws Exception {
 		QueryPlanSnapshotCliOptions options = parseArgs(args);
@@ -83,15 +83,30 @@ public final class QueryPlanSnapshotCli {
 	private final BufferedReader input;
 	private final PrintStream output;
 	private final JLineChoiceMenu jLineChoiceMenu;
+	private final int executionRepeatMinRuns;
+	private final int executionRepeatMaxRuns;
+	private final long executionRepeatSoftLimitNanos;
 
 	QueryPlanSnapshotCli(BufferedReader input, PrintStream output) {
 		this(input, output, false);
 	}
 
 	QueryPlanSnapshotCli(BufferedReader input, PrintStream output, boolean useTerminalChoiceMenu) {
+		this(input, output, useTerminalChoiceMenu, DEFAULT_EXECUTION_REPEAT_MIN_RUNS,
+				DEFAULT_EXECUTION_REPEAT_MAX_RUNS, DEFAULT_EXECUTION_REPEAT_SOFT_LIMIT_NANOS);
+	}
+
+	QueryPlanSnapshotCli(BufferedReader input, PrintStream output, boolean useTerminalChoiceMenu,
+			int executionRepeatMinRuns, int executionRepeatMaxRuns, long executionRepeatSoftLimitNanos) {
 		this.input = Objects.requireNonNull(input, "input");
 		this.output = Objects.requireNonNull(output, "output");
 		this.jLineChoiceMenu = useTerminalChoiceMenu ? JLineChoiceMenu.tryCreate(output) : null;
+		this.executionRepeatMinRuns = validateExecutionRepeatMinRuns(executionRepeatMinRuns);
+		this.executionRepeatMaxRuns = validateExecutionRepeatMaxRuns(executionRepeatMaxRuns);
+		if (this.executionRepeatMinRuns > this.executionRepeatMaxRuns) {
+			throw new IllegalArgumentException("executionRepeatMinRuns must be <= executionRepeatMaxRuns.");
+		}
+		this.executionRepeatSoftLimitNanos = validateExecutionRepeatSoftLimitNanos(executionRepeatSoftLimitNanos);
 	}
 
 	void run(QueryPlanSnapshotCliOptions options) throws Exception {
@@ -1162,6 +1177,27 @@ public final class QueryPlanSnapshotCli {
 		return queryTimeoutSeconds.toString();
 	}
 
+	private static int validateExecutionRepeatMinRuns(int minRuns) {
+		if (minRuns < 1) {
+			throw new IllegalArgumentException("executionRepeatMinRuns must be >= 1.");
+		}
+		return minRuns;
+	}
+
+	private static int validateExecutionRepeatMaxRuns(int maxRuns) {
+		if (maxRuns < 1) {
+			throw new IllegalArgumentException("executionRepeatMaxRuns must be >= 1.");
+		}
+		return maxRuns;
+	}
+
+	private static long validateExecutionRepeatSoftLimitNanos(long softLimitNanos) {
+		if (softLimitNanos < 1L) {
+			throw new IllegalArgumentException("executionRepeatSoftLimitNanos must be >= 1.");
+		}
+		return softLimitNanos;
+	}
+
 	private static TupleQuery prepareTupleQuery(SailRepositoryConnection connection, String queryText,
 			Integer queryTimeoutSeconds) {
 		TupleQuery tupleQuery = connection.prepareTupleQuery(queryText);
@@ -1236,14 +1272,14 @@ public final class QueryPlanSnapshotCli {
 		int runs = 0;
 		boolean softLimitReached = false;
 
-		while (runs < EXECUTION_REPEAT_MAX_RUNS) {
-			if (runs >= EXECUTION_REPEAT_MIN_RUNS) {
+		while (runs < executionRepeatMaxRuns) {
+			if (runs >= executionRepeatMinRuns) {
 				long averageNanos = Math.max(1L, elapsedNanos / runs);
-				if (elapsedNanos + averageNanos > EXECUTION_REPEAT_SOFT_LIMIT_NANOS) {
+				if (elapsedNanos + averageNanos > executionRepeatSoftLimitNanos) {
 					softLimitReached = true;
 					break;
 				}
-			} else if (elapsedNanos >= EXECUTION_REPEAT_SOFT_LIMIT_NANOS) {
+			} else if (elapsedNanos >= executionRepeatSoftLimitNanos) {
 				softLimitReached = true;
 				break;
 			}
@@ -1272,7 +1308,7 @@ public final class QueryPlanSnapshotCli {
 			}
 		}
 
-		boolean maxRunsReached = runs >= EXECUTION_REPEAT_MAX_RUNS;
+		boolean maxRunsReached = runs >= executionRepeatMaxRuns;
 		if (runs == 0) {
 			return new QueryExecutionVerification(0, 0, 0, softLimitReached, maxRunsReached);
 		}
@@ -1296,7 +1332,7 @@ public final class QueryPlanSnapshotCli {
 				+ ", totalMillis=" + totalMillis
 				+ ", averageMillis=" + averageMillis
 				+ ", resultCount=" + executionVerification.resultCount
-				+ ", softLimitMillis=" + TimeUnit.NANOSECONDS.toMillis(EXECUTION_REPEAT_SOFT_LIMIT_NANOS)
+				+ ", softLimitMillis=" + TimeUnit.NANOSECONDS.toMillis(executionRepeatSoftLimitNanos)
 				+ ", softLimitReached=" + executionVerification.softLimitReached
 				+ ", maxRunsReached=" + executionVerification.maxRunsReached);
 	}

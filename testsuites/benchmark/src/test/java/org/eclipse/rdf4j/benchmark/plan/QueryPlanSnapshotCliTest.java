@@ -26,6 +26,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import org.eclipse.rdf4j.benchmark.common.plan.QueryPlanCapture;
 import org.eclipse.rdf4j.benchmark.common.plan.QueryPlanCaptureContext;
@@ -35,6 +36,10 @@ import org.eclipse.rdf4j.benchmark.rio.util.ThemeDataSetGenerator.Theme;
 import org.junit.jupiter.api.Test;
 
 class QueryPlanSnapshotCliTest {
+
+	private static final int TEST_EXECUTION_REPEAT_MIN_RUNS = 1;
+	private static final int TEST_EXECUTION_REPEAT_MAX_RUNS = 1;
+	private static final long TEST_EXECUTION_REPEAT_SOFT_LIMIT_NANOS = TimeUnit.MILLISECONDS.toNanos(1);
 
 	@Test
 	void parsesThemeQueryShortcutAndStore() {
@@ -217,8 +222,7 @@ class QueryPlanSnapshotCliTest {
 	@Test
 	void runModePrintsPrettyExplanationForAllLevels() throws Exception {
 		ByteArrayOutputStream outputBuffer = new ByteArrayOutputStream();
-		QueryPlanSnapshotCli cli = new QueryPlanSnapshotCli(new BufferedReader(new StringReader("")),
-				new PrintStream(outputBuffer, true, StandardCharsets.UTF_8.name()));
+		QueryPlanSnapshotCli cli = newCli("", outputBuffer);
 
 		QueryPlanSnapshotCliOptions options = QueryPlanSnapshotCli.parseArgs(new String[] {
 				"--no-interactive",
@@ -242,8 +246,7 @@ class QueryPlanSnapshotCliTest {
 	@Test
 	void runModePrintsExecutionVerificationSummary() throws Exception {
 		ByteArrayOutputStream outputBuffer = new ByteArrayOutputStream();
-		QueryPlanSnapshotCli cli = new QueryPlanSnapshotCli(new BufferedReader(new StringReader("")),
-				new PrintStream(outputBuffer, true, StandardCharsets.UTF_8.name()));
+		QueryPlanSnapshotCli cli = newCli("", outputBuffer);
 
 		QueryPlanSnapshotCliOptions options = QueryPlanSnapshotCli.parseArgs(new String[] {
 				"--no-interactive",
@@ -257,7 +260,7 @@ class QueryPlanSnapshotCliTest {
 
 		String printed = outputBuffer.toString(StandardCharsets.UTF_8);
 		assertTrue(printed.contains("=== Execution Verification ==="), printed);
-		assertTrue(printed.contains("runs="), printed);
+		assertTrue(printed.contains("runs=1,"), printed);
 	}
 
 	@Test
@@ -273,13 +276,11 @@ class QueryPlanSnapshotCliTest {
 		});
 
 		ByteArrayOutputStream firstRunOutput = new ByteArrayOutputStream();
-		QueryPlanSnapshotCli firstRunCli = new QueryPlanSnapshotCli(new BufferedReader(new StringReader("")),
-				new PrintStream(firstRunOutput, true, StandardCharsets.UTF_8.name()));
+		QueryPlanSnapshotCli firstRunCli = newCli("", firstRunOutput);
 		firstRunCli.run(options);
 
 		ByteArrayOutputStream secondRunOutput = new ByteArrayOutputStream();
-		QueryPlanSnapshotCli secondRunCli = new QueryPlanSnapshotCli(new BufferedReader(new StringReader("")),
-				new PrintStream(secondRunOutput, true, StandardCharsets.UTF_8.name()));
+		QueryPlanSnapshotCli secondRunCli = newCli("", secondRunOutput);
 		secondRunCli.run(options);
 
 		String secondRunPrinted = secondRunOutput.toString(StandardCharsets.UTF_8);
@@ -290,8 +291,7 @@ class QueryPlanSnapshotCliTest {
 	@Test
 	void runModePrintsConfiguredQueryTimeoutInResultsSection() throws Exception {
 		ByteArrayOutputStream outputBuffer = new ByteArrayOutputStream();
-		QueryPlanSnapshotCli cli = new QueryPlanSnapshotCli(new BufferedReader(new StringReader("")),
-				new PrintStream(outputBuffer, true, StandardCharsets.UTF_8.name()));
+		QueryPlanSnapshotCli cli = newCli("", outputBuffer);
 
 		QueryPlanSnapshotCliOptions options = QueryPlanSnapshotCli.parseArgs(new String[] {
 				"--no-interactive",
@@ -312,8 +312,7 @@ class QueryPlanSnapshotCliTest {
 	void runModePersistsRunNameAsMetadataAndPrintsIt() throws Exception {
 		Path outputDirectory = Files.createTempDirectory("rdf4j-cli-run-name-");
 		ByteArrayOutputStream outputBuffer = new ByteArrayOutputStream();
-		QueryPlanSnapshotCli cli = new QueryPlanSnapshotCli(new BufferedReader(new StringReader("")),
-				new PrintStream(outputBuffer, true, StandardCharsets.UTF_8.name()));
+		QueryPlanSnapshotCli cli = newCli("", outputBuffer);
 
 		QueryPlanSnapshotCliOptions options = QueryPlanSnapshotCli.parseArgs(new String[] {
 				"--no-interactive",
@@ -343,8 +342,7 @@ class QueryPlanSnapshotCliTest {
 	void runModePrintsOriginalQueryAtStartOfResultsSection() throws Exception {
 		String query = "SELECT * WHERE { ?s ?p ?o } LIMIT 5";
 		ByteArrayOutputStream outputBuffer = new ByteArrayOutputStream();
-		QueryPlanSnapshotCli cli = new QueryPlanSnapshotCli(new BufferedReader(new StringReader("")),
-				new PrintStream(outputBuffer, true, StandardCharsets.UTF_8.name()));
+		QueryPlanSnapshotCli cli = newCli("", outputBuffer);
 
 		QueryPlanSnapshotCliOptions options = QueryPlanSnapshotCli.parseArgs(new String[] {
 				"--no-interactive",
@@ -379,8 +377,7 @@ class QueryPlanSnapshotCliTest {
 				"")
 				+ "\n";
 		ByteArrayOutputStream outputBuffer = new ByteArrayOutputStream();
-		QueryPlanSnapshotCli cli = new QueryPlanSnapshotCli(new BufferedReader(new StringReader(interactiveInput)),
-				new PrintStream(outputBuffer, true, StandardCharsets.UTF_8.name()));
+		QueryPlanSnapshotCli cli = newCli(interactiveInput, outputBuffer);
 
 		QueryPlanSnapshotCliOptions options = QueryPlanSnapshotCli.parseArgs(new String[] { "--persist", "false" });
 		cli.run(options);
@@ -407,8 +404,7 @@ class QueryPlanSnapshotCliTest {
 				"")
 				+ "\n";
 		ByteArrayOutputStream outputBuffer = new ByteArrayOutputStream();
-		QueryPlanSnapshotCli cli = new QueryPlanSnapshotCli(new BufferedReader(new StringReader(interactiveInput)),
-				new PrintStream(outputBuffer, true, StandardCharsets.UTF_8.name()));
+		QueryPlanSnapshotCli cli = newCli(interactiveInput, outputBuffer);
 
 		QueryPlanSnapshotCliOptions options = QueryPlanSnapshotCli.parseArgs(new String[] { "--persist", "false" });
 		cli.run(options);
@@ -430,8 +426,7 @@ class QueryPlanSnapshotCliTest {
 				"")
 				+ "\n";
 		ByteArrayOutputStream outputBuffer = new ByteArrayOutputStream();
-		QueryPlanSnapshotCli cli = new QueryPlanSnapshotCli(new BufferedReader(new StringReader(interactiveInput)),
-				new PrintStream(outputBuffer, true, StandardCharsets.UTF_8.name()));
+		QueryPlanSnapshotCli cli = newCli(interactiveInput, outputBuffer);
 
 		QueryPlanSnapshotCliOptions options = QueryPlanSnapshotCli.parseArgs(new String[] { "--persist", "false" });
 		cli.run(options);
@@ -457,8 +452,7 @@ class QueryPlanSnapshotCliTest {
 				"0,1")
 				+ "\n";
 		ByteArrayOutputStream outputBuffer = new ByteArrayOutputStream();
-		QueryPlanSnapshotCli cli = new QueryPlanSnapshotCli(new BufferedReader(new StringReader(interactiveInput)),
-				new PrintStream(outputBuffer, true, StandardCharsets.UTF_8.name()));
+		QueryPlanSnapshotCli cli = newCli(interactiveInput, outputBuffer);
 
 		QueryPlanSnapshotCliOptions options = QueryPlanSnapshotCli.parseArgs(new String[] {});
 		cli.run(options);
@@ -485,8 +479,7 @@ class QueryPlanSnapshotCliTest {
 				"release-candidate")
 				+ "\n";
 		ByteArrayOutputStream outputBuffer = new ByteArrayOutputStream();
-		QueryPlanSnapshotCli cli = new QueryPlanSnapshotCli(new BufferedReader(new StringReader(interactiveInput)),
-				new PrintStream(outputBuffer, true, StandardCharsets.UTF_8.name()));
+		QueryPlanSnapshotCli cli = newCli(interactiveInput, outputBuffer);
 
 		QueryPlanSnapshotCliOptions options = QueryPlanSnapshotCli.parseArgs(new String[] {});
 		cli.run(options);
@@ -534,8 +527,7 @@ class QueryPlanSnapshotCliTest {
 				"0,1")
 				+ "\n";
 		ByteArrayOutputStream outputBuffer = new ByteArrayOutputStream();
-		QueryPlanSnapshotCli cli = new QueryPlanSnapshotCli(new BufferedReader(new StringReader(interactiveInput)),
-				new PrintStream(outputBuffer, true, StandardCharsets.UTF_8.name()));
+		QueryPlanSnapshotCli cli = newCli(interactiveInput, outputBuffer);
 
 		QueryPlanSnapshotCliOptions options = QueryPlanSnapshotCli.parseArgs(new String[] {});
 		cli.run(options);
@@ -564,8 +556,7 @@ class QueryPlanSnapshotCliTest {
 					"0,1")
 					+ "\n";
 			ByteArrayOutputStream outputBuffer = new ByteArrayOutputStream();
-			QueryPlanSnapshotCli cli = new QueryPlanSnapshotCli(new BufferedReader(new StringReader(interactiveInput)),
-					new PrintStream(outputBuffer, true, StandardCharsets.UTF_8.name()));
+			QueryPlanSnapshotCli cli = newCli(interactiveInput, outputBuffer);
 
 			QueryPlanSnapshotCliOptions options = QueryPlanSnapshotCli.parseArgs(new String[] {});
 			cli.run(options);
@@ -593,8 +584,7 @@ class QueryPlanSnapshotCliTest {
 				"3")
 				+ "\n";
 		ByteArrayOutputStream outputBuffer = new ByteArrayOutputStream();
-		QueryPlanSnapshotCli cli = new QueryPlanSnapshotCli(new BufferedReader(new StringReader(interactiveInput)),
-				new PrintStream(outputBuffer, true, StandardCharsets.UTF_8.name()));
+		QueryPlanSnapshotCli cli = newCli(interactiveInput, outputBuffer);
 
 		QueryPlanSnapshotCliOptions options = QueryPlanSnapshotCli.parseArgs(new String[] {
 				"--compare-existing",
@@ -620,8 +610,7 @@ class QueryPlanSnapshotCliTest {
 				Map.of("store", "memory", "runName", "candidate"));
 
 		ByteArrayOutputStream outputBuffer = new ByteArrayOutputStream();
-		QueryPlanSnapshotCli cli = new QueryPlanSnapshotCli(new BufferedReader(new StringReader("")),
-				new PrintStream(outputBuffer, true, StandardCharsets.UTF_8.name()));
+		QueryPlanSnapshotCli cli = newCli("", outputBuffer);
 		QueryPlanSnapshotCliOptions options = QueryPlanSnapshotCli.parseArgs(new String[] {
 				"--compare-existing",
 				"--no-interactive",
@@ -634,6 +623,12 @@ class QueryPlanSnapshotCliTest {
 		String printed = outputBuffer.toString(StandardCharsets.UTF_8);
 		assertTrue(printed.contains("queryId=q-beta"), printed);
 		assertFalse(printed.contains("queryId=q-alpha"), printed);
+	}
+
+	private static QueryPlanSnapshotCli newCli(String inputText, ByteArrayOutputStream outputBuffer) throws Exception {
+		return new QueryPlanSnapshotCli(new BufferedReader(new StringReader(inputText)),
+				new PrintStream(outputBuffer, true, StandardCharsets.UTF_8.name()), false,
+				TEST_EXECUTION_REPEAT_MIN_RUNS, TEST_EXECUTION_REPEAT_MAX_RUNS, TEST_EXECUTION_REPEAT_SOFT_LIMIT_NANOS);
 	}
 
 	private static int countOccurrences(String value, String token) {
