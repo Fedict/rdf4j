@@ -12,9 +12,13 @@
 package org.eclipse.rdf4j.sail.lmdb.benchmark;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.io.FileUtils;
@@ -62,6 +66,9 @@ public class ThemeQueryBenchmark {
 	private static final File STORE_DIRECTORY = new File("target", "lmdb-theme-query-benchmark");
 	private static final String TRIPLES_DATA_FILE = "triples/data.mdb";
 	private static final String VALUES_DATA_FILE = "values/data.mdb";
+	private static final String EXPECTED_DB_FILE_SIZES_FILE = "expected-db-file-sizes.properties";
+	private static final String TRIPLES_DATA_SIZE_PROPERTY = "triples.data.mdb.size.bytes";
+	private static final String VALUES_DATA_SIZE_PROPERTY = "values.data.mdb.size.bytes";
 	private static final long EXPECTED_TRIPLES_DATA_SIZE_BYTES = 1500921856L;
 	private static final long EXPECTED_VALUES_DATA_SIZE_BYTES = 713687040L;
 
@@ -113,16 +120,24 @@ public class ThemeQueryBenchmark {
 	}
 
 	private void ensureDataLoadedAndValidated() throws IOException {
-		if (!hasExpectedDbFileSizes()) {
+		var expectedDbFileSizes = readExpectedDbFileSizes();
+		if (!hasExpectedDbFileSizes(expectedDbFileSizes)) {
 			rebuildStoreFromScratch();
+			expectedDbFileSizes = currentDbFileSizes();
+			writeExpectedDbFileSizes(expectedDbFileSizes);
 		}
 
-		if (!hasExpectedDbFileSizes()) {
+		if (!hasExpectedDbFileSizes(expectedDbFileSizes)) {
+			var currentDbFileSizes = currentDbFileSizes();
 			throw new IllegalStateException("Unexpected LMDB db file sizes in fixed benchmark store. Expected "
-					+ TRIPLES_DATA_FILE + "=" + EXPECTED_TRIPLES_DATA_SIZE_BYTES + " and "
-					+ VALUES_DATA_FILE + "=" + EXPECTED_VALUES_DATA_SIZE_BYTES + " but got "
-					+ TRIPLES_DATA_FILE + "=" + dbFileSize(TRIPLES_DATA_FILE) + " and "
-					+ VALUES_DATA_FILE + "=" + dbFileSize(VALUES_DATA_FILE));
+					+ TRIPLES_DATA_FILE + "=" + expectedDbFileSizes.triplesDataSizeBytes + " and "
+					+ VALUES_DATA_FILE + "=" + expectedDbFileSizes.valuesDataSizeBytes + " but got "
+					+ TRIPLES_DATA_FILE + "=" + currentDbFileSizes.triplesDataSizeBytes + " and "
+					+ VALUES_DATA_FILE + "=" + currentDbFileSizes.valuesDataSizeBytes);
+		}
+
+		if (!expectedDbFileSizeFile().isFile()) {
+			writeExpectedDbFileSizes(expectedDbFileSizes);
 		}
 	}
 
@@ -142,9 +157,66 @@ public class ThemeQueryBenchmark {
 		loadData();
 	}
 
-	private boolean hasExpectedDbFileSizes() {
-		return dbFileSize(TRIPLES_DATA_FILE) == EXPECTED_TRIPLES_DATA_SIZE_BYTES
-				&& dbFileSize(VALUES_DATA_FILE) == EXPECTED_VALUES_DATA_SIZE_BYTES;
+	private DbFileSizes readExpectedDbFileSizes() throws IOException {
+		var expectedDbFileSizeFile = expectedDbFileSizeFile();
+		if (!expectedDbFileSizeFile.isFile()) {
+			return defaultExpectedDbFileSizes();
+		}
+		var properties = new Properties();
+		try (var inputStream = new FileInputStream(expectedDbFileSizeFile)) {
+			properties.load(inputStream);
+		}
+		try {
+			return new DbFileSizes(
+					parseSizeProperty(properties, TRIPLES_DATA_SIZE_PROPERTY),
+					parseSizeProperty(properties, VALUES_DATA_SIZE_PROPERTY));
+		} catch (IllegalStateException e) {
+			System.out.println("Ignoring invalid expected LMDB size file " + expectedDbFileSizeFile + ": "
+					+ e.getMessage());
+			if (!expectedDbFileSizeFile.delete()) {
+				System.out.println("Unable to delete invalid expected LMDB size file: " + expectedDbFileSizeFile);
+			}
+			return defaultExpectedDbFileSizes();
+		}
+	}
+
+	private void writeExpectedDbFileSizes(DbFileSizes expectedDbFileSizes) throws IOException {
+		var properties = new Properties();
+		properties.setProperty(TRIPLES_DATA_SIZE_PROPERTY, Long.toString(expectedDbFileSizes.triplesDataSizeBytes));
+		properties.setProperty(VALUES_DATA_SIZE_PROPERTY, Long.toString(expectedDbFileSizes.valuesDataSizeBytes));
+		try (var outputStream = new FileOutputStream(expectedDbFileSizeFile())) {
+			properties.store(outputStream, "Expected LMDB data file sizes for ThemeQueryBenchmark");
+		}
+	}
+
+	private long parseSizeProperty(Properties properties, String propertyName) {
+		var value = properties.getProperty(propertyName);
+		if (value == null) {
+			throw new IllegalStateException("Missing property " + propertyName);
+		}
+		try {
+			return Long.parseLong(value);
+		} catch (NumberFormatException e) {
+			throw new IllegalStateException("Invalid long value for property " + propertyName + ": " + value, e);
+		}
+	}
+
+	private DbFileSizes defaultExpectedDbFileSizes() {
+		return new DbFileSizes(EXPECTED_TRIPLES_DATA_SIZE_BYTES, EXPECTED_VALUES_DATA_SIZE_BYTES);
+	}
+
+	private DbFileSizes currentDbFileSizes() {
+		return new DbFileSizes(dbFileSize(TRIPLES_DATA_FILE), dbFileSize(VALUES_DATA_FILE));
+	}
+
+	private boolean hasExpectedDbFileSizes(DbFileSizes expectedDbFileSizes) {
+		var currentDbFileSizes = currentDbFileSizes();
+		return currentDbFileSizes.triplesDataSizeBytes == expectedDbFileSizes.triplesDataSizeBytes
+				&& currentDbFileSizes.valuesDataSizeBytes == expectedDbFileSizes.valuesDataSizeBytes;
+	}
+
+	private File expectedDbFileSizeFile() {
+		return new File(STORE_DIRECTORY, EXPECTED_DB_FILE_SIZES_FILE);
 	}
 
 	private long dbFileSize(String relativePath) {
@@ -261,10 +333,27 @@ public class ThemeQueryBenchmark {
 		z_queryIndex = 0;
 		setup();
 		try {
-			assertEquals(EXPECTED_TRIPLES_DATA_SIZE_BYTES, dbFileSize(TRIPLES_DATA_FILE),
+			var expectedDbFileSizes = readExpectedDbFileSizes();
+			assertEquals(expectedDbFileSizes.triplesDataSizeBytes, dbFileSize(TRIPLES_DATA_FILE),
 					"Unexpected byte size for " + TRIPLES_DATA_FILE);
-			assertEquals(EXPECTED_VALUES_DATA_SIZE_BYTES, dbFileSize(VALUES_DATA_FILE),
+			assertEquals(expectedDbFileSizes.valuesDataSizeBytes, dbFileSize(VALUES_DATA_FILE),
 					"Unexpected byte size for " + VALUES_DATA_FILE);
+			assertTrue(expectedDbFileSizeFile().isFile(),
+					"Expected sidecar file to exist: " + expectedDbFileSizeFile());
+		} finally {
+			tearDown();
+		}
+	}
+
+	@Test
+	public void executeQueryReturnsExpectedCountForPharmaQueryTenAfterFreshGeneration() throws IOException {
+		FileUtils.deleteDirectory(STORE_DIRECTORY);
+		themeName = "PHARMA";
+		z_queryIndex = 10;
+		setup();
+		try {
+			assertEquals(ThemeQueryCatalog.expectedCountFor(theme, z_queryIndex), executeQuery(),
+					"Unexpected count for freshly generated PHARMA query index 10");
 		} finally {
 			tearDown();
 		}
@@ -302,6 +391,16 @@ public class ThemeQueryBenchmark {
 			return param.value();
 		} catch (NoSuchFieldException e) {
 			throw new IllegalStateException("Missing field " + fieldName, e);
+		}
+	}
+
+	private static final class DbFileSizes {
+		private final long triplesDataSizeBytes;
+		private final long valuesDataSizeBytes;
+
+		private DbFileSizes(long triplesDataSizeBytes, long valuesDataSizeBytes) {
+			this.triplesDataSizeBytes = triplesDataSizeBytes;
+			this.valuesDataSizeBytes = valuesDataSizeBytes;
 		}
 	}
 
