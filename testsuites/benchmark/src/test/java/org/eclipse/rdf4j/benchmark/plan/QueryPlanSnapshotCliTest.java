@@ -21,10 +21,14 @@ import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.io.StringReader;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
@@ -111,13 +115,21 @@ class QueryPlanSnapshotCliTest {
 		assertThrows(IllegalArgumentException.class, () -> QueryPlanSnapshotCli.parseArgs(new String[] {
 				"--store", "memory",
 				"--all-theme-queries",
-				"--theme", "MEDICAL_RECORDS"
-		}));
-		assertThrows(IllegalArgumentException.class, () -> QueryPlanSnapshotCli.parseArgs(new String[] {
-				"--store", "memory",
-				"--all-theme-queries",
 				"--query-id", "custom"
 		}));
+	}
+
+	@Test
+	void allowsRunAllThemeQueriesScopedToSpecificTheme() {
+		QueryPlanSnapshotCliOptions options = QueryPlanSnapshotCli.parseArgs(new String[] {
+				"--store", "memory",
+				"--all-theme-queries",
+				"--theme", "MEDICAL_RECORDS"
+		});
+
+		assertTrue(options.runAllThemeQueries);
+		assertEquals(Theme.MEDICAL_RECORDS, options.theme);
+		assertEquals(QueryPlanSnapshotCliOptions.StoreType.MEMORY, options.store);
 	}
 
 	@Test
@@ -139,6 +151,16 @@ class QueryPlanSnapshotCliTest {
 				"--compare-existing",
 				"--no-interactive",
 				"--run-name", "candidate"
+		}));
+	}
+
+	@Test
+	void compareExistingNoInteractiveAcceptsRunNamePairBatchMode() {
+		assertDoesNotThrow(() -> QueryPlanSnapshotCli.parseArgs(new String[] {
+				"--compare-existing",
+				"--no-interactive",
+				"--compare-run-names", "baseline,candidate",
+				"--emit-csv", "/tmp/plan-diff.csv"
 		}));
 	}
 
@@ -180,6 +202,33 @@ class QueryPlanSnapshotCliTest {
 				"--theme", "MEDICAL_RECORDS",
 				"--query-index", "0",
 				"--query-timeout-seconds", "-1"
+		}));
+	}
+
+	@Test
+	void parsesExecutionRepeatOverrides() {
+		QueryPlanSnapshotCliOptions options = assertDoesNotThrow(() -> QueryPlanSnapshotCli.parseArgs(new String[] {
+				"--store", "memory",
+				"--theme", "MEDICAL_RECORDS",
+				"--query-index", "0",
+				"--execution-repeat-min-runs", "2",
+				"--execution-repeat-max-runs", "5",
+				"--execution-repeat-soft-limit-millis", "240000"
+		}));
+
+		assertEquals(2, options.executionRepeatMinRuns);
+		assertEquals(5, options.executionRepeatMaxRuns);
+		assertEquals(240000L, options.executionRepeatSoftLimitMillis);
+	}
+
+	@Test
+	void rejectsExecutionRepeatMinRunsGreaterThanMaxRuns() {
+		assertThrows(IllegalArgumentException.class, () -> QueryPlanSnapshotCli.parseArgs(new String[] {
+				"--store", "memory",
+				"--theme", "MEDICAL_RECORDS",
+				"--query-index", "0",
+				"--execution-repeat-min-runs", "3",
+				"--execution-repeat-max-runs", "2"
 		}));
 	}
 
@@ -237,7 +286,7 @@ class QueryPlanSnapshotCliTest {
 		String printed = outputBuffer.toString(StandardCharsets.UTF_8);
 		int unoptimizedIndex = printed.indexOf("=== Unoptimized Explanation ===");
 		int optimizedIndex = printed.indexOf("=== Optimized Explanation ===");
-		int executedIndex = printed.indexOf("=== Executed Explanation ===");
+		int executedIndex = printed.indexOf("=== Telemetry Explanation ===");
 		assertTrue(unoptimizedIndex >= 0);
 		assertTrue(optimizedIndex > unoptimizedIndex);
 		assertTrue(executedIndex > optimizedIndex);
@@ -264,6 +313,74 @@ class QueryPlanSnapshotCliTest {
 	}
 
 	@Test
+	void runAllThemeQueriesForSingleThemePrintsBatchEtaStartAndSummary() throws Exception {
+		ByteArrayOutputStream outputBuffer = new ByteArrayOutputStream();
+		QueryPlanSnapshotCli cli = newCli("", outputBuffer);
+
+		QueryPlanSnapshotCliOptions options = QueryPlanSnapshotCli.parseArgs(new String[] {
+				"--no-interactive",
+				"--store", "memory",
+				"--all-theme-queries",
+				"--theme", "MEDICAL_RECORDS",
+				"--persist", "false"
+		});
+
+		cli.run(options);
+
+		String printed = outputBuffer.toString(StandardCharsets.UTF_8);
+		assertTrue(printed.contains("ETA start:"), printed);
+		assertTrue(printed.contains("Completed run-all mode: 11 queries across 1 theme."), printed);
+		assertFalse(printed.contains("Theme=SOCIAL_MEDIA"), printed);
+	}
+
+	@Test
+	void runAllThemeQueriesPrintsPeriodicEtaUpdates() throws Exception {
+		ByteArrayOutputStream outputBuffer = new ByteArrayOutputStream();
+		QueryPlanSnapshotCli cli = new QueryPlanSnapshotCli(
+				new BufferedReader(new StringReader("")),
+				new PrintStream(outputBuffer, true, StandardCharsets.UTF_8.name()),
+				false,
+				TEST_EXECUTION_REPEAT_MIN_RUNS,
+				TEST_EXECUTION_REPEAT_MAX_RUNS,
+				TEST_EXECUTION_REPEAT_SOFT_LIMIT_NANOS,
+				TimeUnit.MILLISECONDS.toNanos(1));
+
+		QueryPlanSnapshotCliOptions options = QueryPlanSnapshotCli.parseArgs(new String[] {
+				"--no-interactive",
+				"--store", "memory",
+				"--all-theme-queries",
+				"--theme", "MEDICAL_RECORDS",
+				"--persist", "false"
+		});
+
+		cli.run(options);
+
+		String printed = outputBuffer.toString(StandardCharsets.UTF_8);
+		assertTrue(printed.contains("ETA start:"), printed);
+		assertTrue(printed.contains("ETA update:"), printed);
+	}
+
+	@Test
+	void batchEtaRemainingEstimateUsesRemainingQueryHistoryForUnknownQueries() throws Exception {
+		Object reporter = newBatchRunEtaReporter(List.of("q1", "q2", "q3"), Map.of("q1", 900L, "q2", 100L), 10000L);
+		invokeReporterMethod(reporter, "markCompleted", new Class<?>[] { String.class, long.class }, "q1", 900L);
+
+		Object remainingEstimate = invokeReporterMethod(reporter, "estimateRemainingLocked", new Class<?>[0]);
+		assertEquals(200L, readLongField(remainingEstimate, "millis"));
+		assertFalse(readBooleanField(remainingEstimate, "unknown"));
+	}
+
+	@Test
+	void batchEtaRemainingEstimateUsesObservedRuntimeWhenHistoryIsMissing() throws Exception {
+		Object reporter = newBatchRunEtaReporter(List.of("q1", "q2"), Map.of(), 0L);
+		invokeReporterMethod(reporter, "markCompleted", new Class<?>[] { String.class, long.class }, "q1", 750L);
+
+		Object remainingEstimate = invokeReporterMethod(reporter, "estimateRemainingLocked", new Class<?>[0]);
+		assertEquals(750L, readLongField(remainingEstimate, "millis"));
+		assertFalse(readBooleanField(remainingEstimate, "unknown"));
+	}
+
+	@Test
 	void lmdbRunRecordsLoadedSizeAndSkipsReloadWhenSizeMatches() throws Exception {
 		Path lmdbDataDirectory = Files.createTempDirectory("rdf4j-cli-lmdb-reuse-");
 		QueryPlanSnapshotCliOptions options = QueryPlanSnapshotCli.parseArgs(new String[] {
@@ -286,6 +403,34 @@ class QueryPlanSnapshotCliTest {
 		String secondRunPrinted = secondRunOutput.toString(StandardCharsets.UTF_8);
 		assertTrue(secondRunPrinted.contains("LMDB data already fully loaded"),
 				"Expected second run to skip reloading LMDB data when byte size matches: " + secondRunPrinted);
+	}
+
+	@Test
+	void lmdbRunPersistsPageCardinalityEstimatorFeatureFlag() throws Exception {
+		Path lmdbDataDirectory = Files.createTempDirectory("rdf4j-cli-lmdb-flags-");
+		Path outputDirectory = Files.createTempDirectory("rdf4j-cli-lmdb-flags-output-");
+		QueryPlanSnapshotCliOptions options = QueryPlanSnapshotCli.parseArgs(new String[] {
+				"--no-interactive",
+				"--store", "lmdb",
+				"--lmdb-data-dir", lmdbDataDirectory.toString(),
+				"--theme", "MEDICAL_RECORDS",
+				"--query-index", "0",
+				"--output-dir", outputDirectory.toString()
+		});
+
+		QueryPlanSnapshotCli cli = newCli("", new ByteArrayOutputStream());
+		cli.run(options);
+
+		Path snapshotPath;
+		try (java.util.stream.Stream<Path> snapshots = Files.list(outputDirectory)) {
+			snapshotPath = snapshots
+					.filter(path -> path.getFileName().toString().endsWith(".json"))
+					.findFirst()
+					.orElseThrow();
+		}
+
+		QueryPlanSnapshot snapshot = new QueryPlanCapture().readSnapshot(snapshotPath);
+		assertEquals("true", snapshot.getFeatureFlags().get("lmdbConfig.pageCardinalityEstimator"));
 	}
 
 	@Test
@@ -336,6 +481,45 @@ class QueryPlanSnapshotCliTest {
 		QueryPlanSnapshot snapshot = new QueryPlanCapture().readSnapshot(snapshotPath);
 		assertEquals("baseline-01", snapshot.getMetadata().get("runName"));
 		assertTrue(outputBuffer.toString(StandardCharsets.UTF_8).contains("RunName=baseline-01"));
+	}
+
+	@Test
+	void runModePersistsExecutionVerificationMetricsAsSnapshotMetadata() throws Exception {
+		Path outputDirectory = Files.createTempDirectory("rdf4j-cli-execution-metadata-");
+		ByteArrayOutputStream outputBuffer = new ByteArrayOutputStream();
+		QueryPlanSnapshotCli cli = newCli("", outputBuffer);
+
+		QueryPlanSnapshotCliOptions options = QueryPlanSnapshotCli.parseArgs(new String[] {
+				"--no-interactive",
+				"--store", "memory",
+				"--theme", "MEDICAL_RECORDS",
+				"--query-index", "0",
+				"--output-dir", outputDirectory.toString()
+		});
+
+		cli.run(options);
+
+		Path snapshotPath;
+		try (java.util.stream.Stream<Path> snapshots = Files.list(outputDirectory)) {
+			snapshotPath = snapshots
+					.filter(path -> path.getFileName().toString().endsWith(".json"))
+					.findFirst()
+					.orElseThrow();
+		}
+
+		QueryPlanSnapshot snapshot = new QueryPlanCapture().readSnapshot(snapshotPath);
+		assertTrue(snapshot.getMetadata().containsKey("execution.runs"));
+		assertTrue(snapshot.getMetadata().containsKey("execution.totalMillis"));
+		assertTrue(snapshot.getMetadata().containsKey("execution.averageMillis"));
+		assertTrue(snapshot.getMetadata().containsKey("execution.resultCount"));
+		assertTrue(snapshot.getMetadata().containsKey("execution.verificationStatus"));
+		assertTrue(snapshot.getMetadata().containsKey("execution.stdDevMillis"));
+		assertTrue(snapshot.getMetadata().containsKey("execution.coefficientOfVariationPct"));
+		assertTrue(snapshot.getMetadata().containsKey("execution.sampleMillis"));
+		assertTrue(snapshot.getMetadata().containsKey("execution.optimizedPlanHashCount"));
+		assertTrue(snapshot.getMetadata().containsKey("execution.optimizedPlanHashStable"));
+		assertTrue(snapshot.getMetadata().containsKey("execution.optimizedPlanHashTransitionCount"));
+		assertTrue(snapshot.getMetadata().containsKey("execution.optimizedPlanHashSequence"));
 	}
 
 	@Test
@@ -625,10 +809,308 @@ class QueryPlanSnapshotCliTest {
 		assertFalse(printed.contains("queryId=q-alpha"), printed);
 	}
 
+	@Test
+	void compareExistingCanBatchCompareRunNamePairAndWriteCsv() throws Exception {
+		Path outputDir = Files.createTempDirectory("rdf4j-cli-run-name-pair-");
+		Path csvOutput = outputDir.resolve("run-name-pair.csv");
+		writeSnapshot(outputDir, "q-alpha", "fingerprint-a", "2026-02-17T10:00:00Z",
+				Map.of("store", "memory", "runName", "baseline"));
+		writeSnapshot(outputDir, "q-alpha", "fingerprint-a", "2026-02-17T10:05:00Z",
+				Map.of("store", "memory", "runName", "candidate"));
+		writeSnapshot(outputDir, "q-beta", "fingerprint-b", "2026-02-17T10:10:00Z",
+				Map.of("store", "memory", "runName", "baseline"));
+
+		ByteArrayOutputStream outputBuffer = new ByteArrayOutputStream();
+		QueryPlanSnapshotCli cli = newCli("", outputBuffer);
+		QueryPlanSnapshotCliOptions options = QueryPlanSnapshotCli.parseArgs(new String[] {
+				"--compare-existing",
+				"--no-interactive",
+				"--output-dir", outputDir.toString(),
+				"--compare-run-names", "baseline,candidate",
+				"--emit-csv", csvOutput.toString()
+		});
+
+		cli.run(options);
+
+		assertTrue(Files.exists(csvOutput));
+		String csv = Files.readString(csvOutput, StandardCharsets.UTF_8);
+		assertTrue(csv.contains("queryId,leftRunName,rightRunName"), csv);
+		assertTrue(csv.contains("executionVerificationStatusLeft,executionVerificationStatusRight"), csv);
+		assertTrue(
+				csv.contains(
+						"executionOptimizedPlanHashTransitionCountLeft,executionOptimizedPlanHashTransitionCountRight"),
+				csv);
+		assertTrue(
+				csv.contains("executedModeledWorkUnitsLeft,executedModeledWorkUnitsRight,executedModeledWorkDeltaPct"),
+				csv);
+		assertTrue(
+				csv.contains(
+						"executedModeledBarrierCountLeft,executedModeledBarrierCountRight,executedModeledJoinInputRowsSumLeft,executedModeledJoinInputRowsSumRight"),
+				csv);
+		assertTrue(
+				csv.contains(
+						"executedJoinRightBindingsPerLeftRatioLeft,executedJoinRightBindingsPerLeftRatioRight,executedJoinTelemetryNodeCountLeft,executedJoinTelemetryNodeCountRight"),
+				csv);
+		assertTrue(
+				csv.contains("executedModeledWorkVectorSignatureLeft,executedModeledWorkVectorSignatureRight"), csv);
+		assertTrue(
+				csv.contains(
+						"executedOperatorWorkBreakdownSignatureLeft,executedOperatorWorkBreakdownSignatureRight"),
+				csv);
+		assertTrue(csv.contains("planDeterminismInputFingerprintSha256Left,planDeterminismInputFingerprintSha256Right"),
+				csv);
+		assertTrue(csv.contains("planDeterminismInputFingerprintMatches,planDeterminismEnvironmentFingerprintMatches"),
+				csv);
+		assertTrue(csv.contains("q-alpha,baseline,candidate"), csv);
+		assertFalse(csv.contains("q-beta"), csv);
+	}
+
+	@Test
+	void compareExistingBatchCsvIncludesExecutedModeledWorkValues() throws Exception {
+		Path outputDir = Files.createTempDirectory("rdf4j-cli-run-name-pair-modeled-work-");
+		Path csvOutput = outputDir.resolve("run-name-pair-modeled-work.csv");
+
+		Map<String, String> baselineExecutedMetrics = new LinkedHashMap<>();
+		baselineExecutedMetrics.put("modeledWorkUnits", "100");
+		baselineExecutedMetrics.put("modeledSelfTimeActualSum", "40");
+		baselineExecutedMetrics.put("modeledInputRowsSum", "500");
+		baselineExecutedMetrics.put("modeledOutputRowsSum", "140");
+		baselineExecutedMetrics.put("modeledBarrierCount", "3");
+		baselineExecutedMetrics.put("modeledJoinInputRowsSum", "200");
+		baselineExecutedMetrics.put("modeledJoinOutputRowsSum", "80");
+		baselineExecutedMetrics.put("modeledJoinTelemetryNodeCount", "2");
+		baselineExecutedMetrics.put("modeledJoinRightBindingSetConsumedPerRightIteratorAverage", "4.5");
+		baselineExecutedMetrics.put("modeledJoinRightIteratorCreatePerJoinNodeAverage", "2.0");
+		baselineExecutedMetrics.put("modeledJoinLeftBindingSetConsumedPerJoinNodeAverage", "20.0");
+		baselineExecutedMetrics.put("modeledJoinRightBindingSetConsumedPerJoinNodeAverage", "9.0");
+		baselineExecutedMetrics.put("modeledWorkByCategory", "join=100;scan=25");
+		baselineExecutedMetrics.put("modeledOperatorCountByCategory", "join=1;scan=2");
+		baselineExecutedMetrics.put("modeledJoinWorkByAlgorithm", "JoinIterator=100");
+		baselineExecutedMetrics.put("estimateActualQErrorP95", "2.5");
+		baselineExecutedMetrics.put("estimateActualQErrorMax", "4.0");
+		baselineExecutedMetrics.put("joinEstimateActualQErrorP95", "3.0");
+		baselineExecutedMetrics.put("modeledWorkVectorSignatureSha256", "vector-baseline");
+		baselineExecutedMetrics.put("operatorWorkBreakdownSignatureSha256", "sig-baseline");
+		baselineExecutedMetrics.put("operatorWorkTopContributors", "Join[JoinIterator]=100");
+
+		Map<String, String> candidateExecutedMetrics = new LinkedHashMap<>();
+		candidateExecutedMetrics.put("modeledWorkUnits", "125");
+		candidateExecutedMetrics.put("modeledSelfTimeActualSum", "65");
+		candidateExecutedMetrics.put("modeledInputRowsSum", "820");
+		candidateExecutedMetrics.put("modeledOutputRowsSum", "230");
+		candidateExecutedMetrics.put("modeledBarrierCount", "5");
+		candidateExecutedMetrics.put("modeledJoinInputRowsSum", "260");
+		candidateExecutedMetrics.put("modeledJoinOutputRowsSum", "95");
+		candidateExecutedMetrics.put("modeledJoinTelemetryNodeCount", "2");
+		candidateExecutedMetrics.put("modeledJoinRightBindingSetConsumedPerRightIteratorAverage", "7.0");
+		candidateExecutedMetrics.put("modeledJoinRightIteratorCreatePerJoinNodeAverage", "3.5");
+		candidateExecutedMetrics.put("modeledJoinLeftBindingSetConsumedPerJoinNodeAverage", "29.0");
+		candidateExecutedMetrics.put("modeledJoinRightBindingSetConsumedPerJoinNodeAverage", "14.0");
+		candidateExecutedMetrics.put("modeledWorkByCategory", "join=125;scan=30");
+		candidateExecutedMetrics.put("modeledOperatorCountByCategory", "join=1;scan=2");
+		candidateExecutedMetrics.put("modeledJoinWorkByAlgorithm", "JoinIterator=125");
+		candidateExecutedMetrics.put("estimateActualQErrorP95", "4.0");
+		candidateExecutedMetrics.put("estimateActualQErrorMax", "8.0");
+		candidateExecutedMetrics.put("joinEstimateActualQErrorP95", "5.5");
+		candidateExecutedMetrics.put("modeledWorkVectorSignatureSha256", "vector-candidate");
+		candidateExecutedMetrics.put("operatorWorkBreakdownSignatureSha256", "sig-candidate");
+		candidateExecutedMetrics.put("operatorWorkTopContributors", "Join[JoinIterator]=125");
+
+		Map<String, String> baselineMetadata = new LinkedHashMap<>();
+		baselineMetadata.put("store", "memory");
+		baselineMetadata.put("runName", "baseline");
+		baselineMetadata.put("planDeterminism.inputFingerprintSha256", "input-same");
+		baselineMetadata.put("planDeterminism.environmentFingerprintSha256", "env-same");
+		baselineMetadata.put("featureFlags.sha256", "flags-baseline");
+		baselineMetadata.put("optimizerInput.unoptimizedStructureNormalizedSha256", "shape-same");
+
+		Map<String, String> candidateMetadata = new LinkedHashMap<>();
+		candidateMetadata.put("store", "memory");
+		candidateMetadata.put("runName", "candidate");
+		candidateMetadata.put("planDeterminism.inputFingerprintSha256", "input-same");
+		candidateMetadata.put("planDeterminism.environmentFingerprintSha256", "env-same");
+		candidateMetadata.put("featureFlags.sha256", "flags-candidate");
+		candidateMetadata.put("optimizerInput.unoptimizedStructureNormalizedSha256", "shape-same");
+
+		writeSnapshotWithDebugMetrics(outputDir, "q-alpha", "fingerprint-a", "2026-02-17T10:00:00Z",
+				baselineMetadata, Map.of(), baselineExecutedMetrics);
+		writeSnapshotWithDebugMetrics(outputDir, "q-alpha", "fingerprint-a", "2026-02-17T10:05:00Z",
+				candidateMetadata, Map.of(), candidateExecutedMetrics);
+
+		ByteArrayOutputStream outputBuffer = new ByteArrayOutputStream();
+		QueryPlanSnapshotCli cli = newCli("", outputBuffer);
+		QueryPlanSnapshotCliOptions options = QueryPlanSnapshotCli.parseArgs(new String[] {
+				"--compare-existing",
+				"--no-interactive",
+				"--output-dir", outputDir.toString(),
+				"--compare-run-names", "baseline,candidate",
+				"--emit-csv", csvOutput.toString()
+		});
+
+		cli.run(options);
+
+		String csv = Files.readString(csvOutput, StandardCharsets.UTF_8);
+		assertTrue(csv.contains(
+				"executedModeledWorkUnitsLeft,executedModeledWorkUnitsRight,executedModeledWorkDeltaPct"), csv);
+		assertTrue(csv.contains(
+				"executedModeledScoreLeft,executedModeledScoreRight,executedModeledScoreDeltaPct,executedModeledWinner,executedModeledDecisionBasis"),
+				csv);
+		assertTrue(csv.contains("planDifferenceLikelyCause,planDifferenceEvidence"), csv);
+		assertTrue(csv.contains(
+				"executedModeledBarrierCountLeft,executedModeledBarrierCountRight,executedModeledJoinInputRowsSumLeft,executedModeledJoinInputRowsSumRight"),
+				csv);
+		assertTrue(csv.contains(
+				"executedJoinTelemetryNodeCountLeft,executedJoinTelemetryNodeCountRight,executedJoinRightBindingSetConsumedPerRightIteratorAverageLeft,executedJoinRightBindingSetConsumedPerRightIteratorAverageRight"),
+				csv);
+		assertTrue(csv.contains("executedModeledTopCategoryDeltas,executedModeledTopOperatorDeltas"), csv);
+		assertTrue(csv.contains(
+				"executedEstimateActualQErrorP95Left,executedEstimateActualQErrorP95Right,executedEstimateActualQErrorMaxLeft,executedEstimateActualQErrorMaxRight,executedJoinEstimateActualQErrorP95Left,executedJoinEstimateActualQErrorP95Right"),
+				csv);
+		assertTrue(csv.contains(
+				"executedModeledOperatorCountByCategoryLeft,executedModeledOperatorCountByCategoryRight,executedModeledJoinWorkByAlgorithmLeft,executedModeledJoinWorkByAlgorithmRight"),
+				csv);
+		assertTrue(csv.contains("executedModeledTopVectorDeltas"), csv);
+		assertTrue(csv.contains(
+				"executedModeledDominantResourceLeft,executedModeledDominantResourceRight,executedModeledTopResourceDeltas"),
+				csv);
+		assertTrue(csv.contains("sig-baseline,sig-candidate"), csv);
+		assertTrue(csv.contains(",100,125,25.0,"), csv);
+		assertTrue(csv.contains(",left,score,"), csv);
+		assertTrue(csv.contains(",3,5,200,260,80,95,"), csv);
+		assertTrue(csv.contains("join:+25"), csv);
+		assertTrue(csv.contains("Join[JoinIterator]:+25"), csv);
+		assertTrue(csv.contains("modeledInputRowsSum:+320"), csv);
+		assertTrue(csv.contains("barrierPenalty:+30"), csv);
+		assertTrue(csv.contains("different-feature-flags"), csv);
+		assertTrue(csv.contains(",2.5,4.0,4.0,8.0,3.0,5.5,"), csv);
+		assertTrue(csv.contains("vector-baseline,vector-candidate"), csv);
+	}
+
+	@Test
+	void compareExistingBatchCsvFallsBackToLegacyExecutedExplanationMetrics() throws Exception {
+		Path outputDir = Files.createTempDirectory("rdf4j-cli-run-name-pair-legacy-executed-");
+		Path csvOutput = outputDir.resolve("run-name-pair-legacy-executed.csv");
+
+		Map<String, String> baselineMetadata = new LinkedHashMap<>();
+		baselineMetadata.put("store", "memory");
+		baselineMetadata.put("runName", "baseline");
+
+		Map<String, String> candidateMetadata = new LinkedHashMap<>();
+		candidateMetadata.put("store", "memory");
+		candidateMetadata.put("runName", "candidate");
+
+		Map<String, String> baselineExecutedMetrics = new LinkedHashMap<>();
+		baselineExecutedMetrics.put("modeledWorkUnits", "100");
+		Map<String, String> candidateExecutedMetrics = new LinkedHashMap<>();
+		candidateExecutedMetrics.put("modeledWorkUnits", "125");
+
+		writeLegacyExecutedSnapshotWithDebugMetrics(outputDir, "q-alpha", "fingerprint-a", "2026-02-17T10:00:00Z",
+				baselineMetadata, Map.of(), baselineExecutedMetrics);
+		writeLegacyExecutedSnapshotWithDebugMetrics(outputDir, "q-alpha", "fingerprint-a", "2026-02-17T10:05:00Z",
+				candidateMetadata, Map.of(), candidateExecutedMetrics);
+
+		ByteArrayOutputStream outputBuffer = new ByteArrayOutputStream();
+		QueryPlanSnapshotCli cli = newCli("", outputBuffer);
+		QueryPlanSnapshotCliOptions options = QueryPlanSnapshotCli.parseArgs(new String[] {
+				"--compare-existing",
+				"--no-interactive",
+				"--output-dir", outputDir.toString(),
+				"--compare-run-names", "baseline,candidate",
+				"--emit-csv", csvOutput.toString()
+		});
+
+		cli.run(options);
+
+		String csv = Files.readString(csvOutput, StandardCharsets.UTF_8);
+		assertTrue(csv.contains(
+				"executedModeledWorkUnitsLeft,executedModeledWorkUnitsRight,executedModeledWorkDeltaPct"), csv);
+		assertEquals("100", firstCsvRowColumnValue(csv, "executedModeledWorkUnitsLeft"), csv);
+		assertEquals("125", firstCsvRowColumnValue(csv, "executedModeledWorkUnitsRight"), csv);
+		assertEquals("25.0", firstCsvRowColumnValue(csv, "executedModeledWorkDeltaPct"), csv);
+	}
+
+	@Test
+	void compareExistingRunNamePairPrefersLatestSuccessfulExecutionPerQuery() throws Exception {
+		Path outputDir = Files.createTempDirectory("rdf4j-cli-run-name-pair-ranking-");
+		Path csvOutput = outputDir.resolve("run-name-pair-ranking.csv");
+
+		Map<String, String> baselineSuccessful = new LinkedHashMap<>();
+		baselineSuccessful.put("store", "memory");
+		baselineSuccessful.put("runName", "baseline");
+		baselineSuccessful.put("execution.averageMillis", "111");
+		baselineSuccessful.put("execution.runs", "3");
+		baselineSuccessful.put("execution.verificationStatus", "max-runs-reached");
+
+		Map<String, String> baselineLatestFailure = new LinkedHashMap<>();
+		baselineLatestFailure.put("store", "memory");
+		baselineLatestFailure.put("runName", "baseline");
+		baselineLatestFailure.put("execution.averageMillis", "0");
+		baselineLatestFailure.put("execution.runs", "0");
+		baselineLatestFailure.put("execution.verificationStatus", "evaluation-error");
+		baselineLatestFailure.put("execution.failureClass", "QueryEvaluationException");
+
+		Map<String, String> candidateSuccessful = new LinkedHashMap<>();
+		candidateSuccessful.put("store", "memory");
+		candidateSuccessful.put("runName", "candidate");
+		candidateSuccessful.put("execution.averageMillis", "120");
+		candidateSuccessful.put("execution.runs", "3");
+		candidateSuccessful.put("execution.verificationStatus", "max-runs-reached");
+
+		writeSnapshot(outputDir, "q-alpha", "fingerprint-a", "2026-02-17T10:00:00Z", baselineSuccessful);
+		writeSnapshot(outputDir, "q-alpha", "fingerprint-a", "2026-02-17T10:10:00Z", baselineLatestFailure);
+		writeSnapshot(outputDir, "q-alpha", "fingerprint-a", "2026-02-17T10:20:00Z", candidateSuccessful);
+
+		ByteArrayOutputStream outputBuffer = new ByteArrayOutputStream();
+		QueryPlanSnapshotCli cli = newCli("", outputBuffer);
+		QueryPlanSnapshotCliOptions options = QueryPlanSnapshotCli.parseArgs(new String[] {
+				"--compare-existing",
+				"--no-interactive",
+				"--output-dir", outputDir.toString(),
+				"--compare-run-names", "baseline,candidate",
+				"--emit-csv", csvOutput.toString()
+		});
+
+		cli.run(options);
+
+		String csv = Files.readString(csvOutput, StandardCharsets.UTF_8);
+		assertTrue(csv.contains("q-alpha,baseline,candidate,2026-02-17T10:00:00Z,2026-02-17T10:20:00Z,111,120"),
+				csv);
+		assertFalse(csv.contains("q-alpha,baseline,candidate,2026-02-17T10:10:00Z"), csv);
+	}
+
 	private static QueryPlanSnapshotCli newCli(String inputText, ByteArrayOutputStream outputBuffer) throws Exception {
 		return new QueryPlanSnapshotCli(new BufferedReader(new StringReader(inputText)),
 				new PrintStream(outputBuffer, true, StandardCharsets.UTF_8.name()), false,
 				TEST_EXECUTION_REPEAT_MIN_RUNS, TEST_EXECUTION_REPEAT_MAX_RUNS, TEST_EXECUTION_REPEAT_SOFT_LIMIT_NANOS);
+	}
+
+	private static Object newBatchRunEtaReporter(List<String> queryIds, Map<String, Long> historicalByQueryId,
+			long fallbackEstimateMillis) throws Exception {
+		Class<?> reporterClass = Class.forName(QueryPlanSnapshotCli.class.getName() + "$BatchRunEtaReporter");
+		Constructor<?> constructor = reporterClass.getDeclaredConstructor(PrintStream.class, List.class, Map.class,
+				long.class, long.class);
+		constructor.setAccessible(true);
+		return constructor.newInstance(new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8),
+				queryIds, historicalByQueryId, fallbackEstimateMillis, TimeUnit.MINUTES.toNanos(1));
+	}
+
+	private static Object invokeReporterMethod(Object reporter, String methodName, Class<?>[] parameterTypes,
+			Object... args) throws Exception {
+		Method method = reporter.getClass().getDeclaredMethod(methodName, parameterTypes);
+		method.setAccessible(true);
+		return method.invoke(reporter, args);
+	}
+
+	private static long readLongField(Object value, String fieldName) throws Exception {
+		Field field = value.getClass().getDeclaredField(fieldName);
+		field.setAccessible(true);
+		return field.getLong(value);
+	}
+
+	private static boolean readBooleanField(Object value, String fieldName) throws Exception {
+		Field field = value.getClass().getDeclaredField(fieldName);
+		field.setAccessible(true);
+		return field.getBoolean(value);
 	}
 
 	private static int countOccurrences(String value, String token) {
@@ -644,6 +1126,43 @@ class QueryPlanSnapshotCliTest {
 		}
 	}
 
+	private static String firstCsvRowColumnValue(String csv, String columnName) {
+		String[] lines = csv.split("\\R", -1);
+		assertTrue(lines.length >= 2, csv);
+		List<String> header = parseCsvLine(lines[0]);
+		List<String> row = parseCsvLine(lines[1]);
+		int columnIndex = header.indexOf(columnName);
+		assertTrue(columnIndex >= 0, csv);
+		assertTrue(columnIndex < row.size(), csv);
+		return row.get(columnIndex);
+	}
+
+	private static List<String> parseCsvLine(String line) {
+		List<String> values = new java.util.ArrayList<>();
+		StringBuilder current = new StringBuilder();
+		boolean inQuotes = false;
+		for (int i = 0; i < line.length(); i++) {
+			char ch = line.charAt(i);
+			if (ch == '"') {
+				if (inQuotes && i + 1 < line.length() && line.charAt(i + 1) == '"') {
+					current.append('"');
+					i++;
+				} else {
+					inQuotes = !inQuotes;
+				}
+				continue;
+			}
+			if (ch == ',' && !inQuotes) {
+				values.add(current.toString());
+				current.setLength(0);
+				continue;
+			}
+			current.append(ch);
+		}
+		values.add(current.toString());
+		return values;
+	}
+
 	private static void writeSnapshot(Path outputDir, String queryId, String fingerprint, String capturedAt)
 			throws Exception {
 		writeSnapshot(outputDir, queryId, fingerprint, capturedAt, Map.of("store", "memory"));
@@ -651,6 +1170,12 @@ class QueryPlanSnapshotCliTest {
 
 	private static void writeSnapshot(Path outputDir, String queryId, String fingerprint, String capturedAt,
 			Map<String, String> metadata) throws Exception {
+		writeSnapshotWithDebugMetrics(outputDir, queryId, fingerprint, capturedAt, metadata, Map.of(), Map.of());
+	}
+
+	private static void writeSnapshotWithDebugMetrics(Path outputDir, String queryId, String fingerprint,
+			String capturedAt, Map<String, String> metadata, Map<String, String> optimizedDebugMetrics,
+			Map<String, String> executedDebugMetrics) throws Exception {
 		QueryPlanCapture capture = new QueryPlanCapture();
 		QueryPlanSnapshot snapshot = new QueryPlanSnapshot();
 		snapshot.setFormatVersion("1");
@@ -663,8 +1188,49 @@ class QueryPlanSnapshotCliTest {
 		QueryPlanExplanation explanation = new QueryPlanExplanation();
 		explanation.setLevel("UNOPTIMIZED");
 		explanation.setExplanationText("Plan text");
+		QueryPlanExplanation optimizedExplanation = new QueryPlanExplanation();
+		optimizedExplanation.setLevel("OPTIMIZED");
+		optimizedExplanation.setExplanationText("Optimized plan text");
+		optimizedExplanation.setDebugMetrics(new LinkedHashMap<>(optimizedDebugMetrics));
+		QueryPlanExplanation executedExplanation = new QueryPlanExplanation();
+		executedExplanation.setLevel("TELEMETRY");
+		executedExplanation.setExplanationText("Executed plan text");
+		executedExplanation.setDebugMetrics(new LinkedHashMap<>(executedDebugMetrics));
 		LinkedHashMap<String, QueryPlanExplanation> explanations = new LinkedHashMap<>();
 		explanations.put("unoptimized", explanation);
+		explanations.put("optimized", optimizedExplanation);
+		explanations.put("telemetry", executedExplanation);
+		snapshot.setExplanations(explanations);
+		capture.writeSnapshot(outputDir.resolve(queryId + "-" + capturedAt.replace(":", "-") + ".json"), snapshot);
+	}
+
+	private static void writeLegacyExecutedSnapshotWithDebugMetrics(Path outputDir, String queryId, String fingerprint,
+			String capturedAt, Map<String, String> metadata, Map<String, String> optimizedDebugMetrics,
+			Map<String, String> executedDebugMetrics) throws Exception {
+		QueryPlanCapture capture = new QueryPlanCapture();
+		QueryPlanSnapshot snapshot = new QueryPlanSnapshot();
+		snapshot.setFormatVersion("1");
+		snapshot.setCapturedAt(capturedAt);
+		snapshot.setQueryId(queryId);
+		snapshot.setQueryString("SELECT * WHERE { ?s ?p ?o }");
+		snapshot.setUnoptimizedFingerprint(fingerprint);
+		snapshot.setMetadata(metadata);
+		snapshot.setFeatureFlags(Map.of("flagA", "true"));
+		QueryPlanExplanation explanation = new QueryPlanExplanation();
+		explanation.setLevel("UNOPTIMIZED");
+		explanation.setExplanationText("Plan text");
+		QueryPlanExplanation optimizedExplanation = new QueryPlanExplanation();
+		optimizedExplanation.setLevel("OPTIMIZED");
+		optimizedExplanation.setExplanationText("Optimized plan text");
+		optimizedExplanation.setDebugMetrics(new LinkedHashMap<>(optimizedDebugMetrics));
+		QueryPlanExplanation executedExplanation = new QueryPlanExplanation();
+		executedExplanation.setLevel("EXECUTED");
+		executedExplanation.setExplanationText("Executed plan text");
+		executedExplanation.setDebugMetrics(new LinkedHashMap<>(executedDebugMetrics));
+		LinkedHashMap<String, QueryPlanExplanation> explanations = new LinkedHashMap<>();
+		explanations.put("unoptimized", explanation);
+		explanations.put("optimized", optimizedExplanation);
+		explanations.put("executed", executedExplanation);
 		snapshot.setExplanations(explanations);
 		capture.writeSnapshot(outputDir.resolve(queryId + "-" + capturedAt.replace(":", "-") + ".json"), snapshot);
 	}
