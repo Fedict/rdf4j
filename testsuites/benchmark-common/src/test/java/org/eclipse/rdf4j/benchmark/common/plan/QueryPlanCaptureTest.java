@@ -22,6 +22,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.EnumMap;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 
 import org.eclipse.rdf4j.query.QueryLanguage;
@@ -96,15 +97,15 @@ class QueryPlanCaptureTest {
 
 		QueryPlanExplanation unoptimized = snapshot.getExplanations().get("unoptimized");
 		QueryPlanExplanation optimized = snapshot.getExplanations().get("optimized");
-		QueryPlanExplanation executed = snapshot.getExplanations().get("executed");
+		QueryPlanExplanation telemetry = snapshot.getExplanations().get("telemetry");
 		assertNotNull(unoptimized, "Expected unoptimized explanation");
 		assertNotNull(optimized, "Expected optimized explanation");
-		assertNotNull(executed, "Expected executed explanation");
+		assertNotNull(telemetry, "Expected telemetry explanation");
 		assertFalse(unoptimized.getTupleExprJson().isBlank(), "Expected tuple expression JSON payload");
 		assertTrue(optimized.getIrRenderedQuery().contains("SELECT"),
 				"Expected optimized IR-rendered SPARQL");
-		assertTrue(executed.getIrRenderedQuery().contains("SELECT"),
-				"Expected executed IR-rendered SPARQL");
+		assertTrue(telemetry.getIrRenderedQuery().contains("SELECT"),
+				"Expected telemetry IR-rendered SPARQL");
 
 		TupleExprJsonCodec codec = new TupleExprJsonCodec();
 		assertNotNull(codec.fromJson(unoptimized.getTupleExprJson()),
@@ -114,6 +115,141 @@ class QueryPlanCaptureTest {
 				snapshot.getUnoptimizedFingerprint());
 		assertTrue(byFingerprint.isPresent(), "Expected lookup by unoptimized fingerprint to find artifact");
 		assertEquals(outputFile.getFileName(), byFingerprint.get().getFileName());
+	}
+
+	@Test
+	void capturesPlanMetricsFieldsForPerformanceDebugging() throws IOException {
+		QueryPlanCapture capture = new QueryPlanCapture();
+		String query = "SELECT ?s WHERE { ?s ?p ?o . ?s ?p2 ?o2 . FILTER(?o != ?o2) }";
+		QueryPlanCaptureContext context = QueryPlanCaptureContext.builder()
+				.outputDirectory(tempDir)
+				.queryId("metrics-select")
+				.queryString(query)
+				.benchmark("QueryPlanCaptureTest")
+				.build();
+
+		Path outputFile = capture.captureAndWrite(context, () -> stubTupleQueryFor(query));
+		QueryPlanSnapshot snapshot = capture.readSnapshot(outputFile);
+		QueryPlanExplanation optimized = snapshot.getExplanations().get("optimized");
+		assertNotNull(optimized);
+		assertTrue(optimized.getDebugMetrics().containsKey("planNodeCount"));
+		assertTrue(optimized.getDebugMetrics().containsKey("maxDepth"));
+		assertTrue(optimized.getDebugMetrics().containsKey("joinAlgorithmCounts"));
+		assertTrue(optimized.getDebugMetrics().containsKey("leafNodeCount"));
+		assertTrue(optimized.getDebugMetrics().containsKey("maxBranchingFactor"));
+		assertTrue(optimized.getDebugMetrics().containsKey("estimatesMultisetSignatureSha256"));
+		assertTrue(optimized.getDebugMetrics().containsKey("statementPatternEstimatesMultisetSignatureSha256"));
+		assertTrue(optimized.getDebugMetrics().containsKey("modeledWorkUnits"));
+		assertTrue(optimized.getDebugMetrics().containsKey("modeledInputRowsSum"));
+		assertTrue(optimized.getDebugMetrics().containsKey("modeledOutputRowsSum"));
+		assertTrue(optimized.getDebugMetrics().containsKey("modeledJoinInputRowsSum"));
+		assertTrue(optimized.getDebugMetrics().containsKey("modeledJoinOutputRowsSum"));
+		assertTrue(optimized.getDebugMetrics().containsKey("modeledSelfTimeActualSum"));
+		assertTrue(optimized.getDebugMetrics().containsKey("modeledTotalTimeActualSum"));
+		assertTrue(optimized.getDebugMetrics().containsKey("modeledBarrierCount"));
+		assertTrue(optimized.getDebugMetrics().containsKey("modeledWorkByCategory"));
+		assertTrue(optimized.getDebugMetrics().containsKey("modeledWorkVectorSignatureSha256"));
+		assertTrue(optimized.getDebugMetrics().containsKey("modeledOperatorCountByCategory"));
+		assertTrue(optimized.getDebugMetrics().containsKey("modeledInputRowsByCategory"));
+		assertTrue(optimized.getDebugMetrics().containsKey("modeledOutputRowsByCategory"));
+		assertTrue(optimized.getDebugMetrics().containsKey("modeledJoinWorkByAlgorithm"));
+		assertTrue(optimized.getDebugMetrics().containsKey("modeledOperatorCountByCategorySignatureSha256"));
+		assertTrue(optimized.getDebugMetrics().containsKey("modeledJoinWorkByAlgorithmSignatureSha256"));
+		assertTrue(optimized.getDebugMetrics().containsKey("modeledHasNextCallCountSum"));
+		assertTrue(optimized.getDebugMetrics().containsKey("modeledHasNextTrueCountSum"));
+		assertTrue(optimized.getDebugMetrics().containsKey("modeledHasNextTimeNanosSum"));
+		assertTrue(optimized.getDebugMetrics().containsKey("modeledNextCallCountSum"));
+		assertTrue(optimized.getDebugMetrics().containsKey("modeledNextTimeNanosSum"));
+		assertTrue(optimized.getDebugMetrics().containsKey("modeledJoinRightIteratorCreateCountSum"));
+		assertTrue(optimized.getDebugMetrics().containsKey("modeledJoinLeftBindingSetConsumedCountSum"));
+		assertTrue(optimized.getDebugMetrics().containsKey("modeledJoinRightBindingSetConsumedCountSum"));
+		assertTrue(optimized.getDebugMetrics().containsKey("modeledJoinRightBindingsPerLeftRatio"));
+		assertTrue(optimized.getDebugMetrics().containsKey("modeledJoinTelemetryNodeCount"));
+		assertTrue(
+				optimized.getDebugMetrics().containsKey("modeledJoinRightBindingSetConsumedPerRightIteratorAverage"));
+		assertTrue(optimized.getDebugMetrics().containsKey("modeledJoinRightIteratorCreatePerJoinNodeAverage"));
+		assertTrue(optimized.getDebugMetrics().containsKey("modeledJoinLeftBindingSetConsumedPerJoinNodeAverage"));
+		assertTrue(optimized.getDebugMetrics().containsKey("modeledJoinRightBindingSetConsumedPerJoinNodeAverage"));
+		assertTrue(optimized.getDebugMetrics().containsKey("modeledSourceRowsScannedSum"));
+		assertTrue(optimized.getDebugMetrics().containsKey("modeledSourceRowsMatchedSum"));
+		assertTrue(optimized.getDebugMetrics().containsKey("modeledSourceRowsFilteredSum"));
+		assertTrue(optimized.getDebugMetrics().containsKey("modeledSourceFilterOutRatio"));
+		assertTrue(optimized.getDebugMetrics().containsKey("modeledFilterInputRowsSum"));
+		assertTrue(optimized.getDebugMetrics().containsKey("modeledFilterOutputRowsSum"));
+		assertTrue(optimized.getDebugMetrics().containsKey("modeledFilterPassRatio"));
+		assertTrue(optimized.getDebugMetrics().containsKey("modeledFilterRejectRatio"));
+		assertTrue(optimized.getDebugMetrics().containsKey("modeledHasNextTimeMillisSum"));
+		assertTrue(optimized.getDebugMetrics().containsKey("modeledNextTimeMillisSum"));
+		assertTrue(optimized.getDebugMetrics().containsKey("modeledIteratorTelemetryNodeCount"));
+		assertTrue(optimized.getDebugMetrics().containsKey("estimateActualComparableNodeCount"));
+		assertTrue(optimized.getDebugMetrics().containsKey("estimateActualAbsErrorSum"));
+		assertTrue(optimized.getDebugMetrics().containsKey("estimateActualRelativeErrorMean"));
+		assertTrue(optimized.getDebugMetrics().containsKey("estimateActualQErrorP50"));
+		assertTrue(optimized.getDebugMetrics().containsKey("estimateActualQErrorP95"));
+		assertTrue(optimized.getDebugMetrics().containsKey("estimateActualQErrorMax"));
+		assertTrue(optimized.getDebugMetrics().containsKey("joinEstimateActualComparableNodeCount"));
+		assertTrue(optimized.getDebugMetrics().containsKey("joinEstimateActualQErrorP50"));
+		assertTrue(optimized.getDebugMetrics().containsKey("joinEstimateActualQErrorP95"));
+		assertTrue(optimized.getDebugMetrics().containsKey("joinEstimateActualQErrorMax"));
+		assertTrue(optimized.getDebugMetrics().containsKey("operatorWorkByTypeAlgorithm"));
+		assertTrue(optimized.getDebugMetrics().containsKey("operatorWorkBreakdownSignatureSha256"));
+		assertTrue(optimized.getDebugMetrics().containsKey("operatorWorkTopContributors"));
+		assertTrue(snapshot.getMetadata().containsKey("queryString.sha256"));
+		assertTrue(snapshot.getMetadata().containsKey("queryString.normalizedWhitespaceSha256"));
+		assertTrue(snapshot.getMetadata().containsKey("optimizerInput.unoptimizedStructureRawSha256"));
+		assertTrue(snapshot.getMetadata().containsKey("optimizerInput.unoptimizedStructureNormalizedSha256"));
+		assertTrue(snapshot.getMetadata().containsKey("optimizerInput.unoptimizedAnonymousTypeTokenCount"));
+	}
+
+	@Test
+	void capturesTelemetryLevelIntoTelemetrySnapshotSlot() {
+		QueryPlanCapture capture = new QueryPlanCapture();
+		String query = "SELECT ?s WHERE { ?s ?p ?o }";
+		AtomicInteger telemetryExplainCalls = new AtomicInteger();
+		AtomicInteger executedExplainCalls = new AtomicInteger();
+
+		EnumMap<Explanation.Level, Explanation> explanations = new EnumMap<>(Explanation.Level.class);
+		for (Explanation.Level level : Explanation.Level.values()) {
+			TupleExpr tupleExpr = QueryParserUtil.parseQuery(QueryLanguage.SPARQL, query, null).getTupleExpr();
+			explanations.put(level, toExplanation(tupleExpr));
+		}
+
+		TupleQuery tupleQuery = (TupleQuery) Proxy.newProxyInstance(
+				QueryPlanCaptureTest.class.getClassLoader(),
+				new Class<?>[] { TupleQuery.class },
+				(proxy, method, args) -> {
+					if ("explain".equals(method.getName())) {
+						Explanation.Level level = (Explanation.Level) args[0];
+						if (level == Explanation.Level.Telemetry) {
+							telemetryExplainCalls.incrementAndGet();
+						}
+						if (level == Explanation.Level.Executed) {
+							executedExplainCalls.incrementAndGet();
+						}
+						return explanations.get(level);
+					}
+					if ("toString".equals(method.getName())) {
+						return "TelemetryAwareStubTupleQuery";
+					}
+					if (method.getReturnType().isPrimitive()) {
+						return primitiveDefault(method.getReturnType());
+					}
+					return null;
+				});
+
+		QueryPlanCaptureContext context = QueryPlanCaptureContext.builder()
+				.outputDirectory(tempDir)
+				.queryId("telemetry-level")
+				.queryString(query)
+				.benchmark("QueryPlanCaptureTest")
+				.build();
+
+		QueryPlanSnapshot snapshot = capture.capture(context, () -> tupleQuery);
+
+		assertTrue(telemetryExplainCalls.get() > 0, "Expected telemetry explanation to be captured");
+		assertEquals(0, executedExplainCalls.get(), "Executed explanation should not be captured directly");
+		assertNotNull(snapshot.getExplanations().get("telemetry"),
+				"Expected telemetry capture under telemetry snapshot key");
 	}
 
 	@Test
